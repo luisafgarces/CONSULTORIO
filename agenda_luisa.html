@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Agenda · Luisa Fernanda</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300&family=Jost:wght@300;400;500&display=swap" rel="stylesheet">
+<style>
+  :root { --rosa:#fadae1; --borde:#cd8e9d; --marron:#643000; --blanco:#fff9fa; --sombra:rgba(205,142,157,0.18); }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { background:var(--blanco); font-family:'Jost',sans-serif; color:var(--marron); min-height:100vh; }
+  header { background:var(--rosa); border-bottom:2px solid var(--borde); padding:28px 36px 22px; display:flex; align-items:center; gap:18px; }
+  header h1 { font-family:'Cormorant Garamond',serif; font-size:1.7rem; font-weight:600; }
+  header p { font-size:0.82rem; color:var(--borde); font-weight:300; letter-spacing:0.08em; text-transform:uppercase; }
+  .dot { width:42px; height:42px; background:var(--borde); border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .dot svg { width:22px; height:22px; fill:white; }
+  .tabs { display:flex; padding:0 36px; border-bottom:1.5px solid var(--borde); background:white; }
+  .tab { padding:14px 22px; font-size:0.85rem; font-weight:500; letter-spacing:0.06em; text-transform:uppercase; color:var(--borde); cursor:pointer; border-bottom:3px solid transparent; margin-bottom:-1.5px; transition:all 0.2s; background:none; border-top:none; border-left:none; border-right:none; }
+  .tab.active { color:var(--marron); border-bottom-color:var(--marron); }
+  main { padding:32px 36px; max-width:860px; }
+  .info-banner { background:var(--rosa); border:1.5px solid var(--borde); border-radius:14px; padding:16px 22px; margin-bottom:24px; font-size:0.85rem; line-height:1.6; display:flex; align-items:center; gap:12px; }
+  .info-banner span { font-size:1.3rem; }
+  .date-nav { display:flex; align-items:center; gap:14px; margin-bottom:24px; }
+  .date-nav h2 { font-family:'Cormorant Garamond',serif; font-size:1.4rem; font-weight:400; flex:1; text-align:center; text-transform:capitalize; }
+  .arrow-btn { width:36px; height:36px; border-radius:50%; border:1.5px solid var(--borde); background:white; cursor:pointer; display:flex; align-items:center; justify-content:center; color:var(--marron); font-size:1.1rem; transition:background 0.2s; }
+  .arrow-btn:hover { background:var(--rosa); }
+  .cita-card { background:white; border:1.5px solid var(--borde); border-radius:14px; padding:20px 24px; margin-bottom:14px; position:relative; overflow:hidden; transition:box-shadow 0.2s; }
+  .cita-card:hover { box-shadow:0 4px 18px var(--sombra); }
+  .cita-card::before { content:''; position:absolute; left:0; top:0; bottom:0; width:5px; background:var(--borde); border-radius:14px 0 0 14px; }
+  .cita-card .hora { font-size:0.78rem; font-weight:500; letter-spacing:0.1em; text-transform:uppercase; color:var(--borde); margin-bottom:4px; }
+  .cita-card .nombre { font-family:'Cormorant Garamond',serif; font-size:1.25rem; font-weight:600; margin-bottom:2px; }
+  .cita-card .tipo { font-size:0.82rem; color:#a0786e; margin-bottom:14px; }
+  .tag { display:inline-block; padding:3px 10px; border-radius:20px; font-size:0.72rem; font-weight:500; letter-spacing:0.05em; margin-bottom:10px; }
+  .tag.virtual { background:#e8f0fe; color:#3b5bdb; }
+  .tag.presencial { background:#e8f5e9; color:#2e7d32; }
+  .tag.admin { background:#fff3e0; color:#e65100; }
+  .wa-box { background:var(--rosa); border:1.5px solid var(--borde); border-radius:12px; padding:16px 18px 16px 18px; font-size:0.88rem; line-height:1.65; position:relative; margin-top:12px; display:none; }
+  .wa-box.show { display:block; }
+  .wa-texto { display:block; white-space:pre-line; padding-right:70px; }
+  .copy-badge { position:absolute; top:10px; right:12px; background:var(--borde); color:white; border:none; border-radius:20px; padding:4px 14px; font-size:0.75rem; cursor:pointer; font-family:'Jost',sans-serif; transition:all 0.2s; }
+  .copy-badge.copied { background:#7ab87a; }
+  .btn { background:var(--marron); color:white; border:none; border-radius:30px; padding:9px 20px; font-family:'Jost',sans-serif; font-size:0.82rem; font-weight:500; cursor:pointer; transition:opacity 0.2s; }
+  .btn:hover { opacity:0.85; }
+  .btn.secondary { background:white; color:var(--marron); border:1.5px solid var(--borde); }
+  .actions { display:flex; gap:10px; flex-wrap:wrap; }
+  .empty { text-align:center; padding:52px 20px; color:var(--borde); }
+  .empty .emoji { font-size:2.5rem; margin-bottom:12px; }
+  .empty p { font-size:0.92rem; line-height:1.7; }
+  .dia-label { font-size:0.78rem; font-weight:500; letter-spacing:0.08em; text-transform:uppercase; color:var(--borde); padding-left:6px; margin-bottom:8px; margin-top:18px; }
+  .toast { position:fixed; bottom:24px; right:24px; background:var(--marron); color:white; padding:12px 22px; border-radius:30px; font-size:0.85rem; opacity:0; transform:translateY(12px); transition:all 0.3s; pointer-events:none; z-index:999; }
+  .toast.show { opacity:1; transform:translateY(0); }
+  @media(max-width:600px){ header,main,.tabs{ padding-left:20px; padding-right:20px; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="dot">
+    <svg viewBox="0 0 24 24"><path d="M19 4h-1V2h-2v2H8V2H6v2H5C3.9 4 3 4.9 3 6v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 16H5V10h14v10zm0-12H5V6h14v2zM9 14H7v-2h2v2zm4 0h-2v-2h2v2zm4 0h-2v-2h2v2zm-8 4H7v-2h2v2zm4 0h-2v-2h2v2z"/></svg>
+  </div>
+  <div>
+    <h1>Mi Agenda</h1>
+    <p>Luisa Fernanda Garc&#233;s &middot; Psic&#243;loga</p>
+  </div>
+</header>
+
+<div class="tabs">
+  <button class="tab active" onclick="switchTab('hoy',this)">Hoy</button>
+  <button class="tab" onclick="switchTab('manana',this)">Ma&#241;ana</button>
+  <button class="tab" onclick="switchTab('semana',this)">Esta semana</button>
+</div>
+
+<main>
+  <div class="info-banner">
+    <span>&#128197;</span>
+    <div>Citas de tu calendario <strong>CONSULTORIO</strong>. Actualizado hoy martes 24 de febrero de 2026.</div>
+  </div>
+
+  <div class="date-nav" id="date-nav">
+    <button class="arrow-btn" onclick="cambiarDia(-1)">&#8249;</button>
+    <h2 id="fecha-titulo"></h2>
+    <button class="arrow-btn" onclick="cambiarDia(1)">&#8250;</button>
+  </div>
+
+  <div id="citas-container"></div>
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ── DATOS REALES DEL CALENDARIO CONSULTORIO ──────────────────
+var EVENTOS = [
+  {
+    id: "ev1",
+    titulo: "Mensajes pacientes consultorio (bloque fijo, 15 min max)",
+    inicio: "2026-02-25T16:20:00-05:00",
+    fin:    "2026-02-25T16:35:00-05:00",
+    tipo: "admin"
+  },
+  {
+    id: "ev2",
+    titulo: "CONSULTORIO VIRTUAL - Sesi\u00f3n",
+    inicio: "2026-02-25T18:10:00-05:00",
+    fin:    "2026-02-25T19:00:00-05:00",
+    descripcion: "Desde casa. Sin desplazamiento.",
+    tipo: "virtual"
+  },
+  {
+    id: "ev3",
+    titulo: "CONSULTORIO PRESENCIAL - Llegada y preparaci\u00f3n del espacio",
+    inicio: "2026-02-28T08:00:00-05:00",
+    fin:    "2026-02-28T12:00:00-05:00",
+    tipo: "presencial"
+  },
+  {
+    id: "ev4",
+    titulo: "Mensajes pacientes consultorio (15 min max) + preparar espacio virtual",
+    inicio: "2026-03-02T16:50:00-05:00",
+    fin:    "2026-03-02T17:10:00-05:00",
+    tipo: "admin"
+  },
+  {
+    id: "ev5",
+    titulo: "CONSULTORIO VIRTUAL - Sesi\u00f3n #1",
+    inicio: "2026-03-02T17:30:00-05:00",
+    fin:    "2026-03-02T18:20:00-05:00",
+    descripcion: "Desde casa. Tom\u00e1s haciendo su actividad aut\u00f3noma.",
+    tipo: "virtual"
+  }
+];
+
+// ── ESTADO ───────────────────────────────────────────────────
+var diaOffset = 0;
+var tabActual = 'hoy';
+
+var diasTilde = ['domingo','lunes','martes','mi\u00e9rcoles','jueves','viernes','s\u00e1bado'];
+var mesesTilde = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+
+function getFecha(offset) {
+  var d = new Date(); d.setDate(d.getDate() + (offset||0)); return d;
+}
+function formatFecha(d) {
+  return diasTilde[d.getDay()] + ', ' + d.getDate() + ' de ' + mesesTilde[d.getMonth()];
+}
+function formatHora(str) {
+  var d = new Date(str);
+  return d.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',hour12:true});
+}
+function mismodia(d1,d2) {
+  return d1.getFullYear()===d2.getFullYear()&&d1.getMonth()===d2.getMonth()&&d1.getDate()===d2.getDate();
+}
+
+// ── RENDER ────────────────────────────────────────────────────
+function renderCitas() {
+  if (tabActual==='semana') { renderSemana(); return; }
+  var offset = tabActual==='manana' ? 1 : diaOffset;
+  var fechaRef = getFecha(offset);
+  var prefijo = tabActual==='hoy' ? 'Hoy \u00b7 ' : tabActual==='manana' ? 'Ma\u00f1ana \u00b7 ' : '';
+  document.getElementById('fecha-titulo').textContent = prefijo + formatFecha(fechaRef);
+
+  var evs = EVENTOS.filter(function(e){ return mismodia(new Date(e.inicio), fechaRef); });
+  evs.sort(function(a,b){ return new Date(a.inicio)-new Date(b.inicio); });
+
+  var c = document.getElementById('citas-container');
+  if (!evs.length) {
+    c.innerHTML = '<div class="empty"><div class="emoji">\uD83C\uDF38</div><p>No hay citas en este d\u00eda.\u00a1Un momento de descanso bien merecido!</p></div>';
+    return;
+  }
+  c.innerHTML = evs.map(function(e){ return card(e, fechaRef); }).join('');
+}
+
+function renderSemana() {
+  document.getElementById('fecha-titulo').textContent = 'Esta semana';
+  var c = document.getElementById('citas-container');
+  var html = '';
+  for (var i=0;i<7;i++) {
+    var dia = getFecha(i);
+    var evs = EVENTOS.filter(function(e){ return mismodia(new Date(e.inicio),dia); });
+    evs.sort(function(a,b){ return new Date(a.inicio)-new Date(b.inicio); });
+    if (evs.length) {
+      html += '<div class="dia-label">'+formatFecha(dia)+'</div>';
+      html += evs.map(function(e){ return card(e,dia); }).join('');
+    }
+  }
+  c.innerHTML = html || '<div class="empty"><div class="emoji">\uD83C\uDF38</div><p>No hay citas esta semana.</p></div>';
+}
+
+function card(e, fechaRef) {
+  var hora = formatHora(e.inicio);
+  var horaFin = formatHora(e.fin);
+  var safeId = 'wa_' + e.id;
+  var tagHtml = '';
+  if (e.tipo==='virtual') tagHtml = '<span class="tag virtual">Virtual</span> ';
+  else if (e.tipo==='presencial') tagHtml = '<span class="tag presencial">Presencial</span> ';
+  else if (e.tipo==='admin') tagHtml = '<span class="tag admin">Administrativo</span> ';
+
+  var waBtn = e.tipo!=='admin'
+    ? '<button class="btn secondary" onclick="toggleWA(\''+safeId+'\')">&#128172; Ver recordatorio WhatsApp</button>'
+    : '';
+
+  var waBox = e.tipo!=='admin'
+    ? '<div class="wa-box" id="'+safeId+'"><button class="copy-badge" onclick="copiar(\''+safeId+'\',this)">Copiar</button><span class="wa-texto">'+generarMsg(e.titulo, hora, fechaRef)+'</span></div>'
+    : '';
+
+  return '<div class="cita-card">'
+    +'<div class="hora">'+hora+' \u2013 '+horaFin+'</div>'
+    +'<div class="nombre">'+e.titulo+'</div>'
+    + (e.descripcion ? '<div class="tipo">'+e.descripcion+'</div>' : '')
+    + tagHtml
+    +'<div class="actions">'+waBtn+'</div>'
+    + waBox
+    +'</div>';
+}
+
+function generarMsg(nombre, hora, fecha) {
+  var esManana = !mismodia(fecha, new Date());
+  var cuando = esManana ? 'ma\u00f1ana' : 'hoy';
+  var diaTexto = esManana ? 'ma\u00f1ana '+fecha.getDate()+' de '+mesesTilde[fecha.getMonth()] : 'hoy';
+  // Extraer nombre limpio (quitar "CONSULTORIO VIRTUAL - " etc.)
+  var nombreLimpio = nombre.replace(/CONSULTORIO (VIRTUAL|PRESENCIAL)\s*[-–]\s*/i,'').replace(/Sesi\u00f3n #?\d*/i,'sesi\u00f3n').trim();
+
+  return 'Hola \uD83C\uDF38\n\nTe escribo para recordarte que tienes tu '+nombreLimpio+' conmigo '+cuando+' a las *'+hora+'*.\n\nSi necesitas cancelar o reprogramar, por favor av\u00edsame con anticipaci\u00f3n.\n\n\u00a1Nos vemos '+diaTexto+'! \uD83C\uDF3F\n\n*Luisa Fernanda Garc\u00e9s Garc\u00eda*\n_Psic\u00f3loga_';
+}
+
+// ── INTERACCIONES ─────────────────────────────────────────────
+function switchTab(tab, el) {
+  tabActual = tab; diaOffset = 0;
+  document.querySelectorAll('.tab').forEach(function(t){ t.classList.remove('active'); });
+  el.classList.add('active');
+  document.getElementById('date-nav').style.display = tab==='semana'?'none':'flex';
+  renderCitas();
+}
+function cambiarDia(dir) {
+  diaOffset += dir;
+  if (diaOffset<0) diaOffset=0;
+  renderCitas();
+}
+function toggleWA(id) { document.getElementById(id).classList.toggle('show'); }
+function copiar(id, btn) {
+  var txt = document.getElementById(id).querySelector('.wa-texto').textContent.trim();
+  navigator.clipboard.writeText(txt).then(function(){
+    btn.textContent = '\u2713 Copiado'; btn.classList.add('copied');
+    showToast('\u00a1Mensaje copiado! P\u00e9galo en WhatsApp \uD83C\uDF38');
+    setTimeout(function(){ btn.textContent='Copiar'; btn.classList.remove('copied'); }, 2500);
+  });
+}
+function showToast(msg) {
+  var t=document.getElementById('toast'); t.textContent=msg; t.classList.add('show');
+  setTimeout(function(){ t.classList.remove('show'); },3000);
+}
+
+// ── INIT ──────────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', function(){ renderCitas(); });
+</script>
+</body>
+</html>
