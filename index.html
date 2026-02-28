@@ -100,31 +100,76 @@ body { font-family: 'Lato', sans-serif; background: var(--white); color: var(--t
 #sidebar {
   width: var(--sidebar-w); min-height: 100vh; background: var(--bg);
   border-right: 2px solid var(--border); display: flex; flex-direction: column;
-  position: fixed; left: 0; top: 0; z-index: 100;
+  position: fixed; left: 0; top: 0; z-index: 200;
+  transition: width 0.28s cubic-bezier(.4,0,.2,1), transform 0.28s cubic-bezier(.4,0,.2,1);
+  overflow: hidden;
 }
-#sidebar .logo-area { padding: 20px 16px 14px; border-bottom: 1px solid var(--border); text-align: center; }
-#sidebar .logo-area img { height: 70px; object-fit: contain; }
-#sidebar .logo-area h2 { font-family: 'Playfair Display', serif; font-size: 0.82rem; color: var(--text); margin-top: 8px; line-height: 1.4; }
-#sidebar .logo-area p { font-size: 0.65rem; color: var(--border); letter-spacing: 1.2px; text-transform: uppercase; margin-top: 2px; }
+/* Collapsed state (desktop) */
+#sidebar.collapsed { width: 62px; }
+#sidebar.collapsed .logo-area h2,
+#sidebar.collapsed .logo-area p,
+#sidebar.collapsed .nav-label,
+#sidebar.collapsed .nav-section,
+#sidebar.collapsed .version { opacity: 0; pointer-events: none; transition: opacity 0.15s; }
+#sidebar.collapsed .logo-area { padding: 14px 8px; }
+#sidebar.collapsed .logo-area img { height: 38px; }
+#sidebar.collapsed .nav-btn { padding: 11px 0; justify-content: center; gap: 0; }
+#sidebar.collapsed .nav-btn .icon { width: auto; font-size: 1.25rem; }
+#sidebar.collapsed #sync-btn,
+#sidebar.collapsed .version-btns { display: none; }
+#sidebar.collapsed .toggle-btn { justify-content: center; }
 
-#sidebar nav { flex: 1; padding: 16px 0; }
-.nav-section { font-size: 0.62rem; color: var(--border); letter-spacing: 1.5px; text-transform: uppercase; padding: 10px 18px 4px; }
+/* Toggle button inside sidebar */
+.toggle-btn {
+  display: flex; align-items: center; justify-content: flex-end;
+  padding: 10px 14px 4px; cursor: pointer; background: none; border: none;
+  width: 100%; color: var(--strong); transition: all 0.2s;
+}
+.toggle-btn:hover { color: var(--border); }
+.toggle-btn svg { width: 20px; height: 20px; flex-shrink: 0; }
+
+/* Mobile toggle button (top bar) */
+#mob-toggle {
+  display: none; position: fixed; top: 12px; left: 12px; z-index: 300;
+  background: var(--border); color: #fff; border: none; border-radius: 10px;
+  width: 40px; height: 40px; cursor: pointer; align-items: center; justify-content: center;
+  box-shadow: 0 2px 8px rgba(100,48,0,0.18); transition: all 0.2s;
+}
+#mob-toggle svg { width: 22px; height: 22px; }
+
+/* Mobile overlay */
+#sidebar-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(100,48,0,0.35);
+  z-index: 199; backdrop-filter: blur(2px); animation: bdFadeIn .2s ease;
+}
+#sidebar-overlay.open { display: block; }
+
+#sidebar .logo-area { padding: 20px 16px 14px; border-bottom: 1px solid var(--border); text-align: center; transition: padding 0.28s; }
+#sidebar .logo-area img { height: 70px; object-fit: contain; transition: height 0.28s; }
+#sidebar .logo-area h2 { font-family: 'Playfair Display', serif; font-size: 0.82rem; color: var(--text); margin-top: 8px; line-height: 1.4; transition: opacity 0.2s; }
+#sidebar .logo-area p { font-size: 0.65rem; color: var(--border); letter-spacing: 1.2px; text-transform: uppercase; margin-top: 2px; transition: opacity 0.2s; }
+
+#sidebar nav { flex: 1; padding: 16px 0; overflow-y: auto; overflow-x: hidden; }
+.nav-section { font-size: 0.62rem; color: var(--border); letter-spacing: 1.5px; text-transform: uppercase; padding: 10px 18px 4px; white-space: nowrap; transition: opacity 0.2s; }
 .nav-btn {
   display: flex; align-items: center; gap: 10px;
   width: 100%; padding: 10px 18px; border: none;
   background: transparent; color: var(--text); font-family: 'Lato', sans-serif;
-  font-size: 0.85rem; cursor: pointer; transition: all 0.2s; text-align: left;
+  font-size: 0.85rem; cursor: pointer; transition: background 0.2s, padding 0.28s, justify-content 0.28s; text-align: left; white-space: nowrap;
 }
-.nav-btn .icon { font-size: 1.1rem; width: 22px; }
+.nav-btn .icon { font-size: 1.1rem; width: 22px; flex-shrink: 0; }
+.nav-label { transition: opacity 0.2s; }
 .nav-btn:hover { background: rgba(205,142,157,0.18); }
 .nav-btn.active { background: var(--border); color: #fff; font-weight: 700; }
 
-#sidebar .version { padding: 12px 18px; font-size: 0.65rem; color: var(--border); border-top: 1px solid var(--border); }
+#sidebar .version { padding: 12px 18px; font-size: 0.65rem; color: var(--border); border-top: 1px solid var(--border); transition: opacity 0.2s; white-space: nowrap; }
+.version-btns { display: flex; flex-direction: column; gap: 4px; }
 #sync-btn { margin: 0 12px 12px; padding: 8px 14px; border-radius: 20px; border: 1.5px solid var(--border); background: transparent; color: var(--text); font-family: Lato,sans-serif; font-size: 0.75rem; cursor: pointer; width: calc(100% - 24px); transition: all 0.2s; }
 #sync-btn:hover { background: var(--border); color: #fff; }
 
 /* MAIN */
-#main { margin-left: var(--sidebar-w); flex: 1; padding: 28px 32px; min-height: 100vh; }
+#main { margin-left: var(--sidebar-w); flex: 1; padding: 28px 32px; min-height: 100vh; transition: margin-left 0.28s cubic-bezier(.4,0,.2,1); }
+#main.collapsed { margin-left: 62px; }
 
 .page { display: none; }
 .page.active { display: block; }
@@ -426,24 +471,61 @@ input[type=range] { accent-color: var(--border); flex: 1; }
 .ag-empty { text-align:center; padding:48px 20px; color:var(--border); }
 .ag-empty .emoji { font-size:2.2rem; margin-bottom:10px; }
 
-@media(max-width: 768px) {
-  #sidebar { width: 200px; }
-  #main { margin-left: 200px; padding: 16px; }
+@media(max-width: 900px) {
   .col2, .col3 { grid-template-columns: 1fr; }
 }
-@media(max-width: 560px) {
-  #sidebar { position: static; width: 100%; min-height: auto; border-right: none; border-bottom: 2px solid var(--border); }
-  #sidebar nav { display: flex; flex-wrap: wrap; padding: 8px; }
-  .nav-section { display: none; }
-  .nav-btn { width: auto; padding: 7px 12px; font-size: 0.75rem; }
-  #main { margin-left: 0; }
+@media(max-width: 768px) {
+  /* On mobile: sidebar is hidden off-screen by default, shown as drawer */
+  #sidebar {
+    transform: translateX(-100%);
+    width: var(--sidebar-w) !important;
+    box-shadow: 4px 0 24px rgba(100,48,0,0.18);
+  }
+  #sidebar.mobile-open {
+    transform: translateX(0);
+  }
+  #sidebar.collapsed { width: var(--sidebar-w) !important; transform: translateX(-100%); }
+  #sidebar.collapsed.mobile-open { transform: translateX(0); }
+  #main { margin-left: 0 !important; padding: 16px 14px 16px 14px; }
+  #main.collapsed { margin-left: 0 !important; }
+  #mob-toggle { display: flex; }
+  /* Reset collapsed label visibility on mobile */
+  #sidebar .logo-area h2, #sidebar .logo-area p,
+  #sidebar .nav-label, #sidebar .nav-section, #sidebar .version { opacity: 1 !important; pointer-events: auto !important; }
+  #sidebar .logo-area { padding: 20px 16px 14px !important; }
+  #sidebar .logo-area img { height: 70px !important; }
+  #sidebar .nav-btn { padding: 10px 18px !important; justify-content: flex-start !important; gap: 10px !important; }
+  #sidebar .nav-btn .icon { font-size: 1.1rem !important; }
+  #sidebar #sync-btn, #sidebar .version-btns { display: block !important; }
+  #sidebar .toggle-btn { display: none; }
+  /* Push content below toggle button */
+  #main > .page.active { padding-top: 8px; }
 }
 </style>
 </head>
 <body>
 
 <!-- SIDEBAR -->
+<!-- Mobile overlay -->
+<div id="sidebar-overlay" onclick="cerrarSidebar()"></div>
+
+<!-- Mobile hamburger -->
+<button id="mob-toggle" onclick="toggleSidebar()" aria-label="Abrir menú">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round">
+    <line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/>
+  </svg>
+</button>
+
 <aside id="sidebar">
+  <!-- Toggle button (desktop) -->
+  <button class="toggle-btn" id="sidebar-toggle-btn" onclick="toggleSidebar()" title="Plegar / desplegar menú">
+    <svg id="toggle-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      <rect x="3" y="3" width="18" height="18" rx="3" opacity=".3"/>
+      <line x1="9" y1="3" x2="9" y2="21"/>
+      <polyline id="toggle-arrow" points="14,8 19,12 14,16"/>
+    </svg>
+  </button>
+
   <div class="logo-area">
     <img id="logo-img" src="" alt="Logo">
     <h2>Luisa Fernanda Garcés García</h2>
@@ -451,31 +533,33 @@ input[type=range] { accent-color: var(--border); flex: 1; }
   </div>
   <nav>
     <div class="nav-section">Principal</div>
-    <button class="nav-btn active" onclick="goPage('dashboard')"><span class="icon">🏠</span> Inicio</button>
-    <button class="nav-btn" onclick="goPage('pacientes')"><span class="icon">👤</span> Pacientes</button>
+    <button class="nav-btn active" onclick="goPage('dashboard');cerrarSidebarMobile()"><span class="icon">🏠</span><span class="nav-label"> Inicio</span></button>
+    <button class="nav-btn" onclick="goPage('pacientes');cerrarSidebarMobile()"><span class="icon">👤</span><span class="nav-label"> Pacientes</span></button>
 
     <div class="nav-section">Clínico</div>
-    <button class="nav-btn" onclick="goPage('anamnesis')"><span class="icon">📋</span> Anamnesis</button>
-    <button class="nav-btn" onclick="goPage('plan')"><span class="icon">🗺️</span> Plan de Tratamiento</button>
-    <button class="nav-btn" onclick="goPage('sesiones')"><span class="icon">📝</span> Notas de Sesión</button>
+    <button class="nav-btn" onclick="goPage('anamnesis');cerrarSidebarMobile()"><span class="icon">📋</span><span class="nav-label"> Anamnesis</span></button>
+    <button class="nav-btn" onclick="goPage('plan');cerrarSidebarMobile()"><span class="icon">🗺️</span><span class="nav-label"> Plan de Tratamiento</span></button>
+    <button class="nav-btn" onclick="goPage('sesiones');cerrarSidebarMobile()"><span class="icon">📝</span><span class="nav-label"> Notas de Sesión</span></button>
 
     <div class="nav-section">Evaluación</div>
-    <button class="nav-btn" onclick="goPage('tests')"><span class="icon">🧪</span> Tests</button>
-    <button class="nav-btn" onclick="goPage('seguimiento')"><span class="icon">📊</span> Seguimiento</button>
+    <button class="nav-btn" onclick="goPage('tests');cerrarSidebarMobile()"><span class="icon">🧪</span><span class="nav-label"> Tests</span></button>
+    <button class="nav-btn" onclick="goPage('seguimiento');cerrarSidebarMobile()"><span class="icon">📊</span><span class="nav-label"> Seguimiento</span></button>
 
     <div class="nav-section">Gestión</div>
-    <button class="nav-btn" onclick="goPage('agenda')"><span class="icon">📅</span> Agenda</button>
-    <button class="nav-btn" onclick="goPage('finanzas')"><span class="icon">💰</span> Finanzas</button>
-    <button class="nav-btn" onclick="goPage('documentos')"><span class="icon">📄</span> Documentos</button>
-    <button class="nav-btn" onclick="goPage('herramientas')"><span class="icon">🔧</span> Herramientas TCC</button>
-    <button class="nav-btn" onclick="goPage('cumpleanos')"><span class="icon">🎂</span> Cumpleaños</button>
+    <button class="nav-btn" onclick="goPage('agenda');cerrarSidebarMobile()"><span class="icon">📅</span><span class="nav-label"> Agenda</span></button>
+    <button class="nav-btn" onclick="goPage('finanzas');cerrarSidebarMobile()"><span class="icon">💰</span><span class="nav-label"> Finanzas</span></button>
+    <button class="nav-btn" onclick="goPage('documentos');cerrarSidebarMobile()"><span class="icon">📄</span><span class="nav-label"> Documentos</span></button>
+    <button class="nav-btn" onclick="goPage('herramientas');cerrarSidebarMobile()"><span class="icon">🔧</span><span class="nav-label"> Herramientas TCC</span></button>
+    <button class="nav-btn" onclick="goPage('cumpleanos');cerrarSidebarMobile()"><span class="icon">🎂</span><span class="nav-label"> Cumpleaños</span></button>
   </nav>
   <div class="version">
     <div style="margin-bottom:8px;font-size:0.65rem;color:var(--border)">Suite Clínica v1.0 · 2025</div>
-    <button id="sync-btn" onclick="sincronizarAhora()">🔄 Sincronizar</button>
-    <button class="btn" onclick="exportarJSON()" style="width:100%;margin-bottom:6px;font-size:0.72rem;padding:7px 10px">⬇️ Exportar respaldo</button>
-    <button class="btn" onclick="document.getElementById('import-input').click()" style="width:100%;font-size:0.72rem;padding:7px 10px">⬆️ Importar respaldo</button>
-    <input type="file" id="import-input" accept=".json" style="display:none" onchange="importarJSON(event)">
+    <div class="version-btns">
+      <button id="sync-btn" onclick="sincronizarAhora()">🔄 Sincronizar</button>
+      <button class="btn" onclick="exportarJSON()" style="width:100%;margin-bottom:6px;font-size:0.72rem;padding:7px 10px">⬇️ Exportar respaldo</button>
+      <button class="btn" onclick="document.getElementById('import-input').click()" style="width:100%;font-size:0.72rem;padding:7px 10px">⬆️ Importar respaldo</button>
+      <input type="file" id="import-input" accept=".json" style="display:none" onchange="importarJSON(event)">
+    </div>
   </div>
 </aside>
 
@@ -1680,6 +1764,71 @@ function getPacientes(){ return DB.get('pacientes') || []; }
 function savePacientes(p){ DB.set('pacientes',p); }
 
 // ===================== UNIVERSAL DOWNLOAD (fixes blob:null on iOS/Safari) =====================
+
+
+// ===================== SIDEBAR TOGGLE =====================
+function toggleSidebar(){
+  var sidebar = document.getElementById('sidebar');
+  var main    = document.getElementById('main');
+  var isMobile = window.innerWidth <= 768;
+
+  if(isMobile){
+    var overlay = document.getElementById('sidebar-overlay');
+    var isOpen = sidebar.classList.contains('mobile-open');
+    if(isOpen){
+      sidebar.classList.remove('mobile-open');
+      overlay.classList.remove('open');
+    } else {
+      sidebar.classList.add('mobile-open');
+      overlay.classList.add('open');
+    }
+  } else {
+    var collapsed = sidebar.classList.toggle('collapsed');
+    main.classList.toggle('collapsed', collapsed);
+    // Flip arrow direction
+    var arrow = document.getElementById('toggle-arrow');
+    if(arrow){
+      arrow.setAttribute('points', collapsed ? '10,8 5,12 10,16' : '14,8 19,12 14,16');
+    }
+    // Persist state
+    try{ localStorage.setItem('sidebar_collapsed', collapsed ? '1' : '0'); }catch(e){}
+  }
+}
+
+function cerrarSidebar(){
+  var sidebar = document.getElementById('sidebar');
+  var overlay = document.getElementById('sidebar-overlay');
+  sidebar.classList.remove('mobile-open');
+  overlay.classList.remove('open');
+}
+
+function cerrarSidebarMobile(){
+  if(window.innerWidth <= 768) cerrarSidebar();
+}
+
+// Restore collapsed state on desktop
+(function(){
+  try{
+    if(window.innerWidth > 768 && localStorage.getItem('sidebar_collapsed') === '1'){
+      var sidebar = document.getElementById('sidebar');
+      var main    = document.getElementById('main');
+      if(sidebar){ sidebar.classList.add('collapsed'); }
+      if(main){ main.classList.add('collapsed'); }
+      var arrow = document.getElementById('toggle-arrow');
+      if(arrow){ arrow.setAttribute('points','10,8 5,12 10,16'); }
+    }
+  }catch(e){}
+})();
+
+// Handle resize: if going from mobile → desktop, clean up mobile classes
+window.addEventListener('resize', function(){
+  var sidebar = document.getElementById('sidebar');
+  var overlay = document.getElementById('sidebar-overlay');
+  if(window.innerWidth > 768){
+    sidebar.classList.remove('mobile-open');
+    overlay.classList.remove('open');
+  }
+});
 
 // EXPORTACION SEGURA - evita window.open vacio que bloquea antivirus
 function abrirDocumentoSeguro(htmlContent, nombreArchivo){
