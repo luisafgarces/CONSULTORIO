@@ -293,7 +293,7 @@ input[type=range] { accent-color: var(--border); flex: 1; }
 /* ── IMAGEN RECORDATORIO CITA ── */
 .cita-img-overlay{display:none;position:fixed;inset:0;background:rgba(100,48,0,0.32);z-index:10001;align-items:center;justify-content:center;backdrop-filter:blur(5px);}
 .cita-img-overlay.open{display:flex;animation:bdFadeIn 0.3s ease;}
-.cita-img-modal{background:#fff;border-radius:24px;border:2px solid var(--border);max-width:480px;width:94%;overflow:hidden;box-shadow:0 20px 60px rgba(100,48,0,0.2);animation:bdPop 0.4s cubic-bezier(.175,.885,.32,1.275);}
+.cita-img-modal{background:#fff;border-radius:24px;border:2px solid var(--border);max-width:480px;width:94%;max-height:92vh;overflow-y:auto;box-shadow:0 20px 60px rgba(100,48,0,0.2);animation:bdPop 0.4s cubic-bezier(.175,.885,.32,1.275);}
 .cita-img-canvas-wrap canvas{width:100%;display:block;}
 .cita-img-footer{padding:14px 18px;display:flex;gap:8px;flex-wrap:wrap;justify-content:flex-end;}
 .btn-cita-dl{background:var(--border);color:#fff;border:none;border-radius:20px;padding:8px 15px;font-family:'Lato',sans-serif;font-size:.8rem;cursor:pointer;}
@@ -563,7 +563,7 @@ input[type=range] { accent-color: var(--border); flex: 1; }
     <label>Paciente:</label>
     <select id="an-sel-pac" onchange="loadAnamnesis()"></select>
     <button class="btn primary" onclick="guardarAnamnesis()">💾 Guardar</button>
-    <button class="btn" onclick="exportarAnamnesis()">⬇️ Exportar RTF</button>
+    <button class="btn" onclick="exportarAnamnesis()">⬇️ Exportar Word</button>
   </div>
 
   <div class="tab-nav">
@@ -746,7 +746,7 @@ input[type=range] { accent-color: var(--border); flex: 1; }
     </div>
     <div class="btn-row">
       <button class="btn primary" onclick="guardarAnamnesis()">💾 Guardar Anamnesis</button>
-      <button class="btn" onclick="exportarAnamnesis()">⬇️ Exportar RTF</button>
+      <button class="btn" onclick="exportarAnamnesis()">⬇️ Exportar Word</button>
     </div>
   </div>
 </div>
@@ -1325,7 +1325,7 @@ input[type=range] { accent-color: var(--border); flex: 1; }
     <canvas id="reciboCanvas" style="display:none"></canvas>
     <div id="recibo-estado-badge" style="margin-bottom:12px;display:none"></div>
     <div style="display:flex;gap:10px;flex-wrap:wrap">
-      <button class="btn-wa" onclick="descargarImagenRecibo()" style="background:#cd8e9d;">⬇️ Descargar imagen</button>
+      <button class="btn-wa" onclick="descargarImagenRecibo()" style="background:#cd8e9d;">&#128444;&#65039; Descargar imagen</button>
       <button class="btn-wa" onclick="enviarReciboWA()">
         <svg viewBox="0 0 24 24"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>
         Enviar por WhatsApp
@@ -1354,7 +1354,7 @@ input[type=range] { accent-color: var(--border); flex: 1; }
 <!-- MODAL IMAGEN RECORDATORIO CITA -->
 <div class="cita-img-overlay" id="citaImgOverlay">
   <div class="cita-img-modal">
-    <div class="cita-img-canvas-wrap"><canvas id="citaImgCanvas" width="800" height="500"></canvas></div>
+    <div class="cita-img-canvas-wrap"><canvas id="citaImgCanvas" width="800" height="620"></canvas></div>
     <div class="cita-img-footer">
       <button class="btn-cita-dl" onclick="citaImgDescargar()">⬇️ Descargar</button>
       <button class="btn-cita-wa" onclick="citaImgWA()">📱 WhatsApp</button>
@@ -1935,88 +1935,85 @@ function exportarAnamnesis(){
   if(!pid){ toast('Selecciona un paciente'); return; }
   const pacs = getPacientes();
   const pac = pacs.find(p=>p.id===pid)||{nombre:'Paciente'};
-  const nombrePac = pac.nombre;
   const data = DB.get('anamnesis_'+pid) || {};
-  // Merge patient profile data into export
   const d = {...data, nombre: pac.nombre, genero: pac.genero||'', ocup: pac.ocup||'', tel: pac.tel||'', email: pac.email||'', edad: pac.fnac ? calcEdad(pac.fnac) : ''};
+  const logoSrc = document.getElementById('logo-img').src;
+  const fechaDoc = new Date().toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'});
 
-  // Convert any character outside ASCII to RTF unicode escape \uN?
-  function rtfEncode(str) {
-    if(!str) return '';
-    let out = '';
-    for(let i = 0; i < str.length; i++) {
-      const code = str.charCodeAt(i);
-      if(code > 127) {
-        // RTF unicode: \uN? where N is signed 16-bit, ? is fallback char
-        const signed = code > 32767 ? code - 65536 : code;
-        out += '\\u' + signed + '?';
-      } else if(code === 92) { out += '\\\\'; }
-      else if(code === 123) { out += '\\{'; }
-      else if(code === 125) { out += '\\}'; }
-      else { out += str[i]; }
-    }
-    return out;
-  }
+  function esc(s){ if(!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function fila(label, val){ if(!val||val==='\u2014'||val==='') return ''; return '<div class="dato"><strong>'+esc(label)+':</strong> '+esc(String(val))+'</div>'; }
+  function sec(t){ return '<h2>'+esc(t)+'</h2>'; }
+  function sub(t){ return '<h3>'+esc(t)+'</h3>'; }
 
-  function sec(t){ return `{\\pard\\sb280\\sa80 {\\b\\fs24\\cf2 ${rtfEncode(t)}}\\par}`; }
-  function sub(t){ return `{\\pard\\sb160\\sa40 {\\b\\fs20\\cf3 ${rtfEncode(t)}}\\par}`; }
-  function campo(label, val){ if(!val||val==='\u2014'||val==='') return ''; return `{\\pard\\sb80\\sa40 {\\b\\fs18\\cf1 ${rtfEncode(label)}: }{\\fs18\\cf1 ${rtfEncode(String(val)||'\u2014')}}\\par}`; }
-
-  const fechaHoy = new Date().toLocaleDateString('es-CO');
-  const partes = [
-    '{\\rtf1\\ansi\\ansicpg1252\\uc1\\deff0',
-    '{\\fonttbl{\\f0\\fswiss Arial;}{\\f1\\froman Georgia;}}',
-    '{\\colortbl;\\red100\\green48\\blue0;\\red205\\green142\\blue157;\\red160\\green83\\blue106;}',
-    `{\\pard\\sb0\\sa120 {\\f1\\b\\fs32\\cf2 ${rtfEncode('ANAMNESIS PSICOL\u00d3GICA')}}\\par}`,
-    `{\\pard\\sb0\\sa60 {\\f0\\fs20\\cf1 ${rtfEncode('Luisa Fernanda Garc\u00e9s Garc\u00eda \u00b7 Psic\u00f3loga \u00b7 TP 174366')}}\\par}`,
-    `{\\pard\\sb0\\sa300 {\\f0\\fs18\\cf3 ${rtfEncode('Fecha: ' + fechaHoy)}}\\par}`,
-    sec('I. DATOS PERSONALES'),
-    campo('Nombre', d.nombre), campo('Edad', d.edad), campo('G\u00e9nero', d.genero),
-    campo('Ocupaci\u00f3n', d.ocup), campo('Estado civil', d.estado), campo('Tel\u00e9fono', d.tel),
-    campo('Email', d.email), campo('Contacto emergencia', (d.emergN||'')+(d.emergT?' | '+d.emergT:'')),
-    sec('II. MOTIVO DE CONSULTA'),
-    campo('Motivo', d.motivo), campo('\u00bfPor qu\u00e9 ahora?', d.decision),
-    campo('Duraci\u00f3n', d.duracion), campo('Intensidad (1-10)', (d.intensidad||'')+'/10'), campo('Intentos previos', d.intentos),
-    sec('III. HISTORIA CL\u00cdNICA'),
-    campo('Diagn\u00f3sticos previos', d.dx), campo('Tratamientos anteriores', d.ttoPrev),
-    campo('Hospitalizaciones', d.hosp+(d.hospD?' - '+d.hospD:'')), campo('Medicaci\u00f3n', d.med),
-    campo('Historia del desarrollo', d.desarrollo), campo('Antecedentes familiares', d.famMental),
-    sec('IV. EVALUACI\u00d3N C-C-E'),
-    sub('A. Cognitiva'), campo('Pensamientos autom\u00e1ticos', d.pens), campo('Creencias nucleares', d.creencias),
-    sub('B. Conductual'), campo('Conductas problema', d.conductas), campo('Actividades placenteras', d.placer),
-    sub('C. Emocional'), campo('Emoci\u00f3n predominante', d.emociones), campo('S\u00edntomas f\u00edsicos', d.sinFis),
-    sub('D. Distorsiones Cognitivas e Ideas Irracionales'),
-    (function(){
-      var dcData = d.distorsiones || {};
-      if(dcData['__no_aplica']) return campo('Distorsiones', 'No aplica');
-      var seleccionadas = Object.keys(dcData).filter(function(k){ return dcData[k] && k!=='__no_aplica'; });
-      if(!seleccionadas.length) return '';
-      var lineas = seleccionadas.map(function(id){
+  var distHtml = '';
+  var dcData = d.distorsiones || {};
+  if(dcData['__no_aplica']){ distHtml = fila('Distorsiones','No aplica'); }
+  else {
+    var sel = Object.keys(dcData).filter(function(k){ return dcData[k] && k!=='__no_aplica'; });
+    if(sel.length){
+      var lineas = sel.map(function(id){
         var dist = DISTORSIONES.find(function(x){ return x.id===id; });
         var nivel = dcData[id] && dcData[id].nivel ? ' ('+dcData[id].nivel+')' : '';
         return dist ? dist.name + nivel : id + nivel;
       });
-      return campo('Distorsiones identificadas', lineas.join(' | ')) + campo('Observaciones', d['dc-obs']||'');
-    })(),
-    sec('V. CONCEPTUALIZACI\u00d3N COGNITIVA'),
-    campo('Situaci\u00f3n desencadenante', d['cc-situacion']),
-    campo('Pensamientos autom\u00e1ticos', d['cc-pa']),
-    campo('Creencia nuclear subyacente', d['cc-significado']),
-    campo('Emoci\u00f3n y conducta resultante', d['cc-emocion']),
-    campo('Hip\u00f3tesis de trabajo', d['cc-hipotesis']),
-    sec('X. METAS TERAP\u00c9UTICAS'),
-    campo('Corto plazo', d.mCorto), campo('Mediano plazo', d.mMedio), campo('Largo plazo', d.mLargo),
-    '{\\pard\\sb300\\sa200\\brdrb\\brdrs\\brdrw10 \\par}',
-    `{\\pard\\sb200\\sa80 {\\b\\fs22\\cf2 ${rtfEncode('FIRMAS')}}\\par}`,
-    `{\\pard\\sb120\\sa120 {\\f0\\fs20\\cf1 ${rtfEncode('Paciente: _________________________________     Fecha: ___-___-_____')}}\\par}`,
-    `{\\pard\\sb60\\sa60 {\\f0\\b\\fs20\\cf1 ${rtfEncode('Terapeuta: Luisa Fernanda Garc\u00e9s Garc\u00eda     TP 174366')}}\\par}`,
-    '}'
-  ];
-  const rtf = partes.filter(Boolean).join('\n');
-  descargarArchivo(rtf, 'Anamnesis_'+nombrePac.replace(/\s+/g,'_')+'.rtf', 'application/octet-stream');
-  toast('Anamnesis exportada \u2713 \u2014 \u00c1brela en Word para editar');
-}
+      distHtml = fila('Distorsiones identificadas', lineas.join(' | ')) + fila('Observaciones', d['dc-obs']||'');
+    }
+  }
 
+  const html = '<!DOCTYPE html><html><head><meta charset="UTF-8">'
+  +'<style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:Arial,sans-serif;color:#643000;background:white;padding:32px 38px;font-size:14px;max-width:900px;margin:0 auto;}'
+  +'.header{display:flex;align-items:center;gap:18px;background:linear-gradient(135deg,#fff8f9,#fadae1);padding:16px 20px;border-radius:12px;border-bottom:3px solid #cd8e9d;margin-bottom:24px;}'
+  +'.header img{height:70px;object-fit:contain;}.header-info h1{font-size:1.15rem;color:#643000;margin-bottom:2px;font-family:Georgia,serif;font-style:italic;}.header-info p{font-size:0.7rem;color:#cd8e9d;letter-spacing:1.5px;text-transform:uppercase;margin-top:2px;}'
+  +'.doc-title{text-align:center;margin:0 0 24px;font-family:Georgia,serif;font-size:1.5rem;color:#643000;border-bottom:2px solid #fadae1;padding-bottom:12px;}'
+  +'h2{font-size:.95rem;color:#a0536a;margin:20px 0 8px;padding:6px 12px;background:#fadae1;border-left:4px solid #cd8e9d;border-radius:0 8px 8px 0;text-transform:uppercase;letter-spacing:.5px;}'
+  +'h3{font-size:.85rem;color:#cd8e9d;margin:14px 0 6px 4px;font-style:italic;}'
+  +'.dato{margin:5px 0 5px 4px;font-size:.9rem;line-height:1.5;}.dato strong{color:#a0536a;}'
+  +'.firmas{margin-top:40px;border-top:2px solid #fadae1;padding-top:24px;display:flex;gap:40px;flex-wrap:wrap;}'
+  +'.firma-bloque{flex:1;min-width:220px;}.firma-label{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#a0536a;margin-bottom:4px;}'
+  +'.firma-img{height:65px;display:block;margin-bottom:4px;mix-blend-mode:multiply;}'
+  +'.firma-linea{border-top:1.5px solid #cd8e9d;padding-top:6px;font-size:.82rem;color:#643000;}'
+  +'.fecha-doc{text-align:right;font-size:.72rem;color:#cd8e9d;margin-top:6px;}'
+  +'@media print{@page{margin:1.8cm}body{padding:0}}</style></head><body>'
+  +'<div class="header"><img src="'+logoSrc+'" alt="Logo"><div class="header-info"><h1>Luisa Fernanda Garc\u00e9s Garc\u00eda</h1><p>Psic\u00f3loga \u00b7 TP 174366</p></div></div>'
+  +'<div class="doc-title">Anamnesis Psicol\u00f3gica</div>'
+  +sec('I. Datos Personales')
+  +fila('Nombre',d.nombre)+fila('Edad',d.edad)+fila('G\u00e9nero',d.genero)
+  +fila('Ocupaci\u00f3n',d.ocup)+fila('Estado civil',d.estado)+fila('Tel\u00e9fono',d.tel)
+  +fila('Email',d.email)+fila('Contacto de emergencia',(d.emergN||'')+(d.emergT?' | '+d.emergT:''))
+  +sec('II. Motivo de Consulta')
+  +fila('Motivo',d.motivo)+fila('\u00bfPor qu\u00e9 ahora?',d.decision)
+  +fila('Duraci\u00f3n',d.duracion)+fila('Intensidad (1-10)',(d.intensidad||'')+'/10')+fila('Intentos previos',d.intentos)
+  +sec('III. Historia Cl\u00ednica')
+  +fila('Diagn\u00f3sticos previos',d.dx)+fila('Tratamientos anteriores',d.ttoPrev)
+  +fila('Hospitalizaciones',d.hosp+(d.hospD?' - '+d.hospD:''))+fila('Medicaci\u00f3n',d.med)
+  +fila('Historia del desarrollo',d.desarrollo)+fila('Antecedentes familiares',d.famMental)
+  +sec('IV. Evaluaci\u00f3n C-C-E')
+  +sub('A. Cognitiva')+fila('Pensamientos autom\u00e1ticos',d.pens)+fila('Creencias nucleares',d.creencias)
+  +sub('B. Conductual')+fila('Conductas problema',d.conductas)+fila('Actividades placenteras',d.placer)
+  +sub('C. Emocional')+fila('Emoci\u00f3n predominante',d.emociones)+fila('S\u00edntomas f\u00edsicos',d.sinFis)
+  +sub('D. Distorsiones Cognitivas e Ideas Irracionales')+distHtml
+  +sec('V. Conceptualizaci\u00f3n Cognitiva')
+  +fila('Situaci\u00f3n desencadenante',d['cc-situacion'])+fila('Pensamientos autom\u00e1ticos',d['cc-pa'])
+  +fila('Creencia nuclear subyacente',d['cc-significado'])+fila('Emoci\u00f3n y conducta resultante',d['cc-emocion'])
+  +fila('Hip\u00f3tesis de trabajo',d['cc-hipotesis'])
+  +sec('VI. Metas Terap\u00e9uticas')
+  +fila('Corto plazo',d.mCorto)+fila('Mediano plazo',d.mMedio)+fila('Largo plazo',d.mLargo)
+  +'<div class="firmas">'
+  +'<div class="firma-bloque"><div class="firma-label">Paciente</div>'
+  +'<div style="height:65px;border-bottom:1.5px solid #cd8e9d;margin-bottom:4px"></div>'
+  +'<div class="firma-linea">'+esc(pac.nombre)+'</div>'
+  +'<div class="fecha-doc">Fecha: ___-___-_____</div></div>'
+  +'<div class="firma-bloque"><div class="firma-label">Psic\u00f3loga Tratante</div>'
+  +'<img class="firma-img" src="'+FIRMA_DATA+'" alt="Firma">'
+  +'<div class="firma-linea"><strong>Luisa Fernanda Garc\u00e9s Garc\u00eda</strong></div>'
+  +'<div class="fecha-doc">TP 174366 &nbsp;\u00b7&nbsp; '+fechaDoc+'</div></div>'
+  +'</div>'
+  +'<p style="text-align:center;font-size:.65rem;color:#cd8e9d;margin-top:20px">Documento confidencial de uso cl\u00ednico \u2014 Generado el '+fechaDoc+'</p>'
+  +'</body></html>';
+
+  descargarArchivo(html, 'Anamnesis_'+pac.nombre.replace(/\s+/g,'_')+'.html', 'application/octet-stream');
+  toast('📋 Descargado. \u00c1brelo en el navegador e imprime \u2192 Guardar como PDF');
+}
 // ===================== PLAN =====================
 function loadPlan(){
   const pid = document.getElementById('pl-sel-pac').value;
@@ -2209,7 +2206,7 @@ function exportarPlanDocx(){
   table{width:100%;border-collapse:collapse;margin-top:8px;}th{background:#fadae1;color:#643000;padding:8px 10px;border:1px solid #cd8e9d;font-size:.78rem;text-align:left;}td{padding:8px 10px;border:1px solid #f0d8de;font-size:.84rem;vertical-align:top;line-height:1.5;}
   .firmas{margin-top:40px;border-top:2px solid #fadae1;padding-top:24px;display:flex;gap:40px;flex-wrap:wrap;}
   .firma-bloque{flex:1;min-width:220px;}.firma-label{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#a0536a;margin-bottom:4px;}
-  .firma-img{height:60px;display:block;margin-bottom:4px;}
+  .firma-img{height:60px;display:block;margin-bottom:4px;mix-blend-mode:multiply;}
   .firma-linea{border-top:1.5px solid #cd8e9d;padding-top:6px;font-size:.82rem;color:#643000;}
   .fecha-doc{text-align:right;font-size:.72rem;color:#cd8e9d;margin-top:6px;}
   @media print{@page{margin:1.8cm}body{padding:0}}</style></head><body>
@@ -2576,7 +2573,7 @@ function exportarResumenPDF(){
   .firmas{margin-top:44px;border-top:2px solid #fadae1;padding-top:22px;display:flex;gap:40px;}
   .firma-bloque{flex:1;text-align:center;}
   .firma-label{font-size:.7rem;font-weight:700;text-transform:uppercase;color:#a0536a;letter-spacing:.5px;margin-bottom:8px;}
-  .firma-img{height:55px;object-fit:contain;margin:0 auto 6px;display:block;}
+  .firma-img{height:55px;object-fit:contain;margin:0 auto 6px;display:block;mix-blend-mode:multiply;}
   .firma-linea{border-top:1.5px solid #cd8e9d;padding-top:6px;font-size:.82rem;color:#643000;}
   .firma-sub{font-size:.68rem;color:#cd8e9d;margin-top:3px;}
   .pie{text-align:center;font-size:.62rem;color:#cd8e9d;margin-top:20px;font-style:italic;}
@@ -2658,7 +2655,7 @@ function exportarHistoriaClinica(){
   .firmas{margin-top:44px;border-top:2px solid #fadae1;padding-top:22px;display:flex;gap:40px;}
   .firma-bloque{flex:1;text-align:center;}
   .firma-label{font-size:.68rem;font-weight:700;text-transform:uppercase;color:#a0536a;letter-spacing:.5px;margin-bottom:8px;}
-  .firma-img{height:52px;object-fit:contain;margin:0 auto 6px;display:block;}
+  .firma-img{height:52px;object-fit:contain;margin:0 auto 6px;display:block;mix-blend-mode:multiply;}
   .firma-linea{border-top:1.5px solid #cd8e9d;padding-top:6px;font-size:.8rem;color:#643000;}
   .firma-sub{font-size:.65rem;color:#cd8e9d;margin-top:2px;}
   .pie{text-align:center;font-size:.6rem;color:#cd8e9d;margin-top:16px;font-style:italic;}
@@ -3447,7 +3444,7 @@ function agCard(e){
   var tagMap={virtual:'<span class="ag-tag virtual">Virtual</span>',presencial:'<span class="ag-tag presencial">Presencial</span>',admin:'<span class="ag-tag admin">Administrativo</span>'};
   var waBtn='';
   var waDirectBtn='';
-  var imgBtn=e.tipo!=='admin'?'<button class="btn primary" style="font-size:.78rem;padding:6px 14px" onclick="abrirImagenCita(\''+e.id+'\')">\uD83D\uDDBB\uFE0F Imagen recordatorio</button>':'';
+  var imgBtn=e.tipo!=='admin'?'<button class="btn primary" style="font-size:.78rem;padding:6px 14px" onclick="abrirImagenCita(\''+e.id+'\')">📅 Imagen recordatorio</button>':'';
   var waBox='';
   var delBtn='<button class="btn" style="font-size:.72rem;padding:5px 12px;color:var(--strong);border-color:var(--bg)" onclick="agEliminar(\''+e.id+'\')">\uD83D\uDDD1</button>';
   var editBtn='<button class="btn" style="font-size:.72rem;padding:5px 12px" onclick="agEditarEvento(\''+e.id+'\')">&#9999;&#65039; Editar</button>';
@@ -3764,7 +3761,7 @@ function pagoItemHTML(r){
   var fecha=new Date(r.fecha+'T12:00:00').toLocaleDateString('es-CO',{day:'numeric',month:'short'});
   var metBadge=esI?`<span class="metodo-badge">${metodoLabel[r.metodo]||r.metodo}</span>`:'';
   var pendBadge=(esI&&r.estado==='pendiente')?'<span style="background:#fff3e0;color:#f57c00;padding:2px 8px;border-radius:10px;font-size:.68rem;font-weight:600;margin-left:4px">Pendiente</span>':'';
-  var acciones=esI?`<button class="icon-btn" onclick="abrirRecibo(getById(${r.id}))" title="Ver/Editar recibo">🧾</button><button class="icon-btn btn-danger" onclick="eliminar(${r.id})" title="Eliminar">✕</button>`:`<button class="icon-btn btn-danger" onclick="eliminar(${r.id})" title="Eliminar">✕</button>`;
+  var acciones=esI?`<button class="icon-btn" onclick="abrirRecibo(getById(${r.id}))" title="Ver/Editar recibo">🧾</button><button class="icon-btn btn-danger" onclick="eliminar(${r.id})" title="Eliminar">\u2715</button>`:`<button class="icon-btn btn-danger" onclick="eliminar(${r.id})" title="Eliminar">\u2715</button>`;
   return `<div class="pago-item"><div class="pago-dot ${r.tipo}"></div><div class="pago-info"><div class="pago-nombre">${esI?r.paciente:r.descripcion}</div><div class="pago-meta">${fecha} \u00b7 ${esI?r.tipoSesion:r.categoria} ${metBadge}${pendBadge}</div></div><div class="pago-monto ${r.tipo}">${esI?'+':'-'}${formatPesos(r.monto)}</div><div class="pago-actions">${acciones}</div></div>`;
 }
 
@@ -4110,7 +4107,7 @@ function docActualizarPreview() {
   }
   document.getElementById('doc-preview-box').innerHTML=`
     <h3>${tipo?.icon} ${tipo?.nombre}</h3>
-    <p style="text-align:center;font-size:.75rem;color:var(--border);margin-bottom:14px">Vista previa \u00b7 El Word descargado incluye logo, encabezado y formato completo</p>
+    <p style="text-align:center;font-size:.75rem;color:var(--border);margin-bottom:14px">Vista previa \u00b7 El documento descargado incluye logo, paleta y firma</p>
     <hr style="border:none;border-top:1px solid var(--bg);margin:10px 0">
     <p style="margin:6px 0;font-size:.82rem"><strong>Paciente:</strong> ${pac.nombre} \u00b7 C.C. ${pac.cc||'___'}</p>
     <div style="margin:12px 0">${contenido.replace(/\n/g,'<br>')}</div>
@@ -4127,134 +4124,162 @@ function docGenerar() {
   if(pac.nombre==='___________'){ toast('Ingresa el nombre del paciente'); return; }
   const datos=docGetDatos();
   const tipo=DOC_TIPOS.find(t=>t.id===docTipoSeleccionado);
-  const rtf=docGenerarRTF(tipo, pac, datos);
+  const html=docGenerarHTML(tipo, pac, datos);
   const nombre=(tipo.nombre+'_'+pac.nombre.split(' ')[0]).replace(/\s+/g,'_');
-  descargarArchivo(rtf, nombre+'_'+new Date().toLocaleDateString('es-CO').replace(/\//g,'-')+'.rtf', 'application/octet-stream');
-  toast('Documento generado \u2713 \u2014 \u00c1brelo en Word para editar y firmar');
+  descargarArchivo(html, nombre+'_'+new Date().toLocaleDateString('es-CO').replace(/\//g,'-')+'.html', 'application/octet-stream');
+  toast('Documento generado \u2713 \u2014 \u00c1brelo en el navegador e imprime \u2192 PDF');
 }
 
-function docGenerarRTF(tipo, pac, datos) {
+function docGenerarHTML(tipo, pac, datos) {
   const fecha=new Date().toLocaleDateString('es-CO',{day:'numeric',month:'long',year:'numeric'});
   const PSI={nombre:'Luisa Fernanda Garc\u00e9s Garc\u00eda',tp:'174366',cc:'1036602429',tel:'3246381453',email:'luisafgarces@gmail.com',dir:'Circular 73A # 39-79, Medell\u00edn, Colombia'};
-  function re(s){ if(!s) return ''; let o=''; for(let i=0;i<s.length;i++){ const c=s.charCodeAt(i); if(c>127){const n=c>32767?c-65536:c;o+='\\u'+n+'?';} else if(c===92)o+='\\\\'; else if(c===123)o+='\\{'; else if(c===125)o+='\\}'; else if(c===10||c===13)o+='\\line '; else o+=s[i];} return o; }
-  function title(t){ return `{\\pard\\sb200\\sa120\\qc{\\f1\\b\\fs30\\cf1 ${re(t)}}\\par}\n`; }
-  function subtitle(t){ return `{\\pard\\sb40\\sa160\\qc{\\f0\\fs18\\i\\cf2 ${re(t)}}\\par}\n`; }
-  function sec(t){ return `{\\pard\\sb240\\sa60\\brdrb\\brdrs\\brdrw8\\brdrcf2{\\f0\\b\\fs20\\cf1 ${re(t.toUpperCase())}}\\par}\n`; }
-  function camp(l,v){ if(!v) return ''; return `{\\pard\\sb60\\sa40{\\f0\\b\\fs19\\cf1 ${re(l+': ')}}{\\f0\\fs19\\cf3 ${re(v)}}\\par}\n`; }
-  function par(t,opts={}){ if(!t) return ''; return `{\\pard\\sb80\\sa120\\qj{\\f0\\fs19\\cf3${opts.italic?'\\i':''} ${re(t)}}\\par}\n`; }
-  function hr(){ return `{\\pard\\sb80\\sa80\\brdrb\\brdrs\\brdrw6\\brdrcf2\\par}\n`; }
-  function enSection(label){ return `{\\pard\\sb80\\sa60{\\f0\\b\\fs18\\cf2 ${re(label)}}\\par}\n`; }
+  const logoSrc = document.getElementById('logo-img').src;
+
+  function esc(s){ if(!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\n/g,'<br>'); }
+  function sec(t){ return '<h2>'+esc(t)+'</h2>'; }
+  function campo(l,v){ if(!v) return ''; return '<div class="campo"><span class="label">'+esc(l)+':</span> <span class="val">'+esc(String(v))+'</span></div>'; }
+  function par(t,italic){ if(!t) return ''; return '<p'+(italic?' style="font-style:italic"':'')+'>'+esc(t)+'</p>'; }
+  function hr(){ return '<hr>'; }
+  function enSec(t){ return '<div class="en-sec">'+esc(t)+'</div>'; }
 
   let body='';
   switch(tipo.id){
     case 'cert_bilingue': case 'cert_espanol': {
       const bil=tipo.id==='cert_bilingue';
-      body+=title(bil?'CERTIFICADO PSICOL\u00d3GICO / PSYCHOLOGICAL CERTIFICATE':'CERTIFICADO PSICOL\u00d3GICO');
-      body+=hr();
-      body+=par(`La suscrita, ${PSI.nombre}, Psic\u00f3loga Titulada con Tarjeta Profesional No. ${PSI.tp}, en el ejercicio de mis funciones profesionales, certifica lo siguiente:`);
-      body+=par(`${pac.tratamiento||'El/La paciente'} ${pac.nombre}, identificado(a) con c\u00e9dula de ciudadan\u00eda n\u00famero ${pac.cc||'___________'} de ${pac.ciudadExp||'Medell\u00edn'}, ha sido sometido(a) a una valoraci\u00f3n psicol\u00f3gica integral llevada a cabo mediante modalidad ${datos.modalidad||'virtual'}.`);
-      body+=par(datos.cuerpo||(datos.diagnostico?`Con base en la evaluaci\u00f3n cl\u00ednica realizada, se concluye que el/la paciente cumple con los criterios diagn\u00f3sticos de ${datos.diagnostico} (de acuerdo con el ${datos.manual||'DSM-5'}).`:'[Completar cuerpo del certificado]'));
+      body+='<h1 class="doc-title">'+(bil?'CERTIFICADO PSICOL\u00d3GICO / PSYCHOLOGICAL CERTIFICATE':'CERTIFICADO PSICOL\u00d3GICO')+'</h1>'+hr();
+      body+=par('La suscrita, '+PSI.nombre+', Psic\u00f3loga Titulada con Tarjeta Profesional No. '+PSI.tp+', en el ejercicio de mis funciones profesionales, certifica lo siguiente:');
+      body+=par((pac.tratamiento||'El/La paciente')+' '+pac.nombre+', identificado(a) con c\u00e9dula de ciudadan\u00eda n\u00famero '+(pac.cc||'___________')+' de '+(pac.ciudadExp||'Medell\u00edn')+', ha sido sometido(a) a una valoraci\u00f3n psicol\u00f3gica integral llevada a cabo mediante modalidad '+(datos.modalidad||'virtual')+'.');
+      body+=par(datos.cuerpo||(datos.diagnostico?'Con base en la evaluaci\u00f3n cl\u00ednica realizada, se concluye que el/la paciente cumple con los criterios diagn\u00f3sticos de '+datos.diagnostico+' (de acuerdo con el '+(datos.manual||'DSM-5')+').':'[Completar cuerpo del certificado]'));
       if(datos.observaciones) body+=par(datos.observaciones);
-      body+=par(`Este certificado se emite a solicitud de la interesada/o para los fines que estime pertinentes, en Medell\u00edn, a los ${fecha}.`);
+      body+=par('Este certificado se emite a solicitud de la interesada/o para los fines que estime pertinentes, en Medell\u00edn, a los '+fecha+'.',true);
       if(bil){
-        body+=`{\\pard\\sb320\\sa40\\par}\n`;
-        body+=hr();
-        body+=enSection('ENGLISH VERSION');
-        body+=par(`The undersigned, ${PSI.nombre}, Licensed Psychologist with Professional License No. ${PSI.tp}, hereby certifies the following:`);
-        body+=par(`${pac.tratamiento_en||'The patient'} ${pac.nombre}, identified with citizenship ID number ${pac.cc||'___________'} from ${pac.ciudadExp||'Medell\u00edn'}, has undergone a comprehensive psychological evaluation conducted via ${datos.modalidad==='presencial'?'in-person':'virtual'} modality.`);
-        body+=par(datos.cuerpo_en||(datos.diagnostico_en||datos.diagnostico?`Based on the clinical assessment, the patient meets diagnostic criteria for ${datos.diagnostico_en||datos.diagnostico} (as per the ${datos.manual||'DSM-5'}).`:'[Add certificate body in English]'));
-        body+=par(`This certificate is issued at the request of the interested party for the purposes deemed pertinent, in Medell\u00edn, on ${new Date().toLocaleDateString('en-US',{day:'numeric',month:'long',year:'numeric'})}.`);
+        body+='<div style="margin-top:32px">'+hr()+enSec('ENGLISH VERSION');
+        body+=par('The undersigned, '+PSI.nombre+', Licensed Psychologist with Professional License No. '+PSI.tp+', hereby certifies the following:');
+        body+=par((pac.tratamiento_en||'The patient')+' '+pac.nombre+', identified with citizenship ID number '+(pac.cc||'___________')+' from '+(pac.ciudadExp||'Medell\u00edn')+', has undergone a comprehensive psychological evaluation conducted via '+(datos.modalidad==='presencial'?'in-person':'virtual')+' modality.');
+        body+=par(datos.cuerpo_en||(datos.diagnostico_en||datos.diagnostico?'Based on the clinical assessment, the patient meets diagnostic criteria for '+(datos.diagnostico_en||datos.diagnostico)+' (as per the '+(datos.manual||'DSM-5')+').':'[Add certificate body in English]'));
+        body+=par('This certificate is issued at the request of the interested party for the purposes deemed pertinent, in Medell\u00edn, on '+new Date().toLocaleDateString('en-US',{day:'numeric',month:'long',year:'numeric'})+'.',true);
+        body+='</div>';
       }
       break;
     }
     case 'cert_esa': {
-      body+=title('CERTIFICADO DE IDONEIDAD PARA ANIMAL DE SOPORTE EMOCIONAL (ESA)');
-      body+=subtitle('Emotional Support Animal Certificate');
-      body+=hr();
-      body+=par(`Yo, ${PSI.nombre}, Psic\u00f3loga Titulada con Tarjeta Profesional No. ${PSI.tp}, certifico que he evaluado psicol\u00f3gicamente a:`);
-      body+=camp('Paciente',pac.nombre); body+=camp('Identificaci\u00f3n','C.C. '+pac.cc); body+=camp('Diagn\u00f3stico / Condici\u00f3n',datos.diagnostico);
-      body+=par(`Con base en la evaluaci\u00f3n cl\u00ednica, certifico que ${pac.nombre.split(' ')[0]} presenta una condici\u00f3n de salud mental que justifica m\u00e9dica y psicol\u00f3gicamente la tenencia de un Animal de Soporte Emocional (ESA).`);
+      body+='<h1 class="doc-title">CERTIFICADO DE IDONEIDAD PARA ANIMAL DE SOPORTE EMOCIONAL (ESA)</h1>';
+      body+='<div class="subtitle">Emotional Support Animal Certificate</div>'+hr();
+      body+=par('Yo, '+PSI.nombre+', Psic\u00f3loga Titulada con Tarjeta Profesional No. '+PSI.tp+', certifico que he evaluado psicol\u00f3gicamente a:');
+      body+=campo('Paciente',pac.nombre)+campo('Identificaci\u00f3n','C.C. '+pac.cc)+campo('Diagn\u00f3stico / Condici\u00f3n',datos.diagnostico);
+      body+=par('Con base en la evaluaci\u00f3n cl\u00ednica, certifico que '+pac.nombre.split(' ')[0]+' presenta una condici\u00f3n de salud mental que justifica m\u00e9dica y psicol\u00f3gicamente la tenencia de un Animal de Soporte Emocional (ESA).');
       body+=sec('Informaci\u00f3n del Animal');
-      body+=camp('Nombre',datos.nombreAnimal); body+=camp('Especie / Raza',datos.especieAnimal); body+=camp('Descripci\u00f3n',datos.descAnimal);
-      body+=par(`Este certificado se emite en Medell\u00edn, a los ${fecha}.`);
-      body+=`{\\pard\\sb280\\sa0\\par}\n`; body+=hr(); body+=enSection('ENGLISH VERSION');
-      body+=par(`I, ${PSI.nombre}, Licensed Psychologist (Professional License No. ${PSI.tp}), hereby certify that ${pac.nombre} presents a mental health condition (${datos.diagnostico||'___'}) that medically and psychologically justifies the need for an Emotional Support Animal (ESA).`);
-      body+=par(`Animal: ${datos.nombreAnimal||'___'} \u00b7 ${datos.especieAnimal||'___'}${datos.descAnimal?' \u00b7 '+datos.descAnimal:''}. Issued in Medell\u00edn, on ${new Date().toLocaleDateString('en-US',{day:'numeric',month:'long',year:'numeric'})}.`);
+      body+=campo('Nombre',datos.nombreAnimal)+campo('Especie / Raza',datos.especieAnimal)+campo('Descripci\u00f3n',datos.descAnimal);
+      body+=par('Este certificado se emite en Medell\u00edn, a los '+fecha+'.',true);
+      body+='<div style="margin-top:28px">'+hr()+enSec('ENGLISH VERSION');
+      body+=par('I, '+PSI.nombre+', Licensed Psychologist (Professional License No. '+PSI.tp+'), hereby certify that '+pac.nombre+' presents a mental health condition ('+(datos.diagnostico||'___')+') that medically and psychologically justifies the need for an Emotional Support Animal (ESA).');
+      body+=par('Animal: '+(datos.nombreAnimal||'___')+' \u00b7 '+(datos.especieAnimal||'___')+(datos.descAnimal?' \u00b7 '+datos.descAnimal:'')+'. Issued in Medell\u00edn, on '+new Date().toLocaleDateString('en-US',{day:'numeric',month:'long',year:'numeric'})+'.',true);
+      body+='</div>';
       break;
     }
     case 'informe_seguimiento': {
-      body+=title('INFORME DE SEGUIMIENTO TERAP\u00c9UTICO'); body+=hr();
+      body+='<h1 class="doc-title">INFORME DE SEGUIMIENTO TERAP\u00c9UTICO</h1>'+hr();
       body+=sec('I. Datos de Identificaci\u00f3n');
-      body+=camp('Paciente',pac.nombre); body+=camp('Identificaci\u00f3n','C.C. '+pac.cc);
-      body+=camp('Diagn\u00f3stico',datos.diagnostico); body+=camp('Per\u00edodo evaluado',datos.periodo);
-      body+=camp('Modalidad',datos.modalidad); body+=camp('N\u00famero de sesiones',datos.numSesiones);
-      body+=sec('II. Motivo de Consulta y Antecedentes'); body+=par(datos.motivoConsulta);
-      body+=sec('III. Evoluci\u00f3n Cl\u00ednica'); body+=par(datos.evolucion);
-      if(datos.logros) body+=camp('Logros terap\u00e9uticos',datos.logros);
-      if(datos.dificultades) body+=camp('Dificultades observadas',datos.dificultades);
-      body+=sec('IV. Estado Actual'); body+=par(datos.estadoActual);
-      if(datos.estadoEmocional) body+=camp('Estado emocional promedio (1-10)',datos.estadoEmocional);
-      body+=sec('V. Plan de Continuidad'); body+=par(datos.planContinuidad);
-      body+=sec('VI. Conclusiones'); body+=par(datos.conclusiones);
+      body+=campo('Paciente',pac.nombre)+campo('Identificaci\u00f3n','C.C. '+pac.cc);
+      body+=campo('Diagn\u00f3stico',datos.diagnostico)+campo('Per\u00edodo evaluado',datos.periodo);
+      body+=campo('Modalidad',datos.modalidad)+campo('N\u00famero de sesiones',datos.numSesiones);
+      body+=sec('II. Motivo de Consulta y Antecedentes')+par(datos.motivoConsulta);
+      body+=sec('III. Evoluci\u00f3n Cl\u00ednica')+par(datos.evolucion);
+      if(datos.logros) body+=campo('Logros terap\u00e9uticos',datos.logros);
+      if(datos.dificultades) body+=campo('Dificultades observadas',datos.dificultades);
+      body+=sec('IV. Estado Actual')+par(datos.estadoActual);
+      if(datos.estadoEmocional) body+=campo('Estado emocional promedio (1-10)',datos.estadoEmocional);
+      body+=sec('V. Plan de Continuidad')+par(datos.planContinuidad);
+      body+=sec('VI. Conclusiones')+par(datos.conclusiones);
       break;
     }
     case 'informe_diagnostico': {
-      body+=title('INFORME PSICOL\u00d3GICO DE EVALUACI\u00d3N DIAGN\u00d3STICA'); body+=hr();
+      body+='<h1 class="doc-title">INFORME PSICOL\u00d3GICO DE EVALUACI\u00d3N DIAGN\u00d3STICA</h1>'+hr();
       body+=sec('I. Datos de Identificaci\u00f3n');
-      body+=camp('Paciente',pac.nombre); body+=camp('Identificaci\u00f3n','C.C. '+pac.cc);
-      body+=camp('Fecha(s) de evaluaci\u00f3n',datos.fechaEval); body+=camp('Modalidad',datos.modalidad); body+=camp('Sesiones',datos.numSesiones);
-      body+=sec('II. Motivo de Consulta'); body+=par(datos.motivoConsulta);
-      body+=sec('III. Historia Cl\u00ednica'); body+=par(datos.historia);
-      body+=sec('IV. Instrumentos Utilizados'); body+=par(datos.instrumentos);
-      body+=sec('V. Resultados'); body+=par(datos.resultados);
+      body+=campo('Paciente',pac.nombre)+campo('Identificaci\u00f3n','C.C. '+pac.cc);
+      body+=campo('Fecha(s) de evaluaci\u00f3n',datos.fechaEval)+campo('Modalidad',datos.modalidad)+campo('Sesiones',datos.numSesiones);
+      body+=sec('II. Motivo de Consulta')+par(datos.motivoConsulta);
+      body+=sec('III. Historia Cl\u00ednica')+par(datos.historia);
+      body+=sec('IV. Instrumentos Utilizados')+par(datos.instrumentos);
+      body+=sec('V. Resultados')+par(datos.resultados);
       body+=sec('VI. Diagn\u00f3stico');
-      body+=camp('Diagn\u00f3stico principal',datos.diagnostico); body+=camp('Manual',datos.manual);
-      if(datos.diagnosticoDif) body+=camp('Diagn\u00f3stico diferencial',datos.diagnosticoDif);
-      body+=sec('VII. Recomendaciones'); body+=par(datos.recomendaciones);
-      body+=sec('VIII. Conclusiones'); body+=par(datos.conclusiones);
+      body+=campo('Diagn\u00f3stico principal',datos.diagnostico)+campo('Manual',datos.manual);
+      if(datos.diagnosticoDif) body+=campo('Diagn\u00f3stico diferencial',datos.diagnosticoDif);
+      body+=sec('VII. Recomendaciones')+par(datos.recomendaciones);
+      body+=sec('VIII. Conclusiones')+par(datos.conclusiones);
       break;
     }
     case 'informe_legal': {
-      body+=title('INFORME PSICOL\u00d3GICO PARA PROCESO LEGAL');
-      body+=subtitle(datos.tipoProcess||'Evaluaci\u00f3n Pericial'); body+=hr();
-      body+=`{\\pard\\sb80\\sa120{\\f0\\b\\fs18\\cf2 ${re('\u26a0 DOCUMENTO CONFIDENCIAL \u2014 USO EXCLUSIVO PARA FINES JUDICIALES')}}\\par}\n`;
+      body+='<h1 class="doc-title">INFORME PSICOL\u00d3GICO PARA PROCESO LEGAL</h1>';
+      if(datos.tipoProcess) body+='<div class="subtitle">'+esc(datos.tipoProcess)+'</div>';
+      body+=hr()+'<div class="alerta">\u26a0\ufe0f DOCUMENTO CONFIDENCIAL \u2014 USO EXCLUSIVO PARA FINES JUDICIALES</div>';
       body+=sec('I. Datos del Solicitante');
-      body+=camp('Solicitado por',datos.solicitante); body+=camp('Entidad',datos.entidad);
-      body+=camp('Prop\u00f3sito',datos.proposito); body+=camp('Radicado',datos.radicado);
+      body+=campo('Solicitado por',datos.solicitante)+campo('Entidad',datos.entidad);
+      body+=campo('Prop\u00f3sito',datos.proposito)+campo('Radicado',datos.radicado);
       body+=sec('II. Datos del Evaluado/a');
-      body+=camp('Nombre',pac.nombre); body+=camp('Identificaci\u00f3n','C.C. '+pac.cc); body+=camp('Relaci\u00f3n con el proceso',datos.relacionProceso);
-      body+=sec('III. Metodolog\u00eda'); body+=par(datos.metodologia); body+=camp('Instrumentos',datos.instrumentos);
-      body+=sec('IV. Hallazgos Cl\u00ednicos'); body+=par(datos.hallazgos);
-      body+=sec('V. An\u00e1lisis Psicol\u00f3gico'); body+=par(datos.analisis);
-      body+=sec('VI. Conclusiones y Concepto'); body+=par(datos.conclusiones);
-      body+=sec('VII. Recomendaciones'); body+=par(datos.recomendaciones);
-      body+=par('La profesional suscrita declara que el presente informe ha sido elaborado de manera objetiva, con base en la evidencia cl\u00ednica recopilada.',{italic:true});
+      body+=campo('Nombre',pac.nombre)+campo('Identificaci\u00f3n','C.C. '+pac.cc)+campo('Relaci\u00f3n con el proceso',datos.relacionProceso);
+      body+=sec('III. Metodolog\u00eda')+par(datos.metodologia)+campo('Instrumentos',datos.instrumentos);
+      body+=sec('IV. Hallazgos Cl\u00ednicos')+par(datos.hallazgos);
+      body+=sec('V. An\u00e1lisis Psicol\u00f3gico')+par(datos.analisis);
+      body+=sec('VI. Conclusiones y Concepto')+par(datos.conclusiones);
+      body+=sec('VII. Recomendaciones')+par(datos.recomendaciones);
+      body+=par('La profesional suscrita declara que el presente informe ha sido elaborado de manera objetiva, con base en la evidencia cl\u00ednica recopilada.',true);
       break;
     }
     case 'informe_incapacidad': {
-      body+=title('CERTIFICADO PSICOL\u00d3GICO DE INCAPACIDAD LABORAL'); body+=hr();
+      body+='<h1 class="doc-title">CERTIFICADO PSICOL\u00d3GICO DE INCAPACIDAD LABORAL</h1>'+hr();
       body+=sec('I. Datos del Paciente');
-      body+=camp('Nombre completo',pac.nombre); body+=camp('Identificaci\u00f3n','C.C. '+pac.cc);
-      body+=camp('Empleador / Empresa',datos.empleador); body+=camp('Cargo',datos.cargo);
+      body+=campo('Nombre completo',pac.nombre)+campo('Identificaci\u00f3n','C.C. '+pac.cc);
+      body+=campo('Empleador / Empresa',datos.empleador)+campo('Cargo',datos.cargo);
       body+=sec('II. Diagn\u00f3stico');
-      body+=camp('Diagn\u00f3stico',datos.diagnostico); body+=camp('C\u00f3digo CIE-11 / DSM-5',datos.codigoDx);
-      body+=sec('III. Justificaci\u00f3n de Incapacidad'); body+=par(datos.justificacion);
-      body+=camp('Per\u00edodo recomendado',datos.periodo); body+=camp('Fecha inicio',datos.fechaInicio); body+=camp('Fecha fin estimada',datos.fechaFin);
-      body+=sec('IV. Recomendaciones'); body+=par(datos.recomendaciones);
+      body+=campo('Diagn\u00f3stico',datos.diagnostico)+campo('C\u00f3digo CIE-11 / DSM-5',datos.codigoDx);
+      body+=sec('III. Justificaci\u00f3n de Incapacidad')+par(datos.justificacion);
+      body+=campo('Per\u00edodo recomendado',datos.periodo)+campo('Fecha inicio',datos.fechaInicio)+campo('Fecha fin estimada',datos.fechaFin);
+      body+=sec('IV. Recomendaciones')+par(datos.recomendaciones);
       break;
     }
   }
-  // Firma
-  body+=`{\\pard\\sb400\\sa0\\par}\n`; body+=hr();
-  body+=par(`En constancia se firma en Medell\u00edn, a los ${fecha}.`,{italic:true});
-  body+=`{\\pard\\sb360\\sa0{\\f0\\fs19\\cf3 ${re('_'.repeat(45))}}\\par}\n`;
-  body+=`{\\pard\\sb40\\sa0{\\f0\\b\\fs22\\cf1 ${re(PSI.nombre)}}\\par}\n`;
-  body+=`{\\pard\\sb20\\sa0{\\f0\\fs19\\cf2 ${re('Psic\u00f3loga Titulada \u00b7 T.P. No. '+PSI.tp)}}\\par}\n`;
-  body+=`{\\pard\\sb20\\sa0{\\f0\\fs18\\cf3 ${re('C.C. '+PSI.cc+' \u00b7 '+PSI.tel+' \u00b7 '+PSI.email)}}\\par}\n`;
-  body+=`{\\pard\\sb10\\sa0{\\f0\\fs18\\cf3 ${re(PSI.dir)}}\\par}\n`;
 
-  return `{\\rtf1\\ansi\\ansicpg1252\\uc1\\deff0\n{\\fonttbl{\\f0\\fswiss Arial;}{\\f1\\froman Georgia;}}\n{\\colortbl;\\red100\\green48\\blue0;\\red205\\green142\\blue157;\\red80\\green80\\blue80;}\n\\widowctrl\\hyphauto\\paperw11906\\paperh16838\\margl1440\\margr1440\\margt1440\\margb1440\n${body}}`;
+  const css = '<style>*{box-sizing:border-box;margin:0;padding:0;}'
+    +'body{font-family:Arial,sans-serif;color:#643000;background:#fff;padding:32px 38px;font-size:14px;max-width:900px;margin:0 auto;}'
+    +'.header{display:flex;align-items:center;gap:18px;background:linear-gradient(135deg,#fff8f9,#fadae1);padding:16px 20px;border-radius:12px;border-bottom:3px solid #cd8e9d;margin-bottom:28px;}'
+    +'.header img{height:70px;object-fit:contain;}'
+    +'.header-info h1{font-size:1.15rem;color:#643000;margin-bottom:2px;font-family:Georgia,serif;font-style:italic;}'
+    +'.header-info p{font-size:0.7rem;color:#cd8e9d;letter-spacing:1.5px;text-transform:uppercase;margin-top:2px;}'
+    +'.doc-title{text-align:center;font-family:Georgia,serif;font-size:1.4rem;color:#643000;margin-bottom:6px;}'
+    +'.subtitle{text-align:center;font-size:.85rem;color:#a0536a;font-style:italic;margin-bottom:12px;}'
+    +'hr{border:none;border-top:2px solid #fadae1;margin:16px 0;}'
+    +'h2{font-size:.92rem;color:#a0536a;margin:20px 0 8px;padding:6px 12px;background:#fadae1;border-left:4px solid #cd8e9d;border-radius:0 8px 8px 0;text-transform:uppercase;letter-spacing:.5px;}'
+    +'.en-sec{font-size:.82rem;font-weight:700;color:#cd8e9d;text-transform:uppercase;letter-spacing:.5px;margin:16px 0 8px;}'
+    +'p{margin:8px 0;font-size:.9rem;line-height:1.7;color:#3a1a00;}'
+    +'.campo{margin:6px 0 6px 4px;font-size:.9rem;line-height:1.5;}'
+    +'.campo .label{font-weight:700;color:#a0536a;}'
+    +'.campo .val{color:#3a1a00;}'
+    +'.alerta{background:#fff3cd;border:1.5px solid #ffc107;border-radius:8px;padding:8px 14px;font-size:.82rem;color:#7a5a00;margin:10px 0;}'
+    +'.firmas{margin-top:44px;border-top:2px solid #fadae1;padding-top:24px;display:flex;gap:40px;flex-wrap:wrap;}'
+    +'.firma-bloque{flex:1;min-width:220px;}.firma-label{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#a0536a;margin-bottom:4px;}'
+    +'.firma-img{height:65px;display:block;margin-bottom:4px;mix-blend-mode:multiply;}'
+    +'.firma-linea{border-top:1.5px solid #cd8e9d;padding-top:6px;font-size:.82rem;color:#643000;}'
+    +'.firma-sub{font-size:.68rem;color:#cd8e9d;margin-top:3px;}'
+    +'@media print{@page{margin:1.8cm}body{padding:0}}</style>';
+
+  const firmaHTML = '<div class="firmas">'
+    +'<div class="firma-bloque"><div class="firma-label">Paciente / Solicitante</div>'
+    +'<div style="height:65px;border-bottom:1.5px solid #cd8e9d;margin-bottom:4px"></div>'
+    +'<div class="firma-linea">'+esc(pac.nombre)+'</div>'
+    +'<div class="firma-sub">Fecha: ___-___-_____</div></div>'
+    +'<div class="firma-bloque"><div class="firma-label">Psic\u00f3loga</div>'
+    +'<img class="firma-img" src="'+FIRMA_DATA+'" alt="Firma">'
+    +'<div class="firma-linea"><strong>'+PSI.nombre+'</strong></div>'
+    +'<div class="firma-sub">T.P. No. '+PSI.tp+' \u00b7 '+fecha+'</div></div>'
+    +'</div>'
+    +'<p style="text-align:center;font-size:.62rem;color:#cd8e9d;margin-top:18px">Documento confidencial \u2014 '+PSI.tel+' \u00b7 '+PSI.email+'</p>';
+
+  return '<!DOCTYPE html><html><head><meta charset="UTF-8">'+css+'</head><body>'
+    +'<div class="header"><img src="'+logoSrc+'" alt="Logo"><div class="header-info"><h1>'+PSI.nombre+'</h1><p>Psic\u00f3loga \u00b7 TP '+PSI.tp+'</p></div></div>'
+    +body+firmaHTML+'</body></html>';
 }
+
 
 
 // ===================== PATIENT MODAL =====================
@@ -4992,62 +5017,70 @@ function exportarPlanWord(){
   var data = DB.get('plan_'+pid)||{};
   var pacs = getPacientes();
   var pac = pacs.find(function(p){ return p.id===pid; })||{nombre:'Paciente'};
+  var logoSrc = document.getElementById('logo-img').src;
   var fechaDoc = new Date().toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'});
 
-  function rtf(str){
-    if(!str) return '';
-    var out = '';
-    for(var i=0;i<str.length;i++){
-      var c=str.charCodeAt(i);
-      if(c>127){ var s=c>32767?c-65536:c; out+='\\u'+s+'?'; }
-      else if(c===92) out+='\\\\';
-      else if(c===123) out+='\\{';
-      else if(c===125) out+='\\}';
-      else out+=str[i];
-    }
-    return out;
-  }
-  function sec(t){ return '{\\pard\\sb240\\sa80{\\b\\fs24\\cf2 '+rtf(t)+'}\\par}'; }
-  function par(t){ return t?'{\\pard\\sb60\\sa60{\\fs20\\cf1 '+rtf(t)+'}\\par}':''; }
-  function campo(l,v){ return v?'{\\pard\\sb80\\sa40{\\b\\fs20\\cf1 '+rtf(l)+': }{\\fs20\\cf1 '+rtf(String(v))+'}\\par}':''; }
+  function esc(s){ if(!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+  function fila(l,v){ if(!v) return ''; return '<div class="dato"><strong>'+esc(l)+':</strong> '+esc(String(v))+'</div>'; }
+  function sec(t){ return '<h2>'+esc(t)+'</h2>'; }
+  function bloque(t){ return '<div class="objetivo">'+esc(t)+'</div>'; }
 
-  var fasesRtf = '';
-  (data.fases||[]).forEach(function(f,i){
+  var fasesTabla = '<table><thead><tr><th>Fase</th><th>Objetivos</th><th>T\u00e9cnicas</th><th>Semanas</th></tr></thead><tbody>';
+  (data.fases||[]).forEach(function(f){
     if(!f[0]&&!f[1]&&!f[2]) return;
-    fasesRtf += '{\\pard\\sb120\\sa40{\\b\\fs20\\cf3 Fase '+(i+1)+(f[0]?' \u2014 '+rtf(f[0]):'')+(f[3]?' ('+rtf(f[3])+' sem.)':'')+'}\\par}';
-    if(f[1]) fasesRtf += par('Objetivos: '+f[1]);
-    if(f[2]) fasesRtf += par('T\u00e9cnicas: '+f[2]);
+    fasesTabla += '<tr><td>'+esc(f[0]||'')+'</td><td>'+esc(f[1]||'')+'</td><td>'+esc(f[2]||'')+'</td><td>'+esc(f[3]||'')+'</td></tr>';
   });
+  fasesTabla += '</tbody></table>';
 
-  var partes = [
-    '{\\rtf1\\ansi\\ansicpg1252\\uc1\\deff0',
-    '{\\fonttbl{\\f0\\fswiss Arial;}{\\f1\\froman Georgia;}}',
-    '{\\colortbl;\\red100\\green48\\blue0;\\red205\\green142\\blue157;\\red160\\green83\\blue106;}',
-    '{\\pard\\sb0\\sa60{\\f1\\b\\fs36\\cf2 '+rtf('Plan de Tratamiento Psicol\u00f3gico')+'}\\par}',
-    '{\\pard\\sb0\\sa40{\\f0\\fs20\\cf1 '+rtf('Luisa Fernanda Garc\u00e9s Garc\u00eda \u00b7 Psic\u00f3loga \u00b7 TP 174366')+'}\\par}',
-    '{\\pard\\sb0\\sa200{\\f0\\fs18\\cf3 '+rtf(fechaDoc)+'}\\par}',
-    campo('Paciente', pac.nombre),
-    campo('Fecha inicio', data.fecha),
-    campo('Modalidad', data.modalidad),
-    campo('Frecuencia', data.frecuencia),
-    data.dx ? sec('Diagn\u00f3stico de Trabajo') + par(data.dx) : '',
-    data.objetivo ? sec('Objetivo General') + par(data.objetivo) : '',
-    data.t1 ? sec('Objetivo Espec\u00edfico 1') + par(data.t1) : '',
-    data.t2 ? sec('Objetivo Espec\u00edfico 2') + par(data.t2) : '',
-    fasesRtf ? sec('Fases del Proceso Terap\u00e9utico') + fasesRtf : '',
-    data.mat ? sec('Materiales y Recursos') + par(data.mat) : '',
-    data.apps ? sec('Apps / Herramientas') + par(data.apps) : '',
-    data.emerg ? sec('Plan de Emergencias') + par(data.emerg) : '',
-    '{\\pard\\sb300\\sa80\\brdrb\\brdrs\\brdrw10 \\par}',
-    '{\\pard\\sb200\\sa60{\\b\\fs22\\cf2 '+rtf('FIRMAS')+'}\\par}',
-    '{\\pard\\sb120\\sa120{\\f0\\fs20\\cf1 '+rtf('Paciente: _________________________________     Fecha: ___-___-_____')+'}\\par}',
-    '{\\pard\\sb60\\sa60{\\f0\\b\\fs20\\cf1 '+rtf('Psic\u00f3loga: Luisa Fernanda Garc\u00e9s Garc\u00eda     TP 174366')+'}\\par}',
-    '}'
-  ];
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8">'
+  +'<style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:Arial,sans-serif;color:#643000;background:#fff;padding:32px 38px;font-size:14px;max-width:900px;margin:0 auto;}'
+  +'.header{display:flex;align-items:center;gap:18px;background:linear-gradient(135deg,#fff8f9,#fadae1);padding:16px 20px;border-radius:12px;border-bottom:3px solid #cd8e9d;margin-bottom:24px;}'
+  +'.header img{height:70px;object-fit:contain;}'
+  +'.header-info h1{font-size:1.15rem;color:#643000;margin-bottom:2px;font-family:Georgia,serif;font-style:italic;}'
+  +'.header-info p{font-size:0.7rem;color:#cd8e9d;letter-spacing:1.5px;text-transform:uppercase;margin-top:2px;}'
+  +'.doc-title{text-align:center;margin:0 0 24px;font-family:Georgia,serif;font-size:1.5rem;color:#643000;border-bottom:2px solid #fadae1;padding-bottom:12px;}'
+  +'h2{font-size:.95rem;color:#a0536a;margin:20px 0 8px;padding:6px 12px;background:#fadae1;border-left:4px solid #cd8e9d;border-radius:0 8px 8px 0;text-transform:uppercase;letter-spacing:.5px;}'
+  +'.dato{margin:5px 0 5px 4px;font-size:.9rem;line-height:1.5;}.dato strong{color:#a0536a;}'
+  +'.objetivo{background:#fff8f9;border:1.5px solid #cd8e9d;border-left:5px solid #cd8e9d;padding:12px 16px;border-radius:0 10px 10px 0;margin:10px 0;font-size:.9rem;line-height:1.6;}'
+  +'table{width:100%;border-collapse:collapse;margin-top:8px;}'
+  +'th{background:#fadae1;color:#643000;padding:8px 10px;border:1px solid #cd8e9d;font-size:.78rem;text-align:left;}'
+  +'td{padding:8px 10px;border:1px solid #f0d8de;font-size:.84rem;vertical-align:top;line-height:1.5;}'
+  +'.firmas{margin-top:40px;border-top:2px solid #fadae1;padding-top:24px;display:flex;gap:40px;flex-wrap:wrap;}'
+  +'.firma-bloque{flex:1;min-width:220px;}.firma-label{font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;color:#a0536a;margin-bottom:4px;}'
+  +'.firma-img{height:65px;display:block;margin-bottom:4px;mix-blend-mode:multiply;}'
+  +'.firma-linea{border-top:1.5px solid #cd8e9d;padding-top:6px;font-size:.82rem;color:#643000;}'
+  +'.fecha-doc{text-align:right;font-size:.72rem;color:#cd8e9d;margin-top:6px;}'
+  +'@media print{@page{margin:1.8cm}body{padding:0}}</style></head><body>'
+  +'<div class="header"><img src="'+logoSrc+'" alt="Logo"><div class="header-info"><h1>Luisa Fernanda Garc\u00e9s Garc\u00eda</h1><p>Psic\u00f3loga \u00b7 TP 174366</p></div></div>'
+  +'<div class="doc-title">Plan de Tratamiento Psicol\u00f3gico</div>'
+  +fila('Paciente', pac.nombre)
+  +fila('Fecha inicio', data.fecha)
+  +fila('Modalidad', data.modalidad)
+  +fila('Frecuencia', data.frecuencia)
+  +(data.dx ? sec('Diagn\u00f3stico de Trabajo')+'<div class="dato">'+esc(data.dx)+'</div>' : '')
+  +(data.objetivo ? sec('Objetivo General')+bloque(data.objetivo) : '')
+  +(data.t1 ? sec('Objetivo Espec\u00edfico 1')+bloque(data.t1) : '')
+  +(data.t2 ? sec('Objetivo Espec\u00edfico 2')+bloque(data.t2) : '')
+  +(((data.fases||[]).some(function(f){return f[0]||f[1]||f[2];})) ? sec('Fases del Proceso Terap\u00e9utico')+fasesTabla : '')
+  +(data.mat||data.apps||data.emerg ? sec('Recursos y Consideraciones') : '')
+  +(data.mat ? fila('📚 Materiales', data.mat) : '')
+  +(data.apps ? fila('📱 Apps / herramientas', data.apps) : '')
+  +(data.emerg ? fila('🚨 Plan de emergencias', data.emerg) : '')
+  +'<div class="firmas">'
+  +'<div class="firma-bloque"><div class="firma-label">Paciente</div>'
+  +'<div style="height:65px;border-bottom:1.5px solid #cd8e9d;margin-bottom:4px"></div>'
+  +'<div class="firma-linea">'+esc(pac.nombre)+'</div>'
+  +'<div class="fecha-doc">Fecha: ___-___-_____</div></div>'
+  +'<div class="firma-bloque"><div class="firma-label">Psic\u00f3loga Tratante</div>'
+  +'<img class="firma-img" src="'+FIRMA_DATA+'" alt="Firma">'
+  +'<div class="firma-linea"><strong>Luisa Fernanda Garc\u00e9s Garc\u00eda</strong></div>'
+  +'<div class="fecha-doc">TP 174366 &nbsp;\u00b7&nbsp; '+fechaDoc+'</div></div>'
+  +'</div>'
+  +'<p style="text-align:center;font-size:.65rem;color:#cd8e9d;margin-top:20px">Documento confidencial de uso cl\u00ednico \u2014 Generado el '+fechaDoc+'</p>'
+  +'</body></html>';
 
-  var rtfContent = partes.filter(Boolean).join('\n');
-  descargarArchivo(rtfContent, 'Plan_'+pac.nombre.replace(/\s+/g,'_')+'.rtf', 'application/octet-stream');
-  toast('📝 Descargado \u2014 \u00e1brelo con Word o WordPad');
+  descargarArchivo(html, 'Plan_'+pac.nombre.replace(/\s+/g,'_')+'.html', 'application/octet-stream');
+  toast('📄 Descargado. \u00c1brelo en el navegador e imprime \u2192 Guardar como PDF');
 }
 
 
@@ -5134,9 +5167,19 @@ function dibujarBday(pac, edad){
   flor(65,230,38,'#cd8e9d'); flor(735,175,32,'#e8a0b0');
   flor(105,405,27,'#e8a0b0'); flor(695,375,34,'#cd8e9d'); flor(385,450,21,'#f0b8c6');
 
-  // Logo
+  // Logo - proporciones correctas
   var logo = document.getElementById('logo-img');
-  if(logo && logo.complete && logo.naturalWidth){ try{ ctx.save(); ctx.globalAlpha=0.93; var _lw=210,_lh=140; ctx.drawImage(logo,W/2-_lw/2,10,_lw,_lh); ctx.restore(); }catch(e){} }
+  if(logo && logo.complete && logo.naturalWidth){
+    try{
+      var _natW=logo.naturalWidth, _natH=logo.naturalHeight;
+      var _maxW=200, _maxH=100;
+      var _sc=Math.min(_maxW/_natW, _maxH/_natH);
+      var _lw=_natW*_sc, _lh=_natH*_sc;
+      ctx.save(); ctx.globalAlpha=0.93;
+      ctx.drawImage(logo, W/2-_lw/2, 14+(_maxH-_lh)/2, _lw, _lh);
+      ctx.restore();
+    }catch(e){}
+  }
 
   // Texto principal
   ctx.save(); ctx.textAlign='center';
@@ -5242,7 +5285,7 @@ function abrirImagenCita(evId){
 
 function dibujarImagenCita(ev){
   var canvas=document.getElementById('citaImgCanvas');
-  var W=800, H=560;
+  var W=800, H=620;
   canvas.width=W; canvas.height=H;
   var ctx=canvas.getContext('2d');
 
@@ -5254,98 +5297,107 @@ function dibujarImagenCita(ev){
   var esVirtual=ev.tipo==='virtual';
   var nombreCita=ev.titulo.replace(/CONSULTORIO (VIRTUAL|PRESENCIAL)\s*[-\u2013]\s*/i,'').trim()||ev.titulo;
 
-  // Fondo
+  // --- FONDO ---
   var g=ctx.createLinearGradient(0,0,0,H);
   g.addColorStop(0,'#fdf5f7'); g.addColorStop(1,'#fadae1');
   ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
 
-  // Franja superior ampliada (220px) para logo + título sin superposición
-  var FRANJA_H = 220;
+  // --- FRANJA SUPERIOR 210px ---
   var fg=ctx.createLinearGradient(0,0,W,0);
-  fg.addColorStop(0,'#c07d8e'); fg.addColorStop(0.5,'#cd8e9d'); fg.addColorStop(1,'#c07d8e');
-  ctx.fillStyle=fg; ctx.fillRect(0,0,W,FRANJA_H);
+  fg.addColorStop(0,'#b87082'); fg.addColorStop(0.5,'#cd8e9d'); fg.addColorStop(1,'#b87082');
+  ctx.fillStyle=fg; ctx.fillRect(0,0,W,210);
 
-  // Círculos decorativos en franja
+  // Circulos decorativos suaves
   function cf(x,y,r,a){ ctx.save(); ctx.globalAlpha=a; ctx.fillStyle='#fff'; ctx.beginPath(); ctx.arc(x,y,r,0,Math.PI*2); ctx.fill(); ctx.restore(); }
-  cf(50,110,70,0.07); cf(750,110,80,0.07);
+  cf(60,105,70,0.07); cf(740,105,80,0.07); cf(400,210,120,0.04);
 
-  // Logo centrado en franja — zona: y=12 a y=140 (128px de alto disponible)
+  // --- LOGO: zona y=10 a y=130 ---
   var logo=document.getElementById('logo-img');
   if(logo && logo.complete && logo.naturalWidth){
     try{
-      var natW=logo.naturalWidth||200, natH=logo.naturalHeight||120;
-      var maxW=240, maxH=110;
+      var natW=logo.naturalWidth, natH=logo.naturalHeight;
+      var maxW=240, maxH=108;
       var sc=Math.min(maxW/natW, maxH/natH);
       var lw=natW*sc, lh=natH*sc;
-      ctx.save(); ctx.globalAlpha=0.97;
-      ctx.drawImage(logo, W/2-lw/2, 12+(110-lh)/2, lw, lh);
+      ctx.save(); ctx.globalAlpha=0.96;
+      ctx.drawImage(logo, W/2-lw/2, 10+(108-lh)/2, lw, lh);
       ctx.restore();
     }catch(e){}
   } else {
-    ctx.save(); ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.92)';
-    ctx.font='bold italic 18px "Playfair Display",Georgia,serif';
-    ctx.fillText('Luisa Fernanda Garc\u00e9s Garc\u00eda', W/2, 65);
-    ctx.font='14px Lato,Arial'; ctx.fillText('Psic\u00f3loga \u00b7 TP 174366', W/2, 88);
+    ctx.save(); ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.9)';
+    ctx.font='bold italic 16px "Playfair Display",Georgia,serif';
+    ctx.fillText('Luisa Fernanda Garc\u00e9s Garc\u00eda', W/2, 68);
+    ctx.font='13px Lato,Arial'; ctx.fillText('Psic\u00f3loga \u00b7 TP 174366', W/2, 88);
     ctx.restore();
   }
 
-  // Separador fino bajo el logo
-  ctx.save(); ctx.strokeStyle='rgba(255,255,255,0.28)'; ctx.lineWidth=1;
-  ctx.beginPath(); ctx.moveTo(W/2-180,138); ctx.lineTo(W/2+180,138); ctx.stroke(); ctx.restore();
+  // Separador fino y decorativo
+  ctx.save(); ctx.strokeStyle='rgba(255,255,255,0.35)'; ctx.lineWidth=1;
+  ctx.beginPath(); ctx.moveTo(W/2-140,132); ctx.lineTo(W/2+140,132); ctx.stroke(); ctx.restore();
 
-  // Título "Recordatorio de Cita" — claramente en la franja, debajo del separador
+  // Titulo "Recordatorio de Cita" - bien abajo dentro de franja
   ctx.save(); ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,0.95)';
-  ctx.shadowColor='rgba(80,30,0,0.30)'; ctx.shadowBlur=8;
-  ctx.font='italic 20px "Playfair Display",Georgia,serif';
-  ctx.fillText('Recordatorio de Cita \uD83C\uDF38', W/2, 175);
+  ctx.shadowColor='rgba(60,20,0,0.2)'; ctx.shadowBlur=5;
+  ctx.font='italic 17px "Playfair Display",Georgia,serif';
+  ctx.fillText('Recordatorio de Cita  \u273F', W/2, 175);
   ctx.restore();
 
-  // Tarjeta blanca — comienza bien por debajo de la franja
-  var CARD_TOP = 204;
-  var CARD_H = 308;
-  ctx.save(); ctx.fillStyle='rgba(255,255,255,0.95)';
-  ctx.shadowColor='rgba(160,83,106,0.15)'; ctx.shadowBlur=28; ctx.shadowOffsetY=6;
-  rrect(ctx,50,CARD_TOP,W-100,CARD_H,22); ctx.fill(); ctx.restore();
+  // --- TARJETA BLANCA: empieza en y=218, bien debajo de franja ---
+  var cY=218, cH=298;
+  ctx.save(); ctx.fillStyle='rgba(255,255,255,0.96)';
+  ctx.shadowColor='rgba(140,70,90,0.14)'; ctx.shadowBlur=30; ctx.shadowOffsetY=8;
+  rrect(ctx,46,cY,W-92,cH,20); ctx.fill(); ctx.restore();
 
-  // Icono tipo sesión
-  ctx.font='38px serif'; ctx.textAlign='center';
-  ctx.fillText(esVirtual?'\uD83D\uDCBB':'\uD83C\uDFE5', W/2, CARD_TOP+52);
+  // Etiqueta tipo sesion (texto, no emoji, para iOS)
+  ctx.save(); ctx.textAlign='center';
+  var tipoColor=esVirtual?'#5b8db5':'#a0536a';
+  ctx.fillStyle=tipoColor; ctx.font='bold 12px Lato,Arial,sans-serif';
+  ctx.letterSpacing='1px';
+  ctx.fillText(esVirtual?'\u2014  SESI\u00d3N VIRTUAL  \u2014':'\u2014  CONSULTA PRESENCIAL  \u2014', W/2, cY+32);
+  ctx.restore();
 
-  // Nombre del paciente/sesión
+  // Nombre de la paciente / titulo cita
   ctx.save(); ctx.textAlign='center'; ctx.fillStyle='#643000';
-  ctx.font='bold 28px "Playfair Display",Georgia,serif';
-  ctx.shadowColor='rgba(100,48,0,0.1)'; ctx.shadowBlur=5;
-  ctx.fillText(nombreCita, W/2, CARD_TOP+96);
+  ctx.font='bold 29px "Playfair Display",Georgia,serif';
+  ctx.shadowColor='rgba(100,48,0,0.08)'; ctx.shadowBlur=4;
+  ctx.fillText(nombreCita, W/2, cY+72);
   ctx.restore();
 
-  // Separador interno
+  // Linea separadora
   ctx.save(); ctx.strokeStyle='#f0d8de'; ctx.lineWidth=1.5;
-  ctx.beginPath(); ctx.moveTo(W/2-170,CARD_TOP+116); ctx.lineTo(W/2+170,CARD_TOP+116); ctx.stroke(); ctx.restore();
+  ctx.beginPath(); ctx.moveTo(W/2-170,cY+88); ctx.lineTo(W/2+170,cY+88); ctx.stroke(); ctx.restore();
 
-  // Filas de datos (más grandes y legibles)
-  function fila(ic,txt,y){
-    ctx.save(); ctx.font='18px serif'; ctx.textAlign='left'; ctx.fillStyle='#cd8e9d';
-    ctx.fillText(ic, W/2-195, y);
-    ctx.font='bold 15px Lato,Arial,sans-serif'; ctx.fillStyle='#643000';
-    ctx.fillText(txt, W/2-150, y); ctx.restore();
+  // Funcion para filas de datos - etiquetas en texto plano (sin emojis)
+  function fila(label, txt, y){
+    var lx=W/2-184, tx=W/2-184;
+    ctx.save();
+    ctx.font='700 11px Lato,Arial,sans-serif';
+    ctx.fillStyle='#cd8e9d'; ctx.textAlign='left';
+    ctx.fillText(label.toUpperCase(), lx, y);
+    ctx.font='600 15px Lato,Arial,sans-serif';
+    ctx.fillStyle='#643000';
+    ctx.fillText(txt, tx, y+20);
+    ctx.restore();
   }
-  fila('\uD83D\uDCC5', diaStr, CARD_TOP+154);
-  fila('\u23F0', hora+' \u2013 '+horaFin, CARD_TOP+188);
-  fila('\uD83D\uDCCD', esVirtual?'Sesi\u00f3n virtual':'Presencial \u00b7 Consultorio', CARD_TOP+222);
-  if(ev.descripcion){ fila('\uD83D\uDCAC', ev.descripcion.slice(0,56)+(ev.descripcion.length>56?'...':''), CARD_TOP+256); }
 
-  // Pie de página
-  var pieY = CARD_TOP + CARD_H + 28;
-  ctx.save(); ctx.textAlign='center'; ctx.fillStyle='#7a3d20'; ctx.globalAlpha=0.78;
-  ctx.font='italic 13px "Playfair Display",Georgia,serif';
-  ctx.fillText('Si necesitas cambiar tu cita, por favor av\u00edsame con anticipaci\u00f3n.', W/2, pieY);
+  fila('Fecha', diaStr,        cY+114);
+  fila('Hora',  hora+' \u2013 '+horaFin, cY+160);
+  fila('Modalidad', esVirtual?'Sesi\u00f3n virtual':'Presencial \u00b7 Consultorio', cY+206);
+  if(ev.descripcion){ fila('Nota', ev.descripcion.slice(0,58)+(ev.descripcion.length>58?'...':''), cY+252); }
+
+  // --- PIE ---
+  var pY=cY+cH;
+  ctx.save(); ctx.textAlign='center'; ctx.fillStyle='#7a3d20'; ctx.globalAlpha=0.68;
+  ctx.font='italic 12.5px "Playfair Display",Georgia,serif';
+  ctx.fillText('Si necesitas cambiar tu cita, por favor av\u00edsame con anticipaci\u00f3n.', W/2, pY+28);
   ctx.restore();
   ctx.save(); ctx.textAlign='center'; ctx.fillStyle='#cd8e9d'; ctx.font='13px Lato,Arial';
-  ctx.fillText('Luisa Fernanda Garc\u00e9s Garc\u00eda \u00b7 Psic\u00f3loga \u00b7 TP 174366', W/2, pieY+20);
-  ctx.fillStyle='#a0536a'; ctx.globalAlpha=0.55; ctx.font='12px Lato,Arial';
-  ctx.fillText('3246381453 \u00b7 luisafgarces@gmail.com', W/2, pieY+38);
+  ctx.fillText('Luisa Fernanda Garc\u00e9s Garc\u00eda \u00b7 Psic\u00f3loga \u00b7 TP 174366', W/2, pY+50);
+  ctx.fillStyle='#a0536a'; ctx.globalAlpha=0.5; ctx.font='12px Lato,Arial';
+  ctx.fillText('3246381453 \u00b7 luisafgarces@gmail.com', W/2, pY+68);
   ctx.restore();
 }
+
 
 function rrect(ctx,x,y,w,h,r){
   ctx.beginPath(); ctx.moveTo(x+r,y);
