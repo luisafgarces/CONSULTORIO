@@ -4338,6 +4338,7 @@ function renderDocumentos() {
 }
 
 function docSeleccionarTipo(id) {
+  if(id === 'informe_laboral_psi'){ goPage('informes'); return; }
   docTipoSeleccionado = id;
   renderDocumentos();
   ['doc-paso2','doc-paso3','doc-paso4'].forEach(x=>document.getElementById(x).style.display='block');
@@ -6530,8 +6531,7 @@ function ilGenerarHTMLPreview(datos){
     +(datos.recColaborador?'<em style="font-weight:700;color:#a0536a;font-size:.85rem">Para el Colaborador</em><div style="font-size:.88rem;margin:8px 0 14px">'+datos.recColaborador+'</div>':'')
     +(datos.recEmpresa?'<em style="font-weight:700;color:#a0536a;font-size:.85rem">Para la Empresa — Plan de Intervención (Ley 2460)</em><div style="font-size:.88rem;margin:8px 0 24px">'+datos.recEmpresa+'</div>':''):'')
   +'<div style="border-top:1.5px solid #cd8e9d;padding-top:24px;text-align:center;margin-top:8px">'
-    +'<div style="font-size:.8rem;font-weight:700;color:#a0536a;letter-spacing:.5px;text-transform:uppercase;margin-bottom:16px">FIRMA DE LA PSICÓLOGA</div>'
-    +'<div style="width:180px;border-bottom:1.5px solid #643000;margin:40px auto 8px"></div>'
+    +'<img src="'+FIRMA_DATA+'" alt="Firma" style="height:72px;object-fit:contain;display:block;margin:0 auto 8px;mix-blend-mode:multiply;">'
     +'<div style="font-weight:700;color:#643000;font-size:.95rem">Luisa Fernanda Garcés García</div>'
     +'<div style="font-size:.78rem;color:#a0536a;margin-top:2px">Psicóloga Titulada · T.P. No. 174366</div>'
     +'<div style="font-size:.75rem;color:#cd8e9d">C.C. 1036602429 · 3246381453 · luisafgarces@gmail.com</div>'
