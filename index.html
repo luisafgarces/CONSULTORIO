@@ -2935,18 +2935,10 @@ function exportarResumenPDF(){
   <div class="titulo">Resumen de Sesi\u00f3n #${num}</div>
   <div class="sub">${fechaFmt} &nbsp;\u00b7&nbsp; ${pac.nombre}</div>
   ${lines}
-  <div class="firmas">
-    <div class="firma-bloque">
-      <div class="firma-label">Paciente</div>
-      <div style="height:55px;border-bottom:1.5px solid #cd8e9d;margin-bottom:6px"></div>
-      <div class="firma-linea">${pac.nombre}</div>
-    </div>
-    <div class="firma-bloque">
-      <div class="firma-label">Psic\u00f3loga Tratante</div>
-      <img class="firma-img" src="${FIRMA_DATA}" alt="Firma">
-      <div class="firma-linea"><strong>Luisa Fernanda Garc\u00e9s Garc\u00eda</strong></div>
-      <div class="firma-sub">TP 174366</div>
-    </div>
+  <div style="margin-top:44px;border-top:2px solid #fadae1;padding-top:22px;text-align:center;">
+    <img class="firma-img" src="${FIRMA_DATA}" alt="Firma">
+    <div class="firma-linea"><strong>Luisa Fernanda Garc\u00e9s Garc\u00eda</strong></div>
+    <div class="firma-sub">Psic\u00f3loga Tratante &nbsp;\u00b7&nbsp; TP 174366</div>
   </div>
   <div class="pie">Generado el ${fechaGen} \u00b7 Documento confidencial de uso cl\u00ednico</div>
   </body></html>`;
