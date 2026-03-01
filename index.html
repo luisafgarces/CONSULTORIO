@@ -484,6 +484,10 @@ input[type=range] { accent-color: var(--border); flex: 1; }
   .col2, .col3 { grid-template-columns: 1fr; }
 }
 @media(max-width: 1024px) {
+  /* Layout sesiones: apilar verticalmente en tablet/móvil */
+  #ses-layout {
+    grid-template-columns: 1fr !important;
+  }
   /* On mobile/tablet: sidebar is hidden off-screen by default, shown as drawer */
   #sidebar {
     transform: translateX(-100%);
@@ -936,7 +940,7 @@ input[type=range] { accent-color: var(--border); flex: 1; }
     <button class="btn primary" onclick="nuevaSesion()">+ Nueva Sesión</button>
   </div>
 
-  <div style="display:grid; grid-template-columns:260px 1fr; gap:20px">
+  <div id="ses-layout" style="display:grid; grid-template-columns:260px 1fr; gap:20px">
     <div>
       <div class="card" style="padding:16px">
         <div class="sec-title" style="font-size:0.9rem">Sesiones</div>
