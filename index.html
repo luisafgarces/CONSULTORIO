@@ -581,6 +581,13 @@ input[type=range] { accent-color: var(--border); flex: 1; }
   </div>
   <div class="stat-grid" id="dash-stats"></div>
   <div id="dash-bday-widget"></div>
+  <div class="card" id="dash-citas-manana-card" style="display:none">
+    <div class="sec-title" style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
+      <span id="dash-citas-manana-titulo">📅 Citas mañana</span>
+      <button class="btn primary" style="font-size:.75rem;padding:6px 14px" onclick="verificarCitasManana()">🔔 Ver alerta recordatorio</button>
+    </div>
+    <div id="dash-citas-manana-lista"></div>
+  </div>
   <div class="card">
     <div class="sec-title">Pacientes Recientes</div>
     <div id="dash-recent-patients"></div>
@@ -3714,6 +3721,34 @@ function renderDashboard(){
     }
     bdayWid.innerHTML = bdayHtml;
   }
+
+  // Citas del día siguiente en el dashboard
+  var mananaD = new Date(); mananaD.setDate(mananaD.getDate()+1);
+  var citasMananaD = agEventos.filter(function(e){
+    if(e.tipo==='admin') return false;
+    var d = new Date(e.inicio);
+    return d.getFullYear()===mananaD.getFullYear() && d.getMonth()===mananaD.getMonth() && d.getDate()===mananaD.getDate();
+  });
+  citasMananaD.sort(function(a,b){ return new Date(a.inicio)-new Date(b.inicio); });
+  var cardManana = document.getElementById('dash-citas-manana-card');
+  var listaManana = document.getElementById('dash-citas-manana-lista');
+  var tituloManana = document.getElementById('dash-citas-manana-titulo');
+  if(cardManana && listaManana){
+    if(citasMananaD.length){
+      var meses2=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+      tituloManana.textContent = '📅 ' + citasMananaD.length + ' cita' + (citasMananaD.length>1?'s':'') + ' mañana — ' + mananaD.getDate()+' de '+meses2[mananaD.getMonth()];
+      listaManana.innerHTML = citasMananaD.map(function(e){
+        var hora = agFormatHora ? agFormatHora(e.inicio) : e.inicio.slice(11,16);
+        return '<div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 12px;background:var(--soft);border-radius:10px;margin-bottom:8px;flex-wrap:wrap">'
+          +'<div><span style="font-weight:700;color:var(--text)">⏰ '+hora+'</span> <span style="color:var(--strong);font-size:.88rem">— '+e.titulo+'</span></div>'
+          +'<button class="btn primary" style="font-size:.72rem;padding:5px 12px" onclick="var existing=document.getElementById(\'cita-alert-badge-main\');if(existing)existing.remove();verificarCitasManana()">🔔 Ver recordatorio</button>'
+          +'</div>';
+      }).join('');
+      cardManana.style.display='block';
+    } else {
+      cardManana.style.display='none';
+    }
+  }
 }
 
 function goPageDirect(name){
@@ -4419,95 +4454,6 @@ const CAMPOS_POR_TIPO = {
 };
 
 function renderCamposEspecificos(tipo) {
-  if(tipo==='informe_laboral_psi'){
-    document.getElementById('doc-campos-especificos').innerHTML = `
-      <div style="background:var(--soft);border:1.5px solid var(--bg);border-radius:12px;padding:14px 18px;margin-bottom:18px">
-        <div style="font-size:.78rem;font-weight:700;color:var(--strong);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">🏢 Datos de la Empresa</div>
-        <div class="row col3">
-          <div class="doc-field-group"><label class="lbl">Empresa Solicitante *</label><input type="text" id="dil-empresa" placeholder="Nombre empresa"></div>
-          <div class="doc-field-group"><label class="lbl">NIT</label><input type="text" id="dil-nit" placeholder="901809107"></div>
-          <div class="doc-field-group"><label class="lbl">ARL Afiliada</label><input type="text" id="dil-arl" placeholder="Sura / Rura / etc."></div>
-        </div>
-        <div class="row col2">
-          <div class="doc-field-group"><label class="lbl">Fecha de Evaluación *</label><input type="date" id="dil-fecha"></div>
-          <div class="doc-field-group"><label class="lbl">Objetivo</label><input type="text" id="dil-objetivo" value="Valoración Psicológica Global"></div>
-        </div>
-      </div>
-      <div style="background:var(--soft);border:1.5px solid var(--bg);border-radius:12px;padding:14px 18px;margin-bottom:18px">
-        <div style="font-size:.78rem;font-weight:700;color:var(--strong);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">👤 Datos del Colaborador</div>
-        <div class="row col3">
-          <div class="doc-field-group"><label class="lbl">Cargo / Ocupación</label><input type="text" id="dil-cargo" placeholder="Auxiliar Doméstica"></div>
-          <div class="doc-field-group"><label class="lbl">Antigüedad en el cargo</label><input type="text" id="dil-antiguedad" placeholder="10 años"></div>
-          <div class="doc-field-group"><label class="lbl">Teléfono</label><input type="tel" id="dil-tel" placeholder="3153548116"></div>
-        </div>
-        <div class="row col3">
-          <div class="doc-field-group"><label class="lbl">Género</label><select id="dil-genero"><option value="">—</option><option>Femenino</option><option>Masculino</option><option>No binario</option><option>Prefiero no decir</option></select></div>
-          <div class="doc-field-group"><label class="lbl">Estado Civil</label><select id="dil-estadocivil"><option value="">—</option><option>Soltero/a</option><option>Casado/a</option><option>Unión libre</option><option>Divorciado/a</option><option>Viudo/a</option></select></div>
-          <div class="doc-field-group"><label class="lbl">Escolaridad</label><select id="dil-escolaridad"><option value="">—</option><option>Primaria</option><option>Secundaria</option><option>Técnico</option><option>Tecnólogo</option><option>Universitario</option><option>Posgrado</option></select></div>
-        </div>
-        <div class="row col2">
-          <div class="doc-field-group"><label class="lbl">Edad</label><input type="number" id="dil-edad" placeholder="35" min="18" max="99"></div>
-          <div class="doc-field-group"><label class="lbl">Jornada Laboral</label><select id="dil-jornada"><option value="">—</option><option>Diurna</option><option>Nocturna</option><option>Mixta</option><option>Por turnos</option></select></div>
-        </div>
-      </div>
-      <div style="background:var(--soft);border:1.5px solid var(--bg);border-radius:12px;padding:14px 18px;margin-bottom:18px">
-        <div style="font-size:.78rem;font-weight:700;color:var(--strong);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">🧪 Instrumentos y Técnicas</div>
-        <div class="checks" style="gap:14px;flex-wrap:wrap;margin-bottom:10px">
-          <label class="chk"><input type="checkbox" id="dil-inst-entrevista" checked> Entrevista semiestructurada</label>
-          <label class="chk"><input type="checkbox" id="dil-inst-examen" checked> Examen Mental</label>
-          <label class="chk"><input type="checkbox" id="dil-inst-phq9" checked> PHQ-9 — Depresión</label>
-          <label class="chk"><input type="checkbox" id="dil-inst-gad7" checked> GAD-7 — Ansiedad</label>
-          <label class="chk"><input type="checkbox" id="dil-inst-phq15"> PHQ-15 — Síntomas Somáticos</label>
-          <label class="chk"><input type="checkbox" id="dil-inst-audit"> AUDIT — Alcohol</label>
-          <label class="chk"><input type="checkbox" id="dil-inst-psq20"> PSQ-20 — Estrés</label>
-          <label class="chk"><input type="checkbox" id="dil-inst-istas21"> ISTAS-21</label>
-        </div>
-        <div class="doc-field-group"><label class="lbl">Otros instrumentos</label><input type="text" id="dil-inst-otros" placeholder="Añadir instrumentos adicionales..."></div>
-      </div>
-      <div style="background:var(--soft);border:1.5px solid var(--bg);border-radius:12px;padding:14px 18px;margin-bottom:18px">
-        <div style="font-size:.78rem;font-weight:700;color:var(--strong);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">📊 Análisis de Resultados</div>
-        <div class="doc-field-group"><label class="lbl">Área Sociodemográfica</label><textarea id="dil-res-socio" rows="3" placeholder="Descripción del área sociodemográfica y contexto familiar..."></textarea></div>
-        <div class="doc-field-group"><label class="lbl">Área Laboral — Factores Intralaborales</label><textarea id="dil-res-intra" rows="3" placeholder="Actividades placenteras, factores de riesgo físico, demandas del trabajo..."></textarea></div>
-        <div class="doc-field-group"><label class="lbl">Área Laboral — Factores Extralaborales</label><textarea id="dil-res-extra" rows="3" placeholder="Relaciones familiares, situación económica, influencia del entorno extralaboral..."></textarea></div>
-        <div class="row col3">
-          <div class="doc-field-group"><label class="lbl">PHQ-9 (0-27)</label><input type="number" id="dil-phq9" min="0" max="27" placeholder="1"></div>
-          <div class="doc-field-group"><label class="lbl">GAD-7 (0-21)</label><input type="number" id="dil-gad7" min="0" max="21" placeholder="0"></div>
-          <div class="doc-field-group"><label class="lbl">Otros puntajes</label><input type="text" id="dil-otros-puntajes" placeholder="Ej: PHQ-15: 4 | AUDIT: 2"></div>
-        </div>
-      </div>
-      <div style="background:var(--soft);border:1.5px solid var(--bg);border-radius:12px;padding:14px 18px;margin-bottom:18px">
-        <div style="font-size:.78rem;font-weight:700;color:var(--strong);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">🧠 Evaluación Clínica — Examen Mental</div>
-        <div class="row col2">
-          <div class="doc-field-group"><label class="lbl">Aspecto y Actitud</label><input type="text" id="dil-em-aspecto" placeholder="Aspecto general, actitud durante la evaluación..."></div>
-          <div class="doc-field-group"><label class="lbl">Conciencia y Orientación</label><input type="text" id="dil-em-conciencia" placeholder="Estado de conciencia y orientación..."></div>
-        </div>
-        <div class="row col2">
-          <div class="doc-field-group"><label class="lbl">Lenguaje</label><input type="text" id="dil-em-lenguaje" placeholder="Características del lenguaje..."></div>
-          <div class="doc-field-group"><label class="lbl">Pensamiento</label><input type="text" id="dil-em-pensamiento" placeholder="Curso y contenido del pensamiento..."></div>
-        </div>
-        <div class="row col2">
-          <div class="doc-field-group"><label class="lbl">Sensopercepción</label><input type="text" id="dil-em-sensopercepcion" placeholder="Alteraciones sensoperceptivas..."></div>
-          <div class="doc-field-group"><label class="lbl">Afectividad y Emoción</label><input type="text" id="dil-em-afectividad" placeholder="Estado afectivo y emocional..."></div>
-        </div>
-        <div class="row col2">
-          <div class="doc-field-group"><label class="lbl">Memoria y Atención</label><input type="text" id="dil-em-memoria" placeholder="Memoria y atención..."></div>
-          <div class="doc-field-group"><label class="lbl">Juicio y Raciocinio</label><input type="text" id="dil-em-juicio" placeholder="Juicio y raciocinio..."></div>
-        </div>
-        <div class="doc-field-group"><label class="lbl">Conciencia de Enfermedad</label><input type="text" id="dil-em-conciencia-enf" placeholder="Conciencia de enfermedad..."></div>
-        <div class="doc-field-group" style="margin-top:10px"><label class="lbl">Impresión Diagnóstica</label><textarea id="dil-impresion" rows="3" placeholder="Impresión diagnóstica y hallazgos clínicos relevantes..."></textarea></div>
-        <div class="doc-field-group"><label class="lbl">Plan de Intervención Sugerido</label><textarea id="dil-plan-intervencion" rows="3" placeholder="Remisión a EPS, pausas activas, evaluación ergonómica, seguimiento..."></textarea></div>
-      </div>
-      <div style="background:var(--soft);border:1.5px solid var(--bg);border-radius:12px;padding:14px 18px;margin-bottom:18px">
-        <div style="font-size:.78rem;font-weight:700;color:var(--strong);text-transform:uppercase;letter-spacing:.5px;margin-bottom:12px">📋 Conclusiones y Recomendaciones</div>
-        <div class="doc-field-group"><label class="lbl">Conclusiones y Diagnóstico Cualitativo</label><textarea id="dil-conclusiones" rows="4" placeholder="Resumen de conclusiones del proceso evaluativo..."></textarea></div>
-        <div class="doc-field-group"><label class="lbl">Recomendaciones para el Colaborador</label><textarea id="dil-rec-colaborador" rows="3" placeholder="Recomendaciones específicas para el colaborador..."></textarea></div>
-        <div class="doc-field-group"><label class="lbl">Recomendaciones para la Empresa (Plan de Intervención Ley 2460)</label><textarea id="dil-rec-empresa" rows="3" placeholder="Gestión del riesgo ergonómico, promoción de salud, seguimiento..."></textarea></div>
-      </div>`;
-    // Rellenar datos del paciente si ya fueron cargados
-    var nom = document.getElementById('doc-pac-nombre').value.trim();
-    if(nom && nom!=='___________'){ /* datos de paciente vienen del paso 2 */ }
-    return;
-  }
   const campos = CAMPOS_POR_TIPO[tipo]||[];
   document.getElementById('doc-campos-especificos').innerHTML = campos.map(c=>`
     <div class="doc-field-group">
@@ -4569,12 +4515,7 @@ function docActualizarPreview() {
       contenido=`Empresa: ${datos.empresa||'___'} \u00b7 Cargo: ${datos.cargo||'___'}\nPHQ-9: ${datos.phq9||'___'}/27 \u00b7 GAD-7: ${datos.gad7||'___'}/21\n\nHallazgos: ${(datos.hallazgos||'[Por completar]').slice(0,120)}`;
       break;
     case 'informe_laboral_psi':
-      var dilEmp=(document.getElementById('dil-empresa')||{}).value||'[empresa]';
-      var dilFecha=(document.getElementById('dil-fecha')||{}).value||'—';
-      var dilPhq=(document.getElementById('dil-phq9')||{}).value||'—';
-      var dilGad=(document.getElementById('dil-gad7')||{}).value||'—';
-      var dilCargo=(document.getElementById('dil-cargo')||{}).value||'—';
-      contenido='Empresa: '+dilEmp+' · Cargo: '+dilCargo+'\nFecha: '+dilFecha+'\nPHQ-9: '+dilPhq+'/27 · GAD-7: '+dilGad+'/21\n\nCompleta los campos de Evaluación Clínica y presiona Generar PDF.';
+      contenido='Redirige al m\u00f3dulo de Informes Laborales.';
       break;
   }
   document.getElementById('doc-preview-box').innerHTML=`
@@ -4596,59 +4537,7 @@ function docGenerar() {
   if(pac.nombre==='___________'){ toast('Ingresa el nombre del paciente'); return; }
   const datos=docGetDatos();
   const tipo=DOC_TIPOS.find(t=>t.id===docTipoSeleccionado);
-  if(tipo.id==='informe_laboral_psi'){
-    function chkD(id){ var el=document.getElementById(id); return el&&el.checked; }
-    function valD(id){ var el=document.getElementById(id); return el?el.value.trim():''; }
-    var instrs=[];
-    if(chkD('dil-inst-entrevista')) instrs.push('Entrevista semiestructurada (anamnesis)');
-    if(chkD('dil-inst-examen')) instrs.push('Observación de conducta (Examen Mental)');
-    if(chkD('dil-inst-phq9')) instrs.push('Cuestionario de Salud del Paciente (PHQ-9) — Depresión');
-    if(chkD('dil-inst-gad7')) instrs.push('Trastorno de Ansiedad Generalizada (GAD-7) — Ansiedad');
-    if(chkD('dil-inst-phq15')) instrs.push('PHQ-15 — Síntomas Somáticos');
-    if(chkD('dil-inst-audit')) instrs.push('AUDIT — Uso de Alcohol');
-    if(chkD('dil-inst-psq20')) instrs.push('PSQ-20 — Estrés Percibido');
-    if(chkD('dil-inst-istas21')) instrs.push('ISTAS-21 — Factores Psicosociales');
-    if(valD('dil-inst-otros')) instrs.push(valD('dil-inst-otros'));
-    var dilDatos = {
-      id: 'informe_'+Date.now(),
-      pacienteId: document.getElementById('doc-sel-pac').value||null,
-      empresa: valD('dil-empresa'), nit: valD('dil-nit'), arl: valD('dil-arl'),
-      fecha: valD('dil-fecha'), objetivo: valD('dil-objetivo'),
-      nombre: pac.nombre, cc: pac.cc, edad: valD('dil-edad'),
-      genero: valD('dil-genero'), estadocivil: valD('dil-estadocivil'),
-      tel: valD('dil-tel'), email: pac.cc||'', cargo: valD('dil-cargo'),
-      antiguedad: valD('dil-antiguedad'), escolaridad: valD('dil-escolaridad'), jornada: valD('dil-jornada'),
-      instrumentos: instrs,
-      resSocio: valD('dil-res-socio'), resIntra: valD('dil-res-intra'), resExtra: valD('dil-res-extra'),
-      phq9: valD('dil-phq9'), gad7: valD('dil-gad7'), otrosPuntajes: valD('dil-otros-puntajes'),
-      emAspecto: valD('dil-em-aspecto'), emConciencia: valD('dil-em-conciencia'),
-      emLenguaje: valD('dil-em-lenguaje'), emPensamiento: valD('dil-em-pensamiento'),
-      emSensopercepcion: valD('dil-em-sensopercepcion'), emAfectividad: valD('dil-em-afectividad'),
-      emMemoria: valD('dil-em-memoria'), emJuicio: valD('dil-em-juicio'),
-      emConcienciaEnf: valD('dil-em-conciencia-enf'),
-      impresion: valD('dil-impresion'), planIntervencion: valD('dil-plan-intervencion'),
-      conclusiones: valD('dil-conclusiones'),
-      recColaborador: valD('dil-rec-colaborador'), recEmpresa: valD('dil-rec-empresa'),
-    };
-    if(!dilDatos.nombre||dilDatos.nombre==='___________'){ toast('Ingresa el nombre del colaborador en el paso 2'); return; }
-    if(!dilDatos.empresa){ toast('Ingresa el nombre de la empresa'); return; }
-    // Guardar en historial
-    var listaIL = DB.get('informes_laborales')||[];
-    listaIL.unshift(dilDatos);
-    DB.set('informes_laborales', listaIL);
-    if(dilDatos.pacienteId){
-      var pInf = DB.get('informes_pac_'+dilDatos.pacienteId)||[];
-      pInf.unshift(dilDatos.id);
-      DB.set('informes_pac_'+dilDatos.pacienteId, pInf);
-    }
-    // Generar PDF
-    var htmlIL = ilGenerarHTMLPreview(dilDatos);
-    var ventanaIL = window.open('','_blank','width=900,height=700');
-    ventanaIL.document.write('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Informe — '+dilDatos.nombre+'</title><link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lato:wght@300;400;700&display=swap" rel="stylesheet"><style>body{font-family:\'Lato\',sans-serif;color:#643000;background:#fff;padding:32px;margin:0}@media print{body{padding:18px}.no-print{display:none!important}@page{margin:1.5cm}}</style></head><body><div class="no-print" style="margin-bottom:18px;display:flex;gap:12px"><button onclick="window.print()" style="background:#cd8e9d;color:#fff;border:none;border-radius:20px;padding:9px 22px;font-size:.88rem;cursor:pointer;font-family:Lato,sans-serif">🖨️ Imprimir / Guardar PDF</button><button onclick="window.close()" style="background:transparent;color:#643000;border:1.5px solid #cd8e9d;border-radius:20px;padding:9px 22px;font-size:.88rem;cursor:pointer;font-family:Lato,sans-serif">✕ Cerrar</button></div>'+htmlIL+'</body></html>');
-    ventanaIL.document.close();
-    toast('✅ Informe guardado y PDF generado');
-    return;
-  }
+  if(tipo.id==='informe_laboral_psi'){ goPage('informes'); return; }
   const html=docGenerarHTML(tipo, pac, datos);
   const nombre=(tipo.nombre+'_'+pac.nombre.split(' ')[0]).replace(/\s+/g,'_');
   // Guardar en historial
@@ -5759,9 +5648,8 @@ function verificarCitasManana(){
 }
 
 function mostrarAlertaCitasManana(citas){
-  // No mostrar si ya fue cerrada hoy
-  var hoy = new Date().toISOString().split('T')[0];
-  if(localStorage.getItem('citas_alerta_vista') === hoy) return;
+  // No mostrar si ya hay una badge visible
+  if(document.getElementById('cita-alert-badge-main')) return;
 
   var badge = document.createElement('div');
   badge.className = 'cita-alert-badge';
@@ -5776,19 +5664,18 @@ function mostrarAlertaCitasManana(citas){
   }).join('');
 
   var n = citas.length;
-  var hoyStr = new Date().toISOString().split('T')[0];
-  badge.innerHTML = '<button class="cita-alert-badge-x" onclick="event.stopPropagation();document.getElementById(&quot;cita-alert-badge-main&quot;).remove();localStorage.setItem(&quot;citas_alerta_vista&quot;,&quot;'+hoyStr+'&quot;);">✕</button>'
+  badge.innerHTML = '<button class="cita-alert-badge-x" onclick="event.stopPropagation();document.getElementById(&quot;cita-alert-badge-main&quot;).remove();">✕</button>'
     + '<h4>📅 ' + n + ' cita' + (n>1?'s':'') + ' mañana</h4>'
     + itemsHTML
     + '<div style="font-size:.68rem;color:#cd8e9d;margin-top:8px;text-align:center">Toca WA para enviar el recordatorio</div>';
 
   document.body.appendChild(badge);
 
-  // Auto-cerrar en 20 segundos
+  // Auto-cerrar en 5 minutos
   setTimeout(function(){
     var b = document.getElementById('cita-alert-badge-main');
     if(b){ b.style.transition='opacity 0.5s'; b.style.opacity='0'; setTimeout(function(){ b.remove(); }, 500); }
-  }, 20000);
+  }, 300000);
 }
 
 function verificarCumpleanos(){
