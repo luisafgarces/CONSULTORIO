@@ -549,7 +549,7 @@ input[type=range] { accent-color: var(--border); flex: 1; }
     <button class="nav-btn" onclick="goPage('agenda');cerrarSidebarMobile()"><span class="icon">📅</span><span class="nav-label"> Agenda</span></button>
     <button class="nav-btn" onclick="goPage('finanzas');cerrarSidebarMobile()"><span class="icon">💰</span><span class="nav-label"> Finanzas</span></button>
     <button class="nav-btn" onclick="goPage('documentos');cerrarSidebarMobile()"><span class="icon">📄</span><span class="nav-label"> Documentos</span></button>
-    <button class="nav-btn" onclick="goPage('informes');cerrarSidebarMobile()"><span class="icon">🏢</span><span class="nav-label"> Informes Laborales</span></button>
+
     <button class="nav-btn" onclick="goPage('herramientas');cerrarSidebarMobile()"><span class="icon">🔧</span><span class="nav-label"> Herramientas TCC</span></button>
     <button class="nav-btn" onclick="goPage('cumpleanos');cerrarSidebarMobile()"><span class="icon">🎂</span><span class="nav-label"> Cumpleaños</span></button>
   </nav>
@@ -648,7 +648,7 @@ input[type=range] { accent-color: var(--border); flex: 1; }
     <label>Paciente:</label>
     <select id="an-sel-pac" onchange="loadAnamnesis()"></select>
     <button class="btn primary" onclick="guardarAnamnesis()">💾 Guardar</button>
-    <button class="btn" onclick="exportarAnamnesis()">⬇️ Exportar Word</button>
+    <button class="btn" onclick="exportarAnamnesis()">📄 Exportar PDF</button>
   </div>
 
   <div class="tab-nav">
@@ -831,7 +831,7 @@ input[type=range] { accent-color: var(--border); flex: 1; }
     </div>
     <div class="btn-row">
       <button class="btn primary" onclick="guardarAnamnesis()">💾 Guardar Anamnesis</button>
-      <button class="btn" onclick="exportarAnamnesis()">⬇️ Exportar Word</button>
+      <button class="btn" onclick="exportarAnamnesis()">📄 Exportar PDF</button>
     </div>
   </div>
 </div>
@@ -1509,10 +1509,11 @@ input[type=range] { accent-color: var(--border); flex: 1; }
     <div class="sec-title">4️⃣ Vista previa y descarga</div>
     <div id="doc-preview-box" class="doc-preview"></div>
     <div class="btn-row" style="margin-top:18px">
-      <button class="btn primary" onclick="docGenerar()">⬇️ Descargar Word (.docx)</button>
+      <button class="btn primary" onclick="docGenerar()">📄 Generar y guardar PDF</button>
       <button class="btn" onclick="docActualizarPreview()">🔄 Actualizar vista previa</button>
+      <button class="btn" onclick="docLimpiar()" style="background:var(--soft);color:var(--text);border-color:var(--border)" title="Limpia todos los campos del formulario">🧹 Limpiar</button>
     </div>
-    <p style="font-size:.75rem;color:var(--strong);margin-top:10px">⚠️ El archivo Word se descarga listo para editar y firmar. Puedes ajustar el texto antes de imprimir.</p>
+    <p style="font-size:.75rem;color:var(--strong);margin-top:10px">✅ El documento se guarda automáticamente en el historial de la paciente y se abre listo para imprimir como PDF.</p>
   </div>
 </div>
 
@@ -2328,21 +2329,20 @@ function exportarAnamnesis(){
   +fila('Hip\u00f3tesis de trabajo',d['cc-hipotesis'])
   +sec('VI. Metas Terap\u00e9uticas')
   +fila('Corto plazo',d.mCorto)+fila('Mediano plazo',d.mMedio)+fila('Largo plazo',d.mLargo)
-  +'<div class="firmas">'
-  +'<div class="firma-bloque"><div class="firma-label">Paciente</div>'
-  +'<div style="height:65px;border-bottom:1.5px solid #cd8e9d;margin-bottom:4px"></div>'
-  +'<div class="firma-linea">'+esc(pac.nombre)+'</div>'
-  +'<div class="fecha-doc">Fecha: ___-___-_____</div></div>'
-  +'<div class="firma-bloque"><div class="firma-label">Psic\u00f3loga Tratante</div>'
-  +'<img class="firma-img" src="'+FIRMA_DATA+'" alt="Firma">'
-  +'<div class="firma-linea"><strong>Luisa Fernanda Garc\u00e9s Garc\u00eda</strong></div>'
-  +'<div class="fecha-doc">TP 174366 &nbsp;\u00b7&nbsp; '+fechaDoc+'</div></div>'
+  +'<div style="margin-top:48px;text-align:center">'
+  +'<img src="'+FIRMA_DATA+'" alt="Firma" style="height:68px;object-fit:contain;display:block;margin:0 auto 4px;mix-blend-mode:multiply;">'
+  +'<div style="width:240px;border-top:1.5px solid #643000;margin:4px auto 6px"></div>'
+  +'<div style="font-size:.9rem;font-weight:700;color:#643000">Luisa Fernanda Garcés García</div>'
+  +'<div style="font-size:.78rem;color:#a0536a">Psicóloga Titulada &middot; T.P. No. 174366</div>'
+  +'<div style="font-size:.74rem;color:#cd8e9d;margin-top:2px">C.C. 1036602429 &middot; 3246381453 &middot; luisafgarces@gmail.com</div>'
   +'</div>'
-  +'<p style="text-align:center;font-size:.65rem;color:#cd8e9d;margin-top:20px">Documento confidencial de uso cl\u00ednico \u2014 Generado el '+fechaDoc+'</p>'
+  +'<p style="text-align:center;font-size:.65rem;color:#cd8e9d;margin-top:20px">Documento confidencial de uso clínico — Generado el '+fechaDoc+'</p>'
   +'</body></html>';
 
-  descargarArchivo(html, 'Anamnesis_'+pac.nombre.replace(/\s+/g,'_')+'.html', 'application/octet-stream');
-  toast('📋 Descargado. \u00c1brelo en el navegador e imprime \u2192 Guardar como PDF');
+  const ventana = window.open('','_blank','width=900,height=750');
+  ventana.document.write('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Anamnesis — '+pac.nombre+'</title></head><body>'+html+'<div class="no-print" style="position:fixed;bottom:20px;right:20px;display:flex;gap:10px;z-index:999"><button onclick="window.print()" style="background:#cd8e9d;color:#fff;border:none;border-radius:20px;padding:10px 24px;font-size:.9rem;cursor:pointer">Imprimir / Guardar PDF</button><button onclick="window.close()" style="background:#fff;color:#643000;border:1.5px solid #cd8e9d;border-radius:20px;padding:10px 20px;font-size:.9rem;cursor:pointer">Cerrar</button></div><style>@media print{.no-print{display:none!important}@page{margin:1.5cm}}</style></body></html>');
+  ventana.document.close();
+  toast('Anamnesis lista para guardar como PDF');
 }
 // ===================== PLAN =====================
 function loadPlan(){
@@ -4257,6 +4257,9 @@ const DOC_TIPOS = [
   { id:'informe_diagnostico', icon:'🔍', nombre:'Informe Diagn\u00f3stico', desc:'Evaluaci\u00f3n diagn\u00f3stica completa con resultados.' },
   { id:'informe_legal',    icon:'\u2696\ufe0f', nombre:'Informe Legal / Custodia', desc:'Para procesos judiciales, custodias o peritajes.' },
   { id:'informe_incapacidad', icon:'🏥', nombre:'Incapacidad Laboral', desc:'Certificado de incapacidad por condici\u00f3n psicol\u00f3gica.' },
+  { id:'informe_laboral_psi', icon:'🏢', nombre:'Informe Laboral Psicol\u00f3gico', desc:'Evaluaci\u00f3n factores de riesgo psicosocial \u00b7 Ley 2460 de 2025.' },
+  { id:'constancia_empresa', icon:'\ud83d\udcdc', nombre:'Constancia para Empresa (Ley 2460)', desc:'Certifica asesor\u00eda y evaluaci\u00f3n psicol\u00f3gica ocupacional a la empresa.' },
+  { id:'entregable_empleado', icon:'\ud83d\udc64', nombre:'Entregable para el Empleado', desc:'Resultados de evaluaci\u00f3n psicol\u00f3gica ocupacional para entregar al colaborador.' },
 ];
 var docTipoSeleccionado = null;
 
@@ -4291,7 +4294,8 @@ function docCargarPaciente() {
   const pac = getPacientes().find(p=>p.id===pid);
   if(!pac) return;
   document.getElementById('doc-pac-nombre').value = pac.nombre||'';
-  document.getElementById('doc-pac-cc').value = '';
+  const anCC = DB.get('anamnesis_'+pid)||{};
+  document.getElementById('doc-pac-cc').value = anCC.cc || pac.cc || '';
   document.getElementById('doc-pac-fnac').value = pac.fnac||'';
   document.getElementById('doc-tratamiento').value = pac.genero==='Femenino'?'La se\u00f1ora':'El se\u00f1or';
   const an = DB.get('anamnesis_'+pid)||{};
@@ -4377,6 +4381,26 @@ const CAMPOS_POR_TIPO = {
     {id:'fechaFin',label:'Fecha de fin estimada',ph:'',type:'date'},
     {id:'recomendaciones',label:'Recomendaciones',ph:'',area:true},
   ],
+  constancia_empresa: [
+    {id:'empresa',label:'Nombre de la empresa *',ph:'Ej: Servicios Domésticos del Norte S.A.S.'},
+    {id:'nit',label:'NIT de la empresa',ph:'Ej: 900123456-7'},
+    {id:'cargo',label:'Cargo del colaborador/a',ph:'Ej: Auxiliar Doméstica'},
+    {id:'fechaEval',label:'Fecha de evaluación',ph:'',type:'date'},
+    {id:'instrumentos',label:'Instrumentos utilizados',ph:'Ej: entrevista clínica, observación de conducta, PHQ-9, GAD-7...',area:true},
+    {id:'resultado',label:'Resultado / hallazgo principal',ph:'Ej: no evidencian indicadores clínicos de depresión o ansiedad en el momento actual',area:true},
+    {id:'observaciones',label:'Observaciones adicionales (opcional)',ph:'',area:true},
+  ],
+  entregable_empleado: [
+    {id:'empresa',label:'Nombre de la empresa',ph:'Ej: Servicios Domésticos del Norte S.A.S.'},
+    {id:'cargo',label:'Cargo del colaborador/a',ph:'Ej: Auxiliar Doméstica'},
+    {id:'fechaEval',label:'Fecha de evaluación',ph:'',type:'date'},
+    {id:'phq9',label:'Puntaje PHQ-9 (depresión, 0-27)',ph:'Ej: 1',type:'number'},
+    {id:'gad7',label:'Puntaje GAD-7 (ansiedad, 0-21)',ph:'Ej: 0',type:'number'},
+    {id:'instrumentosUsados',label:'Instrumentos aplicados',ph:'Ej: Entrevista personal, PHQ-9, GAD-7'},
+    {id:'observacionesEntrevista',label:'Observaciones durante la entrevista',ph:'Ej: Se mostró colaboradora, atenta y con estado de ánimo tranquilo...',area:true},
+    {id:'hallazgos',label:'Hallazgos y situaciones mencionadas',ph:'Ej: Mencionó sentir dolor de espalda...',area:true},
+    {id:'recomendaciones',label:'Recomendaciones para el colaborador',ph:'Ej: Consultar con su EPS, realizar pausas activas...',area:true},
+  ],
 };
 
 function renderCamposEspecificos(tipo) {
@@ -4434,6 +4458,15 @@ function docActualizarPreview() {
     case 'informe_incapacidad':
       contenido=`Empleador: ${datos.empleador||'___'} \u00b7 Diagn\u00f3stico: ${datos.diagnostico||'___'}\nPer\u00edodo: ${datos.periodo||'___'} \u00b7 Del ${datos.fechaInicio||'___'} al ${datos.fechaFin||'___'}\n\n${(datos.justificacion||'[Por completar]').slice(0,200)}...`;
       break;
+    case 'constancia_empresa':
+      contenido=`Empresa: ${datos.empresa||'___'} \u00b7 NIT: ${datos.nit||'___'}\nColaborador/a: ${pac.nombre} \u00b7 Cargo: ${datos.cargo||'___'}\nFecha: ${datos.fechaEval||'___'}\n\nResultado: ${(datos.resultado||'[Por completar]').slice(0,120)}`;
+      break;
+    case 'entregable_empleado':
+      contenido=`Empresa: ${datos.empresa||'___'} \u00b7 Cargo: ${datos.cargo||'___'}\nPHQ-9: ${datos.phq9||'___'}/27 \u00b7 GAD-7: ${datos.gad7||'___'}/21\n\nHallazgos: ${(datos.hallazgos||'[Por completar]').slice(0,120)}`;
+      break;
+    case 'informe_laboral_psi':
+      contenido='Redirige al m\u00f3dulo de Informes Laborales.';
+      break;
   }
   document.getElementById('doc-preview-box').innerHTML=`
     <h3>${tipo?.icon} ${tipo?.nombre}</h3>
@@ -4454,10 +4487,33 @@ function docGenerar() {
   if(pac.nombre==='___________'){ toast('Ingresa el nombre del paciente'); return; }
   const datos=docGetDatos();
   const tipo=DOC_TIPOS.find(t=>t.id===docTipoSeleccionado);
+  if(tipo.id==='informe_laboral_psi'){ goPage('informes'); return; }
   const html=docGenerarHTML(tipo, pac, datos);
   const nombre=(tipo.nombre+'_'+pac.nombre.split(' ')[0]).replace(/\s+/g,'_');
-  descargarArchivo(html, nombre+'_'+new Date().toLocaleDateString('es-CO').replace(/\//g,'-')+'.html', 'application/octet-stream');
-  toast('Documento generado \u2713 \u2014 \u00c1brelo en el navegador e imprime \u2192 PDF');
+  // Guardar en historial
+  const pid = document.getElementById('doc-sel-pac').value;
+  const docRecord = { id:Date.now().toString(), pacienteId:pid||null, pacienteNombre:pac.nombre, tipoId:docTipoSeleccionado, tipoNombre:tipo.nombre, tipoIcon:tipo.icon, fecha:new Date().toISOString().split('T')[0], htmlContent:html };
+  const docs = DB.get('documentos_clinicos')||[];
+  docs.push(docRecord);
+  DB.set('documentos_clinicos', docs);
+  // Abrir ventana para PDF
+  const ventana = window.open('','_blank','width=900,height=750');
+  ventana.document.write('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>'+nombre+'</title><link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lato:wght@300;400;700&display=swap" rel="stylesheet"></head><body>'+html+'<div class="no-print" style="position:fixed;bottom:20px;right:20px;display:flex;gap:10px;z-index:999"><button onclick="window.print()" style="background:#cd8e9d;color:#fff;border:none;border-radius:20px;padding:10px 24px;font-size:.9rem;cursor:pointer;font-family:Lato,sans-serif">\uD83D\uDDA8\uFE0F Imprimir / Guardar PDF</button><button onclick="window.close()" style="background:#fff;color:#643000;border:1.5px solid #cd8e9d;border-radius:20px;padding:10px 20px;font-size:.9rem;cursor:pointer;font-family:Lato,sans-serif">&#x2715; Cerrar</button></div><style>@media print{.no-print{display:none!important}@page{margin:1.5cm}}</style></body></html>');
+  ventana.document.close();
+  toast('Documento guardado y listo para PDF \u2713');
+}
+
+function docLimpiar() {
+  if(!confirm('\u00bfLimpiar todos los campos del formulario?')) return;
+  var selPac = document.getElementById('doc-sel-pac');
+  if(selPac) selPac.value='';
+  ['doc-pac-nombre','doc-pac-cc','doc-pac-fnac','doc-pac-ciudad','doc-tratamiento'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
+  var ciudad = document.getElementById('doc-pac-ciudad');
+  if(ciudad) ciudad.value='Medell\u00edn';
+  document.querySelectorAll('#doc-campos-especificos input, #doc-campos-especificos textarea, #doc-campos-especificos select').forEach(function(el){ el.value=''; });
+  var preview = document.getElementById('doc-preview-box');
+  if(preview) preview.innerHTML='<p style="text-align:center;color:var(--border);padding:20px;font-size:.88rem">Vista previa \u2014 completa el formulario y pulsa Actualizar</p>';
+  toast('Formulario limpiado \u2713');
 }
 
 function docGenerarHTML(tipo, pac, datos) {
@@ -4568,10 +4624,79 @@ function docGenerarHTML(tipo, pac, datos) {
       body+=sec('IV. Recomendaciones')+par(datos.recomendaciones);
       break;
     }
-  }
-
+    case 'constancia_empresa': {
+      const hoy = new Date();
+      const diasTexto = ['cero','uno','dos','tres','cuatro','cinco','seis','siete','ocho','nueve','diez','once','doce','trece','catorce','quince','dieciséis','diecisiete','dieciocho','diecinueve','veinte','veintiuno','veintidós','veintitrés','veinticuatro','veinticinco','veintiséis','veintisiete','veintiocho','veintinueve','treinta','treinta y uno'];
+      const mesesTexto = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+      const diaNum = hoy.getDate(); const diaStr = diasTexto[diaNum]||diaNum;
+      const mesStr = mesesTexto[hoy.getMonth()]; const anioStr = hoy.getFullYear();
+      body += '<div style="margin-bottom:28px"><p style="text-align:center;font-weight:700;font-size:1rem;color:#643000;margin-bottom:4px">CONSTANCIA DE ASESOR\u00cdA Y ACOMPA\u00d1AMIENTO EN SALUD MENTAL</p>';
+      body += '<p style="text-align:center;font-size:.85rem;color:#a0536a;font-weight:700">LEY 2460 DE 2025</p></div><hr>';
+      body += '<p>El suscrito(a) <strong>LUISA FERNANDA GARC\u00c9S GARC\u00cdA</strong>, identificado(a) con c\u00e9dula de ciudadan\u00eda No. <strong>1036602429</strong> y con Tarjeta Profesional No. <strong>174366</strong> expedida por el Consejo Profesional de Psicolog\u00eda de Colombia, en mi calidad de psic\u00f3loga.</p>';
+      body += '<p style="font-weight:700;margin-top:20px">HACE CONSTAR:</p>';
+      body += '<p>Que la empresa <strong>'+esc(datos.empresa||'[NOMBRE DE LA EMPRESA]')+'</strong>';
+      if(datos.nit) body += ', identificada con NIT <strong>'+esc(datos.nit)+'</strong>,';
+      body += ' ha solicitado y recibido asesor\u00eda y acompa\u00f1amiento profesional para la implementaci\u00f3n de las disposiciones contenidas en la Ley 2460 de 2025, espec\u00edficamente en lo relacionado con la evaluaci\u00f3n de factores de riesgo psicosocial y la formulaci\u00f3n de estrategias para la promoci\u00f3n de la salud mental y prevenci\u00f3n del trastorno mental en el \u00e1mbito laboral.</p>';
+      body += '<p>Como parte de este proceso, se realiz\u00f3 la evaluaci\u00f3n psicol\u00f3gica ocupacional a la colaboradora:</p>';
+      body += '<div style="background:#fadae1;border-left:4px solid #cd8e9d;border-radius:0 8px 8px 0;padding:12px 18px;margin:16px 0">';
+      body += campo('NOMBRE DEL COLABORADOR', pac.nombre);
+      if(pac.cc) body += campo('C\u00c9DULA DE CIUDADAN\u00cdA', pac.cc);
+      if(datos.cargo) body += campo('CARGO', datos.cargo);
+      if(datos.fechaEval) body += campo('FECHA DE EVALUACI\u00d3N', fechaEvalFmt);
+      body += '</div>';
+      body += '<p>Dicha evaluaci\u00f3n incluy\u00f3 '+esc(datos.instrumentos||'entrevista cl\u00ednica, observaci\u00f3n de conducta y cuestionarios')+'';
+      if(datos.resultado) body += ', cuyos resultados '+esc(datos.resultado)+'';
+      body += '.</p>';
+      if(datos.observaciones) body += '<p>'+esc(datos.observaciones)+'</p>';
+      body += '<p>Esta actividad se enmarca en el cumplimiento de la normatividad vigente en Seguridad y Salud en el Trabajo y en el monitoreo permanente de la exposici\u00f3n a factores de riesgo psicosocial, tal como lo ordena la Ley 2460 de 2025.</p>';
+      body += '<p style="margin-top:20px">Se expide la presente constancia a solicitud de la empresa interesada, a los <strong>'+diaStr+' ('+diaNum+')</strong> d\u00edas del mes de <strong>'+mesStr+'</strong> de <strong>'+anioStr+'</strong>.</p>';
+      body += '<p style="margin-top:14px;font-style:italic">Atentamente,</p>';
+      break;
+    }
+    case 'entregable_empleado': {
+      const fechaEvalFmt2 = datos.fechaEval ? new Date(datos.fechaEval+'T12:00:00').toLocaleDateString('es-CO',{day:'numeric',month:'long',year:'numeric'}) : fecha;
+      const phq = parseInt(datos.phq9)||0; const gad = parseInt(datos.gad7)||0;
+      var nivelPhq=function(v){ if(v<=4) return {label:'M\u00ednimo o sin depresi\u00f3n',color:'#2e7d32',desc:'No se identifican s\u00edntomas significativos de depresi\u00f3n.'}; if(v<=9) return {label:'Leve',color:'#f57f17',desc:'S\u00edntomas leves de depresi\u00f3n. Se recomienda monitoreo.'}; if(v<=14) return {label:'Moderado',color:'#e65100',desc:'S\u00edntomas moderados. Se recomienda evaluaci\u00f3n profesional.'}; if(v<=19) return {label:'Moderadamente severo',color:'#b71c1c',desc:'S\u00edntomas importantes. Se recomienda atenci\u00f3n profesional.'}; return {label:'Severo',color:'#880e4f',desc:'S\u00edntomas severos. Requiere atenci\u00f3n profesional urgente.'}; }
+      var nivelGad=function(v){ if(v<=4) return {label:'Ansiedad m\u00ednima',color:'#2e7d32',desc:'No se identifican s\u00edntomas significativos de ansiedad.'}; if(v<=9) return {label:'Leve',color:'#f57f17',desc:'S\u00edntomas leves de ansiedad. Se recomienda monitoreo.'}; if(v<=14) return {label:'Moderada',color:'#e65100',desc:'S\u00edntomas moderados. Se recomienda evaluaci\u00f3n profesional.'}; return {label:'Severa',color:'#b71c1c',desc:'S\u00edntomas importantes. Requiere atenci\u00f3n profesional.'}; }
+      const nPhq=nivelPhq(phq); const nGad=nivelGad(gad);
+      const instStr=datos.instrumentosUsados||'Entrevista personal, cuestionario PHQ-9 (depresi\u00f3n) y GAD-7 (ansiedad)';
+      body += '<div style="background:linear-gradient(135deg,#fadae1,#fff8f9);border:2px solid #cd8e9d;border-radius:12px;padding:16px 20px;margin-bottom:20px">';
+      body += '<p style="font-weight:700;font-size:1rem;color:#643000;margin:0 0 4px">RESULTADOS DE EVALUACI\u00d3N PSICOL\u00d3GICA OCUPACIONAL</p>';
+      body += '<table style="width:100%;border-collapse:collapse;margin-top:8px;font-size:.88rem">';
+      body += '<tr><td style="padding:3px 8px 3px 0;width:130px;font-weight:700;color:#a0536a">Fecha:</td><td>'+fechaEvalFmt2+'</td></tr>';
+      body += '<tr><td style="padding:3px 8px 3px 0;font-weight:700;color:#a0536a">Evaluador(a):</td><td>Luisa Fernanda Garc\u00e9s Garc\u00eda \u2014 Psic\u00f3loga / TP 174366</td></tr>';
+      if(datos.empresa) body += '<tr><td style="padding:3px 8px 3px 0;font-weight:700;color:#a0536a">Empresa:</td><td>'+esc(datos.empresa)+'</td></tr>';
+      body += '</table></div>';
+      body += '<h2 style="background:#fadae1;border-left:4px solid #cd8e9d;padding:7px 14px;border-radius:0 8px 8px 0;font-size:.9rem;text-transform:uppercase;color:#643000;margin:18px 0 10px">1. Datos del Colaborador</h2>';
+      body += '<table style="width:100%;border-collapse:collapse;font-size:.9rem">';
+      body += '<tr><td style="padding:4px 8px 4px 0;width:130px;font-weight:700;color:#a0536a">Nombre:</td><td>'+esc(pac.nombre)+'</td></tr>';
+      if(pac.cc) body += '<tr><td style="padding:4px 8px 4px 0;font-weight:700;color:#a0536a">C\u00e9dula:</td><td>'+esc(pac.cc)+'</td></tr>';
+      if(datos.cargo) body += '<tr><td style="padding:4px 8px 4px 0;font-weight:700;color:#a0536a">Cargo:</td><td>'+esc(datos.cargo)+'</td></tr>';
+      body += '</table>';
+      body += '<h2 style="background:#fadae1;border-left:4px solid #cd8e9d;padding:7px 14px;border-radius:0 8px 8px 0;font-size:.9rem;text-transform:uppercase;color:#643000;margin:18px 0 10px">2. Informaci\u00f3n sobre la Evaluaci\u00f3n</h2>';
+      body += '<p>Agradecemos su participaci\u00f3n en el proceso de evaluaci\u00f3n psicol\u00f3gica solicitado por su empleador. Este proceso forma parte de las actividades de promoci\u00f3n y prevenci\u00f3n en salud mental que las empresas deben realizar seg\u00fan la legislaci\u00f3n colombiana (<strong>Ley 2460 de 2025</strong>).</p>';
+      body += '<p><strong>Las actividades realizadas fueron:</strong></p><ul style="margin:8px 0 8px 20px;font-size:.9rem;line-height:1.8;color:#3a1a00">';
+      instStr.split(/[,;\n]+/).forEach(function(inst){ var t=inst.trim(); if(t) body += '<li>'+esc(t)+'.</li>'; });
+      body += '</ul>';
+      body += '<h2 style="background:#fadae1;border-left:4px solid #cd8e9d;padding:7px 14px;border-radius:0 8px 8px 0;font-size:.9rem;text-transform:uppercase;color:#643000;margin:18px 0 10px">3. Resultados Generales</h2>';
+      body += '<table style="width:100%;border-collapse:collapse;border:1px solid #f0d8de;font-size:.87rem"><tr style="background:#fadae1"><th style="padding:9px 12px;text-align:left;color:#643000">Aspecto Evaluado</th><th style="padding:9px 12px;text-align:left;color:#643000">Resultado</th><th style="padding:9px 12px;text-align:left;color:#643000">\u00bfQu\u00e9 significa?</th></tr>';
+      body += '<tr style="border-top:1px solid #f0d8de"><td style="padding:10px 12px;font-weight:700">Salud Emocional (Depresi\u00f3n)</td><td style="padding:10px 12px"><span style="font-weight:700;color:'+nPhq.color+'">'+phq+' de 27</span><br><small style="color:'+nPhq.color+';font-weight:700">'+nPhq.label+'</small></td><td style="padding:10px 12px;color:#3a1a00">'+nPhq.desc+'</td></tr>';
+      body += '<tr style="border-top:1px solid #f0d8de;background:#fdf8f9"><td style="padding:10px 12px;font-weight:700">Salud Emocional (Ansiedad)</td><td style="padding:10px 12px"><span style="font-weight:700;color:'+nGad.color+'">'+gad+' de 21</span><br><small style="color:'+nGad.color+';font-weight:700">'+nGad.label+'</small></td><td style="padding:10px 12px;color:#3a1a00">'+nGad.desc+'</td></tr>';
+      if(datos.observacionesEntrevista){ body += '<tr style="border-top:1px solid #f0d8de"><td style="padding:10px 12px;font-weight:700">Observaciones durante la entrevista</td><td colspan="2" style="padding:10px 12px;color:#3a1a00">'+esc(datos.observacionesEntrevista)+'</td></tr>'; }
+      body += '</table>';
+      if(datos.hallazgos||datos.recomendaciones){
+        body += '<h2 style="background:#fadae1;border-left:4px solid #cd8e9d;padding:7px 14px;border-radius:0 8px 8px 0;font-size:.9rem;text-transform:uppercase;color:#643000;margin:18px 0 10px">4. Hallazgos y Recomendaciones</h2>';
+        if(datos.hallazgos) body += '<p>'+esc(datos.hallazgos)+'</p>';
+        if(datos.recomendaciones){ body += '<p><strong>Le recomendamos:</strong></p><ul style="margin:8px 0 8px 20px;font-size:.9rem;line-height:1.9;color:#3a1a00">'; datos.recomendaciones.split(/\n+/).forEach(function(r){ var t=r.replace(/^[-\u2022*]\s*/,'').trim(); if(t) body += '<li>'+esc(t)+'</li>'; }); body += '</ul>'; }
+      }
+      body += '<h2 style="background:#fadae1;border-left:4px solid #cd8e9d;padding:7px 14px;border-radius:0 8px 8px 0;font-size:.9rem;text-transform:uppercase;color:#643000;margin:18px 0 10px">5. Nota Importante</h2>';
+      body += '<p>Los resultados de esta evaluaci\u00f3n son confidenciales y ser\u00e1n entregados a su empleador \u00fanicamente para fines del Sistema de Gesti\u00f3n de Seguridad y Salud en el Trabajo (SG-SST). Usted tiene derecho a conocer esta informaci\u00f3n y a resolver cualquier duda con la profesional que realiz\u00f3 la evaluaci\u00f3n.</p>';
+      body += '<p style="margin-top:18px;font-style:italic">Atentamente,</p>';
+      break;
+    }
   const css = '<style>*{box-sizing:border-box;margin:0;padding:0;}'
     +'body{font-family:Arial,sans-serif;color:#643000;background:#fff;padding:32px 38px;font-size:14px;max-width:900px;margin:0 auto;}'
+  }
     +'.header{display:flex;align-items:center;gap:18px;background:linear-gradient(135deg,#fff8f9,#fadae1);padding:16px 20px;border-radius:12px;border-bottom:3px solid #cd8e9d;margin-bottom:28px;}'
     +'.header img{height:70px;object-fit:contain;}'
     +'.header-info h1{font-size:1.15rem;color:#643000;margin-bottom:2px;font-family:Georgia,serif;font-style:italic;}'
@@ -4593,17 +4718,31 @@ function docGenerarHTML(tipo, pac, datos) {
     +'.firma-sub{font-size:.68rem;color:#cd8e9d;margin-top:3px;}'
     +'@media print{@page{margin:1.8cm}body{padding:0}}</style>';
 
-  const firmaHTML = '<div class="firmas">'
-    +'<div class="firma-bloque"><div class="firma-label">Paciente / Solicitante</div>'
-    +'<div style="height:65px;border-bottom:1.5px solid #cd8e9d;margin-bottom:4px"></div>'
-    +'<div class="firma-linea">'+esc(pac.nombre)+'</div>'
-    +'<div class="firma-sub">Fecha: ___-___-_____</div></div>'
-    +'<div class="firma-bloque"><div class="firma-label">Psic\u00f3loga</div>'
-    +'<img class="firma-img" src="'+FIRMA_DATA+'" alt="Firma">'
-    +'<div class="firma-linea"><strong>'+PSI.nombre+'</strong></div>'
-    +'<div class="firma-sub">T.P. No. '+PSI.tp+' \u00b7 '+fecha+'</div></div>'
-    +'</div>'
-    +'<p style="text-align:center;font-size:.62rem;color:#cd8e9d;margin-top:18px">Documento confidencial \u2014 '+PSI.tel+' \u00b7 '+PSI.email+'</p>';
+  // Firma: solo psicóloga para docs laborales
+  var firmaHTML;
+  if(tipo.id==='constancia_empresa'||tipo.id==='entregable_empleado'){
+    firmaHTML='<div style="margin-top:48px;text-align:center">'
+      +'<img src="'+FIRMA_DATA+'" alt="Firma" style="height:68px;object-fit:contain;display:block;margin:0 auto 4px;mix-blend-mode:multiply;">'
+      +'<div style="width:240px;border-top:1.5px solid #643000;margin:4px auto 6px"></div>'
+      +'<div style="font-size:.9rem;font-weight:700;color:#643000">'+PSI.nombre+'</div>'
+      +'<div style="font-size:.78rem;color:#a0536a">Psic\u00f3loga Titulada &middot; T.P. No. '+PSI.tp+'</div>'
+      +'<div style="font-size:.74rem;color:#cd8e9d;margin-top:2px">C.C. '+PSI.cc+' &middot; '+PSI.tel+' &middot; '+PSI.email+'</div>'
+      +'<div style="font-size:.72rem;color:#cd8e9d;margin-top:2px">'+PSI.dir+'</div>'
+      +'</div>'
+      +'<p style="text-align:center;font-size:.62rem;color:#cd8e9d;margin-top:16px">Documento confidencial</p>';
+  } else {
+    firmaHTML='<div class="firmas">'
+      +'<div class="firma-bloque"><div class="firma-label">Paciente / Solicitante</div>'
+      +'<div style="height:65px;border-bottom:1.5px solid #cd8e9d;margin-bottom:4px"></div>'
+      +'<div class="firma-linea">'+esc(pac.nombre)+'</div>'
+      +'<div class="firma-sub">Fecha: ___-___-_____</div></div>'
+      +'<div class="firma-bloque"><div class="firma-label">Psic\u00f3loga</div>'
+      +'<img class="firma-img" src="'+FIRMA_DATA+'" alt="Firma">'
+      +'<div class="firma-linea"><strong>'+PSI.nombre+'</strong></div>'
+      +'<div class="firma-sub">T.P. No. '+PSI.tp+' \u00b7 '+fecha+'</div></div>'
+      +'</div>'
+      +'<p style="text-align:center;font-size:.62rem;color:#cd8e9d;margin-top:18px">Documento confidencial \u2014 '+PSI.tel+' \u00b7 '+PSI.email+'</p>';
+  }
 
   return '<!DOCTYPE html><html><head><meta charset="UTF-8">'+css+'</head><body>'
     +'<div class="header"><img src="'+logoSrc+'" alt="Logo"><div class="header-info"><h1>'+PSI.nombre+'</h1><p>Psic\u00f3loga \u00b7 TP '+PSI.tp+'</p></div></div>'
