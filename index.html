@@ -478,10 +478,13 @@ input[type=range] { accent-color: var(--border); flex: 1; }
 .ag-empty .emoji { font-size:2.2rem; margin-bottom:10px; }
 
 @media(max-width: 900px) {
+  .col3 { grid-template-columns: 1fr 1fr; }
+}
+@media(max-width: 600px) {
   .col2, .col3 { grid-template-columns: 1fr; }
 }
-@media(max-width: 768px) {
-  /* On mobile: sidebar is hidden off-screen by default, shown as drawer */
+@media(max-width: 1024px) {
+  /* On mobile/tablet: sidebar is hidden off-screen by default, shown as drawer */
   #sidebar {
     transform: translateX(-100%);
     width: var(--sidebar-w) !important;
@@ -495,7 +498,7 @@ input[type=range] { accent-color: var(--border); flex: 1; }
   #main { margin-left: 0 !important; padding: 16px 14px 16px 14px; }
   #main.collapsed { margin-left: 0 !important; }
   #mob-toggle { display: flex; }
-  /* Reset collapsed label visibility on mobile */
+  /* Reset collapsed label visibility on mobile/tablet */
   #sidebar .logo-area h2, #sidebar .logo-area p,
   #sidebar .nav-label, #sidebar .nav-section, #sidebar .version { opacity: 1 !important; pointer-events: auto !important; }
   #sidebar .logo-area { padding: 20px 16px 14px !important; }
@@ -1964,7 +1967,7 @@ function savePacientes(p){ DB.set('pacientes',p); }
 function toggleSidebar(){
   var sidebar = document.getElementById('sidebar');
   var main    = document.getElementById('main');
-  var isMobile = window.innerWidth <= 768;
+  var isMobile = window.innerWidth <= 1024;
 
   if(isMobile){
     var overlay = document.getElementById('sidebar-overlay');
@@ -1997,13 +2000,13 @@ function cerrarSidebar(){
 }
 
 function cerrarSidebarMobile(){
-  if(window.innerWidth <= 768) cerrarSidebar();
+  if(window.innerWidth <= 1024) cerrarSidebar();
 }
 
 // Restore collapsed state on desktop
 (function(){
   try{
-    if(window.innerWidth > 768 && localStorage.getItem('sidebar_collapsed') === '1'){
+    if(window.innerWidth > 1024 && localStorage.getItem('sidebar_collapsed') === '1'){
       var sidebar = document.getElementById('sidebar');
       var main    = document.getElementById('main');
       if(sidebar){ sidebar.classList.add('collapsed'); }
@@ -2018,7 +2021,7 @@ function cerrarSidebarMobile(){
 window.addEventListener('resize', function(){
   var sidebar = document.getElementById('sidebar');
   var overlay = document.getElementById('sidebar-overlay');
-  if(window.innerWidth > 768){
+  if(window.innerWidth > 1024){
     sidebar.classList.remove('mobile-open');
     overlay.classList.remove('open');
   }
