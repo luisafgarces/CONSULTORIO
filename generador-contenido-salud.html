@@ -114,6 +114,21 @@ textarea::placeholder { color:#cbb0b8; }
 .apikey-status { font-size:11px; color:var(--brown-mid); margin-top:6px; }
 .apikey-status.ok { color:#7aaa7a; }
 
+.history-section { margin-top:32px; }
+.history-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:14px; }
+.history-header h3 { font-family:'Playfair Display',serif; font-size:16px; font-weight:400; color:var(--brown); }
+.history-clear { font-size:11px; color:var(--brown-mid); background:none; border:none; cursor:pointer; text-decoration:underline; font-family:'DM Sans',sans-serif; }
+.history-grid { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+@media(max-width:600px){ .history-grid{grid-template-columns:1fr} }
+.history-card { background:rgba(255,255,255,.82); border:1px solid rgba(205,142,157,.2); border-radius:14px; padding:16px; cursor:pointer; transition:all .2s; position:relative; }
+.history-card:hover { border-color:var(--rose); box-shadow:0 4px 16px rgba(205,142,157,.2); }
+.history-date { font-size:10px; color:var(--brown-mid); letter-spacing:1px; text-transform:uppercase; margin-bottom:8px; }
+.history-text { font-size:12px; color:var(--brown); line-height:1.6; display:-webkit-box; -webkit-line-clamp:4; -webkit-box-orient:vertical; overflow:hidden; }
+.history-tags { display:flex; gap:6px; margin-top:10px; flex-wrap:wrap; }
+.history-tag { font-size:10px; padding:3px 8px; background:var(--rose-pale); color:var(--rose); border-radius:20px; }
+.history-copy { position:absolute; top:12px; right:12px; background:none; border:1px solid rgba(205,142,157,.3); border-radius:8px; padding:4px 8px; font-size:10px; color:var(--rose); cursor:pointer; font-family:'DM Sans',sans-serif; }
+.history-empty { text-align:center; color:var(--brown-mid); font-size:13px; padding:32px; grid-column:1/-1; }
+
 .toast { position:fixed; bottom:28px; left:50%; transform:translateX(-50%) translateY(60px); background:var(--brown); color:white; padding:11px 22px; border-radius:30px; font-size:13px; font-weight:500; transition:transform .3s cubic-bezier(.34,1.56,.64,1); z-index:200; pointer-events:none; }
 .toast.show { transform:translateX(-50%) translateY(0); }
 
@@ -254,6 +269,17 @@ textarea::placeholder { color:#cbb0b8; }
 </div>
 <div class="toast" id="toast"></div>
 
+<!-- HISTORIAL -->
+<div class="wrap history-section">
+  <div class="history-header">
+    <h3>📋 Historial de contenido</h3>
+    <button class="history-clear" onclick="clearHistory()">Borrar todo</button>
+  </div>
+  <div class="history-grid" id="historyGrid">
+    <div class="history-empty">Aún no has generado contenido.<br>¡Tu historial aparecerá aquí! 🌸</div>
+  </div>
+</div>
+
 <script>
 let net='instagram', type='consejo', tone='cercano', fmt='post', tmpl=0, currentText='', busy=false;
 
@@ -261,6 +287,7 @@ let net='instagram', type='consejo', tone='cercano', fmt='post', tmpl=0, current
 window.addEventListener('DOMContentLoaded', ()=>{
   const saved = localStorage.getItem('gemini_api_key');
   if(saved){ document.getElementById('apiKeyInput').value=saved; checkKey(); }
+  renderHistory();
 });
 
 const TMPLS=[
@@ -457,7 +484,7 @@ async function generateAll(){
     const text=data.candidates[0].content.parts[0].text;
     const out=document.getElementById('output-text');
     out.textContent=''; let i=0;
-    const iv=setInterval(()=>{ out.textContent+=text[i];i++; if(i>=text.length){clearInterval(iv);currentText=text;reDrawImage();} },7);
+    const iv=setInterval(()=>{ out.textContent+=text[i];i++; if(i>=text.length){clearInterval(iv);currentText=text;reDrawImage();saveToHistory(text);} },7);
   }catch(e){
     document.getElementById('output-text').textContent='Error: '+e.message;
   }finally{
@@ -468,6 +495,45 @@ async function generateAll(){
 }
 
 function copyText(){ if(!currentText)return; navigator.clipboard.writeText(currentText).then(()=>showToast('✓ ¡Texto copiado!')); }
+
+// HISTORIAL
+function saveToHistory(text){
+  const history=JSON.parse(localStorage.getItem('content_history')||'[]');
+  const item={ id:Date.now(), text, net, type, tone, date:new Date().toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'}) };
+  history.unshift(item);
+  if(history.length>500) history.pop(); // máximo 500
+  localStorage.setItem('content_history',JSON.stringify(history));
+  renderHistory();
+}
+
+function renderHistory(){
+  const grid=document.getElementById('historyGrid');
+  const history=JSON.parse(localStorage.getItem('content_history')||'[]');
+  if(!history.length){ grid.innerHTML='<div class="history-empty">Aún no has generado contenido.<br>¡Tu historial aparecerá aquí! 🌸</div>'; return; }
+  const typeLabels={consejo:'💡 Consejo',promocion:'🎯 Promo',testimonio:'⭐ Testimonio',educativo:'📚 Educativo',presentacion:'👋 Presentación',motivacion:'🌿 Motivación'};
+  const netLabels={instagram:'📸 Instagram',whatsapp:'💬 WhatsApp'};
+  grid.innerHTML=history.map(h=>`
+    <div class="history-card">
+      <button class="history-copy" onclick="copyHistoryItem(${h.id})">📋 Copiar</button>
+      <div class="history-date">${h.date}</div>
+      <div class="history-text">${h.text}</div>
+      <div class="history-tags">
+        <span class="history-tag">${netLabels[h.net]||h.net}</span>
+        <span class="history-tag">${typeLabels[h.type]||h.type}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+function copyHistoryItem(id){
+  const history=JSON.parse(localStorage.getItem('content_history')||'[]');
+  const item=history.find(h=>h.id===id);
+  if(item){ navigator.clipboard.writeText(item.text).then(()=>showToast('✓ ¡Texto copiado!')); }
+}
+
+function clearHistory(){
+  if(confirm('¿Borrar todo el historial?')){ localStorage.removeItem('content_history'); renderHistory(); }
+}
 
 function downloadImage(){
   const story=fmt==='story';
