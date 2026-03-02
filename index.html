@@ -1253,10 +1253,10 @@ input[type=range] { accent-color: var(--border); flex: 1; }
     </div>
   </div>
   <div class="ag-tab-nav">
-    <button class="ag-tab active" onclick="agSwitchTab('hoy',this)">Hoy</button>
-    <button class="ag-tab" onclick="agSwitchTab('manana',this)">Mañana</button>
-    <button class="ag-tab" onclick="agSwitchTab('semana',this)">Esta semana</button>
-    <button class="ag-tab" id="ag-tab-cumple" onclick="agSwitchTab('cumpleanos',this)" style="display:flex;align-items:center;gap:6px">🎂 Cumpleaños <span id="ag-badge-cumple" style="display:none;background:#cd8e9d;color:#fff;border-radius:10px;font-size:.67rem;padding:1px 7px;font-weight:700;line-height:1.6"></span></button>
+    <button class="ag-tab active" data-tab="hoy" onclick="agSwitchTab('hoy',this)">Hoy</button>
+    <button class="ag-tab" data-tab="semana" onclick="agSwitchTab('semana',this)">📅 Semana</button>
+    <button class="ag-tab" data-tab="mes" onclick="agSwitchTab('mes',this)">🗓 Mes</button>
+    <button class="ag-tab" id="ag-tab-cumple" data-tab="cumpleanos" onclick="agSwitchTab('cumpleanos',this)" style="display:flex;align-items:center;gap:6px">🎂 Cumpleaños <span id="ag-badge-cumple" style="display:none;background:#cd8e9d;color:#fff;border-radius:10px;font-size:.67rem;padding:1px 7px;font-weight:700;line-height:1.6"></span></button>
   </div>
   <div class="card" id="ag-nav-card" style="padding:14px 20px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
     <div id="ag-fecha-titulo" style="font-family:'Playfair Display',serif;font-size:1.1rem"></div>
@@ -3791,6 +3791,8 @@ function agGuardar(){ DB.set('agenda_eventos', agEventos); }
 
 var agTabActual = 'hoy';
 var agDiaOffset = 0;
+var agSemanaOffset = 0;
+var agMesOffset = 0;
 var agMeses = ['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
 var agDias = ['domingo','lunes','martes','mi\u00e9rcoles','jueves','viernes','s\u00e1bado'];
 
@@ -3801,12 +3803,13 @@ function agMismoDia(d1,d2){ return d1.getFullYear()===d2.getFullYear()&&d1.getMo
 
 function renderAgenda(){
   if(agTabActual==='semana'){ agRenderSemana(); return; }
-  var offset = agTabActual==='manana'?1:agDiaOffset;
-  var fechaRef = agGetFecha(offset);
-  var prefijo = agTabActual==='hoy'?'Hoy \u00b7 ':agTabActual==='manana'?'Ma\u00f1ana \u00b7 ':'';
+  if(agTabActual==='mes'){ agRenderMes(); return; }
+  var fechaRef = agGetFecha(agDiaOffset);
+  var hoy = new Date(); var manana = agGetFecha(1);
+  var prefijo = agMismoDia(fechaRef,hoy)?'Hoy \u00b7 ':agMismoDia(fechaRef,manana)?'Ma\u00f1ana \u00b7 ':'';
   document.getElementById('ag-fecha-titulo').textContent = prefijo + agFormatFecha(fechaRef);
-  document.getElementById('ag-prev').style.display = agTabActual==='semana'?'none':'';
-  document.getElementById('ag-next').style.display = agTabActual==='semana'?'none':'';
+  document.getElementById('ag-prev').style.display = '';
+  document.getElementById('ag-next').style.display = '';
   var evs = agEventos.filter(e=>agMismoDia(new Date(e.inicio), fechaRef));
   evs.sort((a,b)=>new Date(a.inicio)-new Date(b.inicio));
   var c = document.getElementById('ag-container');
@@ -3815,15 +3818,81 @@ function renderAgenda(){
 }
 
 function agRenderSemana(){
-  document.getElementById('ag-fecha-titulo').textContent = 'Esta semana';
+  var hoy = new Date();
+  var diaSemana = hoy.getDay();
+  var lunes = new Date(hoy);
+  lunes.setDate(hoy.getDate() - (diaSemana===0?6:diaSemana-1) + agSemanaOffset*7);
+  lunes.setHours(0,0,0,0);
+  var domingo = new Date(lunes); domingo.setDate(lunes.getDate()+6);
+  var label = agSemanaOffset===0?'Esta semana':agSemanaOffset===1?'Semana siguiente':
+    'Semana del '+lunes.getDate()+' de '+['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'][lunes.getMonth()];
+  var fmt = function(d){ return ('0'+(d.getDate())).slice(-2)+'/'+('0'+(d.getMonth()+1)).slice(-2); };
+  document.getElementById('ag-fecha-titulo').textContent = label+' ('+fmt(lunes)+' – '+fmt(domingo)+')';
   var c = document.getElementById('ag-container'); var html='';
   for(var i=0;i<7;i++){
-    var dia=agGetFecha(i);
+    var dia=new Date(lunes); dia.setDate(lunes.getDate()+i);
     var evs=agEventos.filter(e=>agMismoDia(new Date(e.inicio),dia));
     evs.sort((a,b)=>new Date(a.inicio)-new Date(b.inicio));
-    if(evs.length){ html+='<div class="dia-label">'+agFormatFecha(dia)+'</div>'+evs.map(e=>agCard(e)).join(''); }
+    var esHoy=agMismoDia(dia,hoy);
+    var dias=['domingo','lunes','martes','miércoles','jueves','viernes','sábado'];
+    var meses=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+    html+='<div class="dia-label" style="'+(esHoy?'color:var(--border);font-weight:700':'')+'">'+dias[dia.getDay()]+', '+dia.getDate()+' de '+meses[dia.getMonth()]+(esHoy?' ★ Hoy':'')+'</div>';
+    if(evs.length){ html+=evs.map(e=>agCard(e)).join(''); }
+    else { html+='<div style="font-size:.8rem;color:#bbb;padding:4px 0 12px 4px;font-style:italic">Sin citas</div>'; }
   }
   c.innerHTML = html||'<div class="ag-empty"><div class="emoji">🌸</div><p>No hay citas esta semana.</p></div>';
+}
+
+function agRenderMes(){
+  if(typeof agMesOffset==='undefined') agMesOffset=0;
+  var hoy = new Date();
+  var refMes = new Date(hoy.getFullYear(), hoy.getMonth()+agMesOffset, 1);
+  var mes = refMes.getMonth(); var anio = refMes.getFullYear();
+  var mesesCap=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  document.getElementById('ag-fecha-titulo').textContent = mesesCap[mes]+' '+anio;
+  document.getElementById('ag-prev').style.display = '';
+  document.getElementById('ag-next').style.display = '';
+  var c = document.getElementById('ag-container');
+  var diasEnMes = new Date(anio, mes+1, 0).getDate();
+  var html = '<div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;margin-bottom:6px;">';
+  ['Lun','Mar','Mié','Jue','Vie','Sáb','Dom'].forEach(function(d){ html+='<div style="text-align:center;font-size:.72rem;font-weight:700;color:var(--border);padding:4px 0">'+d+'</div>'; });
+  html+='</div><div style="display:grid;grid-template-columns:repeat(7,1fr);gap:3px;">';
+  var primerDia = new Date(anio,mes,1).getDay();
+  var offset = primerDia===0?6:primerDia-1;
+  for(var b=0;b<offset;b++) html+='<div></div>';
+  for(var d=1;d<=diasEnMes;d++){
+    var fecha = new Date(anio,mes,d);
+    var evsDia = agEventos.filter(function(e){ return agMismoDia(new Date(e.inicio),fecha); });
+    evsDia.sort(function(a,b){ return new Date(a.inicio)-new Date(b.inicio); });
+    var esHoy = agMismoDia(fecha,hoy);
+    var bg = esHoy?'background:var(--border);color:#fff':'background:#fff8f9;color:var(--text)';
+    var bdr = esHoy?'var(--border)':'#f0dde2';
+    html+='<div onclick="agIrAFechaMes('+anio+','+mes+','+d+')" style="border:1.5px solid '+bdr+';border-radius:10px;padding:5px 4px;min-height:62px;'+bg+';cursor:pointer" title="Ver citas del '+d+'">';
+    html+='<div style="font-size:.8rem;font-weight:700;margin-bottom:3px">'+d+'</div>';
+    evsDia.slice(0,3).forEach(function(ev){
+      var colores={virtual:'#a8c7d8',presencial:'#cd8e9d',admin:'#b8b8d0'};
+      var color=colores[ev.tipo]||'#cd8e9d';
+      html+='<div style="background:'+color+';color:#fff;border-radius:4px;font-size:.63rem;padding:2px 3px;margin-bottom:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis" title="'+ev.titulo.replace(/"/g,"'")+'">'+ev.titulo+'</div>';
+    });
+    if(evsDia.length>3) html+='<div style="font-size:.62rem;color:'+(esHoy?'rgba(255,255,255,.8)':'var(--border)')+'">+'+(evsDia.length-3)+' más</div>';
+    html+='</div>';
+  }
+  html+='</div>';
+  html+='<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;font-size:.75rem;align-items:center"><span style="display:flex;align-items:center;gap:4px"><span style="background:#cd8e9d;border-radius:4px;width:12px;height:12px;display:inline-block"></span>Presencial</span><span style="display:flex;align-items:center;gap:4px"><span style="background:#a8c7d8;border-radius:4px;width:12px;height:12px;display:inline-block"></span>Virtual</span><span style="display:flex;align-items:center;gap:4px"><span style="background:#b8b8d0;border-radius:4px;width:12px;height:12px;display:inline-block"></span>Administrativo</span></div>';
+  c.innerHTML = html;
+}
+
+function agIrAFechaMes(anio, mes, dia){
+  var hoy = new Date(); hoy.setHours(0,0,0,0);
+  var fecha = new Date(anio,mes,dia);
+  var diff = Math.round((fecha-hoy)/(1000*60*60*24));
+  agTabActual='hoy'; agDiaOffset=diff; agSemanaOffset=0; agMesOffset=0;
+  document.querySelectorAll('.ag-tab').forEach(function(t){ t.classList.remove('active'); });
+  var tabHoy = document.querySelector('.ag-tab[data-tab="hoy"]');
+  if(tabHoy) tabHoy.classList.add('active');
+  ['ag-nav-card','ag-container','ag-form-card'].forEach(function(id){ var el=document.getElementById(id); if(el) el.style.display=''; });
+  var cp = document.getElementById('ag-panel-cumple'); if(cp) cp.style.display='none';
+  renderAgenda();
 }
 
 var _agEventMap = {};
@@ -3976,6 +4045,8 @@ function agLimpiarTodo(){
 function agSwitchTab(tab,el){
   agTabActual = tab;
   agDiaOffset = 0;
+  agSemanaOffset = 0;
+  agMesOffset = 0;
   document.querySelectorAll('.ag-tab').forEach(t=>t.classList.remove('active'));
   el.classList.add('active');
   var esCumple = (tab==='cumpleanos');
@@ -3986,7 +4057,11 @@ function agSwitchTab(tab,el){
   dsp('ag-panel-cumple', esCumple);
   if(esCumple){ agRenderCumpleanos(); } else { renderAgenda(); }
 }
-function agCambiarDia(dir){ agDiaOffset+=dir; if(agDiaOffset<0)agDiaOffset=0; renderAgenda(); }
+function agCambiarDia(dir){
+  if(agTabActual==='semana'){ agSemanaOffset+=dir; renderAgenda(); return; }
+  if(agTabActual==='mes'){ agMesOffset+=dir; renderAgenda(); return; }
+  agDiaOffset+=dir; renderAgenda();
+}
 function agAgregarEvento(){
   var titulo=document.getElementById('ag-nuevo-titulo').value.trim();
   var inicio=document.getElementById('ag-nuevo-inicio').value;
