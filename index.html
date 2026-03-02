@@ -2499,7 +2499,7 @@ function entregablePlan(){
   +'.cita{font-style:italic;color:#643000;line-height:1.8;margin-bottom:18px;font-size:.9rem;}'
   +'.firmas{display:flex;gap:36px;justify-content:center;}'
   +'.fb{flex:1;max-width:220px;text-align:center;}.fl{font-size:.65rem;font-weight:700;text-transform:uppercase;color:#a0536a;letter-spacing:.5px;margin-bottom:8px;}'
-  +'.fi{height:50px;object-fit:contain;display:block;margin:0 auto 6px;}.fn{border-top:1.5px solid #cd8e9d;padding-top:5px;font-size:.8rem;color:#643000;}.fs{font-size:.62rem;color:#cd8e9d;margin-top:2px;}'
+  +'.fi{height:50px;object-fit:contain;display:block;margin:0 auto 6px;mix-blend-mode:multiply;background:transparent;}.fn{border-top:1.5px solid #cd8e9d;padding-top:5px;font-size:.8rem;color:#643000;}.fs{font-size:.62rem;color:#cd8e9d;margin-top:2px;}'
   +'.pie{text-align:center;font-size:.62rem;color:#cd8e9d;margin-top:18px;font-style:italic;}'
   +'@media print{@page{margin:1.5cm}body{padding:0}}</style></head><body>'
   +'<div class="header">'
@@ -2515,7 +2515,6 @@ function entregablePlan(){
   +((data.mat||data.apps||data.emerg)?'<div class="sec">Recursos y apoyos</div>'+(data.mat?'<div class="recurso"><strong>Materiales:</strong> '+esc(data.mat)+'</div>':'')+(data.apps?'<div class="recurso"><strong>Apps:</strong> '+esc(data.apps)+'</div>':'')+(data.emerg?'<div class="recurso"><strong>Plan de emergencias:</strong> '+esc(data.emerg)+'</div>':''):'')
   +'<div class="compromiso"><div class="cita">"He le\u00eddo y comprendo mi plan de tratamiento. Me comprometo a participar activamente en mi proceso terap\u00e9utico."</div>'
   +'<div class="firmas">'
-  +'<div class="fb"><div class="fl">Paciente</div><div style="height:48px;border-bottom:1.5px solid #cd8e9d;margin-bottom:6px;"></div><div class="fn">'+esc(pac.nombre)+'</div><div class="fs">Fecha: ___-___-_____</div></div>'
   +'<div class="fb"><div class="fl">Psic\u00f3loga Tratante</div><img class="fi" src="'+FIRMA_DATA+'" alt="Firma"><div class="fn"><strong>Luisa Fernanda Garc\u00e9s Garc\u00eda</strong></div><div class="fs">TP 174366 \u00b7 '+fechaDoc+'</div></div>'
   +'</div></div>'
   +'<div class="pie">Generado el '+fechaDoc+' \u00b7 Documento confidencial \u00b7 Suite Cl\u00ednica</div>'
@@ -2599,13 +2598,7 @@ function exportarPlanDocx(){
   ${data.mat?'<div class="dato"><strong>📚 Materiales:</strong> '+data.mat+'</div>':''}
   ${data.apps?'<div class="dato"><strong>📱 Apps / herramientas:</strong> '+data.apps+'</div>':''}
   ${data.emerg?'<div class="dato"><strong>🚨 Plan de emergencias:</strong> '+data.emerg+'</div>':''}
-  <div class="firmas">
-    <div class="firma-bloque">
-      <div class="firma-label">Paciente</div>
-      <div style="height:60px;border-bottom:1.5px solid #cd8e9d;margin-bottom:4px"></div>
-      <div class="firma-linea">${pac.nombre}</div>
-      <div class="fecha-doc">Fecha: ___-___-_____</div>
-    </div>
+  <div class="firmas" style="justify-content:center">
     <div class="firma-bloque">
       <div class="firma-label">Psic\u00f3loga Tratante</div>
       <img class="firma-img" src="${FIRMA_DATA}" alt="Firma">
