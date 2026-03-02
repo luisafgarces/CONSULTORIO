@@ -456,7 +456,7 @@ async function generateAll(){
     out.textContent=''; let i=0;
     const iv=setInterval(()=>{ out.textContent+=text[i];i++; if(i>=text.length){clearInterval(iv);currentText=text;reDrawImage();} },7);
   }catch(e){
-    document.getElementById('output-text').textContent='Error al generar. Intentá de nuevo.';
+    document.getElementById('output-text').textContent='Error: '+e.message;
   }finally{
     busy=false;btn.disabled=false;
     document.getElementById('btnText').style.display='inline';
