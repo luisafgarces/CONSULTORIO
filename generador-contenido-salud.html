@@ -366,10 +366,13 @@ function drawContent(ctx,W,H,tpl,text,story){
   const clean=text.replace(/[#*_~`]/g,'').replace(/\n{3,}/g,'\n\n').trim();
   const contentY=story?H*.28:H*.26;
   const maxH=story?H*.54:H*.54;
-  let fs=Math.round(W*.031);
+  let fs=Math.round(W*.028);
   let lines=wrapText(ctx,clean,maxW,fs);
-  while(lines.length*fs*1.6>maxH && fs>W*.016){ fs--; lines=wrapText(ctx,clean,maxW,fs); }
-  const lh=fs*1.62;
+  while(lines.length*fs*1.55>maxH && fs>W*.013){ fs--; lines=wrapText(ctx,clean,maxW,fs); }
+  // Clip lines if still too many
+  const maxLines=Math.floor(maxH/(fs*1.55));
+  if(lines.length>maxLines){ lines=lines.slice(0,maxLines-1); lines.push('...'); }
+  const lh=fs*1.55;
   const startY=contentY+(maxH-lines.length*lh)/2;
   ctx.font=`300 ${fs}px 'DM Sans',sans-serif`;
   ctx.fillStyle=tpl.text; ctx.textAlign='center';
@@ -444,8 +447,8 @@ async function generateAll(){
   reDrawImage();
 
   const types={consejo:'consejo práctico',promocion:'publicación promocional',testimonio:'post con testimonio de cliente',educativo:'post educativo',presentacion:'presentación personal/profesional',motivacion:'mensaje motivacional'};
-  const netI=net==='instagram'?'para Instagram: usa emojis, 5-7 hashtags al final. Máx 270 palabras.':'para WhatsApp Business: directo, cálido, sin hashtags. Máx 170 palabras.';
-  const prompt=`Sos experta en marketing de salud y bienestar. Creá un ${types[type]} ${netI}\nTema: "${topic}"\nTono: ${tone}\nSolo escribí el texto del post, sin explicaciones.`;
+  const netI=net==='instagram'?'para Instagram: usa emojis, máx 3 hashtags al final. IMPORTANTE: máximo 80 palabras en total.':'para WhatsApp Business: directo, cálido, sin hashtags. IMPORTANTE: máximo 60 palabras en total.';
+  const prompt=`Sos experta en marketing de salud y bienestar. Creá un ${types[type]} ${netI}\nTema: "${topic}"\nTono: ${tone}\nSolo escribí el texto del post, sin explicaciones. Sé concisa y poderosa.`;
 
   try{
     const res=await fetch(`https://generativelanguage.googleapis.com/v1beta/models/gemini-3-flash-preview:generateContent?key=${apiKey}`,{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({contents:[{parts:[{text:prompt}]}]})});
