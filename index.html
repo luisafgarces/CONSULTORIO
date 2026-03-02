@@ -1888,6 +1888,7 @@ input[type=range] { accent-color: var(--border); flex: 1; }
       <button class="pac-hist-btn" onclick="switchPacTab('cancelaciones',this)">❌ Cancelaciones</button>
       <button class="pac-hist-btn" onclick="switchPacTab('histclinica',this)">🏥 Historia Clínica</button>
       <button class="pac-hist-btn" onclick="switchPacTab('informes',this)">🏢 Informes Laborales</button>
+      <button class="pac-hist-btn" onclick="switchPacTab('consentimiento',this)">✅ Consentimiento</button>
     </div>
     <div class="pac-hist-section active" id="pac-tab-datos"></div>
     <div class="pac-hist-section" id="pac-tab-sesiones"></div>
@@ -1895,6 +1896,7 @@ input[type=range] { accent-color: var(--border); flex: 1; }
     <div class="pac-hist-section" id="pac-tab-cancelaciones"></div>
     <div class="pac-hist-section" id="pac-tab-histclinica"></div>
     <div class="pac-hist-section" id="pac-tab-informes"></div>
+    <div class="pac-hist-section" id="pac-tab-consentimiento"></div>
     <div class="btn-row" style="margin-top:20px">
       <button class="btn danger" onclick="eliminarPaciente(_pacModalId)">🗑 Eliminar Paciente</button>
       <button class="btn primary" onclick="guardarPacienteModal()">💾 Guardar Cambios</button>
@@ -1902,7 +1904,26 @@ input[type=range] { accent-color: var(--border); flex: 1; }
   </div>
 </div>
 
-<!-- MODAL DETALLE SESIÓN -->
+<!-- MODAL FIRMA CONSENTIMIENTO PACIENTE -->
+<div class="pac-modal-overlay" id="ci-firma-overlay" onclick="if(event.target===this)cerrarCIFirmaModal()" style="z-index:800">
+  <div class="pac-modal" style="max-width:520px">
+    <div class="pac-modal-header">
+      <div class="pac-modal-title">✍️ Firma del Paciente</div>
+      <button class="pac-modal-close" onclick="cerrarCIFirmaModal()">✕</button>
+    </div>
+    <p style="font-size:.82rem;color:var(--strong);margin-bottom:12px">Dibuja tu firma en el recuadro:</p>
+    <canvas id="ci-firma-canvas" width="460" height="160" style="border:2px solid var(--border);border-radius:12px;cursor:crosshair;background:#fff;touch-action:none;width:100%;display:block"></canvas>
+    <div style="display:flex;gap:8px;margin-top:10px;justify-content:space-between">
+      <button class="btn" onclick="ciLimpiarFirma()" style="font-size:.8rem">🗑 Limpiar</button>
+      <div style="display:flex;gap:8px">
+        <button class="btn" onclick="cerrarCIFirmaModal()" style="font-size:.8rem">Cancelar</button>
+        <button class="btn primary" onclick="ciGuardarFirmaPaciente()" style="font-size:.8rem">✅ Aceptar firma</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
 <div class="ses-detail-overlay" id="ses-detail-overlay" onclick="if(event.target===this)this.classList.remove('open')">
   <div class="ses-detail-modal">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:18px">
@@ -2935,10 +2956,13 @@ function exportarResumenPDF(){
   <div class="titulo">Resumen de Sesi\u00f3n #${num}</div>
   <div class="sub">${fechaFmt} &nbsp;\u00b7&nbsp; ${pac.nombre}</div>
   ${lines}
-  <div style="margin-top:44px;border-top:2px solid #fadae1;padding-top:22px;text-align:center;">
-    <img class="firma-img" src="${FIRMA_DATA}" alt="Firma">
-    <div class="firma-linea"><strong>Luisa Fernanda Garc\u00e9s Garc\u00eda</strong></div>
-    <div class="firma-sub">Psic\u00f3loga Tratante &nbsp;\u00b7&nbsp; TP 174366</div>
+  <div class="firmas" style="justify-content:center">
+    <div class="firma-bloque">
+      <div class="firma-label">Psic\u00f3loga Tratante</div>
+      <img class="firma-img" src="${FIRMA_DATA}" alt="Firma">
+      <div class="firma-linea"><strong>Luisa Fernanda Garc\u00e9s Garc\u00eda</strong></div>
+      <div class="firma-sub">TP 174366</div>
+    </div>
   </div>
   <div class="pie">Generado el ${fechaGen} \u00b7 Documento confidencial de uso cl\u00ednico</div>
   </body></html>`;
@@ -4330,7 +4354,6 @@ function renderDocumentos() {
 }
 
 function docSeleccionarTipo(id) {
-  if(id === 'informe_laboral_psi'){ goPage('informes'); return; }
   docTipoSeleccionado = id;
   renderDocumentos();
   ['doc-paso2','doc-paso3','doc-paso4'].forEach(x=>document.getElementById(x).style.display='block');
@@ -4823,6 +4846,7 @@ function switchPacTab(tab,btn){
   document.getElementById("pac-tab-"+tab).classList.add("active");
   btn.classList.add("active");
   if(tab==='informes') renderPacInformes(_pacModalId);
+  if(tab==='consentimiento') renderPacConsentimiento(_pacModalId);
 }
 
 function renderPacInformes(pid){
@@ -5020,6 +5044,7 @@ function exportarHistoriaClinica(pacId){
 
   const sesSinCancel = ses.filter(s=>s.tipo!=='cancelacion');
   const cancels = ses.filter(s=>s.tipo==='cancelacion');
+  const ci = DB.get('consentimiento_'+pacId)||{};
 
   const LOGO_B64 = document.getElementById('logo-img')&&document.getElementById('logo-img').src ? document.getElementById('logo-img').src : '';
 
@@ -5225,7 +5250,33 @@ function exportarHistoriaClinica(pacId){
     <span class="annotation-label">\u00c1rea para notas / Apple Pencil</span>
   </div>
 
-  <!-- FIRMA -->
+  <!-- CONSENTIMIENTO INFORMADO ANEXO -->
+  ${(ci.firmaPaciente||ci.firmaPsicologa) ? `
+  <div style="page-break-before:always;margin-top:40px">
+    <h3 class="sec-title">📜 Anexo: Consentimiento Informado</h3>
+    <div style="background:#fdf5f7;border-radius:10px;padding:12px 16px;font-size:.79rem;line-height:1.72;margin-bottom:14px;color:#3a1a00">
+      <p style="margin-bottom:8px">Yo, <strong>${esc(pac.nombre)}</strong>${pac.cc?' (C.C. '+esc(pac.cc)+')':''}, declaro haber recibido información suficiente sobre el proceso psicológico y otorgo mi consentimiento libre e informado, aceptando: <strong>(1)</strong> la confidencialidad y el secreto profesional (Ley 1090/2006), <strong>(2)</strong> el tratamiento de mis datos personales y de salud (Ley 1581/2012), <strong>(3)</strong> la política de honorarios y cancelaciones con aviso mínimo de 24 horas, <strong>(4)</strong> los alcances y limitaciones del proceso psicológico, y <strong>(5)</strong> los derechos que me asisten como paciente.</p>
+      ${ci.fechaFirma?`<p style="font-size:.75rem;color:#a0536a">Fecha de firma: ${new Date(ci.fechaFirma).toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'})}</p>`:''}
+    </div>
+    <div style="display:flex;justify-content:space-around;align-items:flex-end;gap:20px;margin-top:24px">
+      <div style="text-align:center;min-width:180px">
+        <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;color:#a0536a;letter-spacing:.5px;margin-bottom:8px">Firma del Paciente</div>
+        ${ci.firmaPaciente
+          ? `<img src="${ci.firmaPaciente}" style="height:56px;object-fit:contain;display:block;margin:0 auto 6px;mix-blend-mode:multiply" alt="Firma paciente">`
+          : `<div style="height:48px;border-bottom:1.5px solid #cd8e9d;margin-bottom:6px"></div>`}
+        <div style="border-top:1.5px solid #cd8e9d;padding-top:5px;font-size:.8rem;color:#643000">${esc(pac.nombre)}</div>
+        ${pac.cc?`<div style="font-size:.68rem;color:#cd8e9d">C.C. ${esc(pac.cc)}</div>`:''}
+      </div>
+      <div style="text-align:center;min-width:180px">
+        <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;color:#a0536a;letter-spacing:.5px;margin-bottom:8px">Psicóloga Tratante</div>
+        <img src="${FIRMA_DATA}" alt="Firma" style="height:56px;object-fit:contain;display:block;margin:0 auto 6px;mix-blend-mode:multiply">
+        <div style="border-top:1.5px solid #cd8e9d;padding-top:5px;font-size:.8rem;color:#643000"><strong>Luisa Fernanda Garcés García</strong></div>
+        <div style="font-size:.68rem;color:#cd8e9d">T.P. 174366</div>
+      </div>
+    </div>
+  </div>` : ''}
+
+  <!-- FIRMA HISTORIA CLÍNICA -->
   <div class="footer">
     <div style="display:flex;justify-content:space-around;align-items:flex-end;margin-bottom:16px;">
       <div style="text-align:center;min-width:190px;">
@@ -5272,7 +5323,403 @@ function exportarHistoriaClinica(pacId){
   }
 }
 
-// ===================== SESSION DETAIL =====================
+// ===================== CONSENTIMIENTO INFORMADO =====================
+
+var _ciPacId = null;
+var _ciDrawing = false;
+var _ciLastX = 0, _ciLastY = 0;
+var _ciCanvas = null, _ciCtx = null;
+
+function renderPacConsentimiento(pid){
+  _ciPacId = pid;
+  var el = document.getElementById('pac-tab-consentimiento');
+  if(!el) return;
+  var pacs = getPacientes();
+  var pac = pacs.find(p=>p.id===pid)||{};
+  var ci = DB.get('consentimiento_'+pid)||{};
+  var firmado = !!(ci.firmaPaciente && ci.firmaPsicologa);
+  var fechaFirmado = ci.fechaFirma ? new Date(ci.fechaFirma).toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'}) : null;
+
+  el.innerHTML = `
+    <div style="background:${firmado?'#edfaf0':'#fff8f0'};border:1.5px solid ${firmado?'#7ecba0':'#e8d0d6'};border-radius:12px;padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px">
+      <div style="font-size:1.5rem">${firmado?'✅':'⏳'}</div>
+      <div>
+        <div style="font-weight:700;font-size:.9rem;color:${firmado?'#2d6a4f':'#a0536a'}">${firmado?'Consentimiento firmado por ambas partes':'Pendiente de firma'}</div>
+        ${fechaFirmado?`<div style="font-size:.75rem;color:#666">Firmado el ${fechaFirmado}</div>`:''}
+      </div>
+    </div>
+
+    <div style="background:#fdf5f7;border-radius:10px;padding:14px 16px;font-size:.81rem;line-height:1.75;max-height:220px;overflow-y:auto;margin-bottom:14px;color:#3a1a00">
+      <strong style="font-size:.88rem;display:block;margin-bottom:8px;font-family:'Playfair Display',serif">CONSENTIMIENTO INFORMADO PARA PROCESO PSICOLÓGICO</strong>
+      <p>Yo, <strong>${pac.nombre||'el/la paciente'}</strong>${pac.cc?' (C.C. '+pac.cc+')':''}, declaro que he recibido información clara y comprensible sobre el proceso psicológico a seguir con la Psicóloga <strong>Luisa Fernanda Garcés García</strong> (T.P. 174366), y manifiesto mi consentimiento libre, voluntario e informado para recibirlo, bajo las siguientes condiciones:</p>
+      <p><strong>1. Confidencialidad:</strong> Toda la información compartida durante el proceso es estrictamente confidencial y está protegida por el secreto profesional, conforme a la Ley 1090 de 2006. Solo se divulgará con mi autorización expresa o cuando exista una obligación legal, riesgo inminente para mi integridad o la de terceros.</p>
+      <p><strong>2. Tratamiento de datos personales (Ley 1581 de 2012):</strong> Autorizo el tratamiento de mis datos personales y de salud únicamente para fines del proceso clínico. Mis datos serán almacenados de forma segura, no serán compartidos con terceros sin mi consentimiento y podré solicitar su consulta, corrección o eliminación en cualquier momento.</p>
+      <p><strong>3. Derechos del paciente:</strong> Tengo derecho a recibir información sobre mi proceso terapéutico, a participar en las decisiones sobre mi tratamiento, a retirar mi consentimiento en cualquier momento y a recibir un trato digno, respetuoso y sin discriminación.</p>
+      <p><strong>4. Grabaciones y registros:</strong> Cualquier grabación de audio o video de las sesiones requerirá mi autorización explícita y previa. Los registros escritos de las sesiones son propiedad de la profesional y constituyen el expediente clínico.</p>
+      <p><strong>5. Honorarios y cancelaciones:</strong> Conozco las tarifas acordadas para el proceso. En caso de cancelación, me comprometo a notificar con al menos <strong>24 horas de anticipación</strong>. Las cancelaciones sin previo aviso podrán generar el cobro del valor de la sesión.</p>
+      <p><strong>6. Alcances y limitaciones:</strong> Entiendo que la psicología no es un servicio de emergencias. Ante una crisis o riesgo de vida, debo contactar a servicios de urgencias (Línea 106 o emergencias 123). El proceso psicológico no garantiza resultados específicos, pues depende de múltiples factores incluyendo mi participación activa.</p>
+      <p><strong>7. Menores de edad:</strong> Si el proceso involucra a un menor, el consentimiento es otorgado por su representante legal, quien además se compromete a apoyar el proceso.</p>
+    </div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
+      <div style="flex:1;min-width:180px">
+        <div style="font-size:.75rem;font-weight:700;color:var(--strong);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Firma del paciente</div>
+        ${ci.firmaPaciente
+          ? `<div style="border:1.5px solid #7ecba0;border-radius:10px;padding:6px;background:#edfaf0;text-align:center">
+               <img src="${ci.firmaPaciente}" style="height:54px;object-fit:contain;display:block;margin:0 auto">
+               <div style="font-size:.72rem;color:#2d6a4f;margin-top:3px">✅ Firmado</div>
+             </div>
+             <button class="btn" style="font-size:.72rem;margin-top:6px;width:100%" onclick="abrirCIFirmaModal('${pid}')">🔄 Volver a firmar</button>`
+          : `<div style="border:2px dashed var(--border);border-radius:10px;padding:18px;text-align:center;background:#fdf5f7">
+               <div style="font-size:.8rem;color:var(--strong);margin-bottom:8px">Sin firma del paciente</div>
+               <button class="btn primary" style="font-size:.8rem" onclick="abrirCIFirmaModal('${pid}')">✍️ Firmar aquí</button>
+             </div>`
+        }
+      </div>
+      <div style="flex:1;min-width:180px">
+        <div style="font-size:.75rem;font-weight:700;color:var(--strong);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Firma de la psicóloga</div>
+        ${FIRMA_DATA
+          ? `<div style="border:1.5px solid #cd8e9d;border-radius:10px;padding:6px;background:#fdf5f7;text-align:center">
+               <img src="${FIRMA_DATA}" style="height:54px;object-fit:contain;display:block;margin:0 auto;mix-blend-mode:multiply">
+               <div style="font-size:.72rem;color:#a0536a;margin-top:3px">Luisa F. Garcés García · TP 174366</div>
+             </div>`
+          : `<div style="border:2px dashed var(--border);border-radius:10px;padding:18px;text-align:center;background:#fdf5f7">
+               <div style="font-size:.8rem;color:var(--strong)">No hay firma registrada.<br><span style="font-size:.72rem">Configura tu firma en Ajustes.</span></div>
+             </div>`
+        }
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn primary" onclick="ciGuardarConsentimiento('${pid}')" style="font-size:.82rem">💾 Guardar consentimiento</button>
+      <button class="btn" onclick="ciGenerarPDF('${pid}')" style="font-size:.82rem">📄 Generar PDF independiente</button>
+      ${firmado?`<button class="btn" style="font-size:.82rem;background:var(--border);color:#fff" onclick="exportarHistoriaClinicaConCI('${pid}')">📋 Hist. Clínica + Consentimiento</button>`:''}
+      <button class="btn" onclick="ciLimpiarFirmaPaciente('${pid}')" style="font-size:.82rem;background:#fff3e0;color:#a0536a;border:1.5px solid #e8b87a" title="Borra solo la firma del paciente">🧹 Limpiar firma</button>
+      <button class="btn" onclick="ciEliminarConsentimiento('${pid}')" style="font-size:.82rem;background:#ffeaea;color:#c0392b;border:1.5px solid #e8a0a0" title="Elimina todo el consentimiento guardado">🗑️ Eliminar consentimiento</button>
+    </div>`;
+}
+
+function abrirCIFirmaModal(pid){
+  _ciPacId = pid;
+  document.getElementById('ci-firma-overlay').classList.add('open');
+  setTimeout(function(){
+    _ciCanvas = document.getElementById('ci-firma-canvas');
+    _ciCtx = _ciCanvas.getContext('2d');
+    // Ajustar resolución del canvas al tamaño real
+    var rect = _ciCanvas.getBoundingClientRect();
+    _ciCanvas.width = rect.width * (window.devicePixelRatio||1);
+    _ciCanvas.height = 160 * (window.devicePixelRatio||1);
+    _ciCtx.scale(window.devicePixelRatio||1, window.devicePixelRatio||1);
+    _ciCtx.strokeStyle = '#3a1a00';
+    _ciCtx.lineWidth = 2.2;
+    _ciCtx.lineCap = 'round';
+    _ciCtx.lineJoin = 'round';
+    ciBindFirmaEvents();
+  }, 100);
+}
+
+function ciBindFirmaEvents(){
+  var c = _ciCanvas;
+  c.onmousedown = function(e){ _ciDrawing=true; var pos=ciGetPos(e,c); _ciLastX=pos.x; _ciLastY=pos.y; };
+  c.onmousemove = function(e){ if(!_ciDrawing) return; var pos=ciGetPos(e,c); ciDraw(_ciLastX,_ciLastY,pos.x,pos.y); _ciLastX=pos.x; _ciLastY=pos.y; };
+  c.onmouseup = c.onmouseleave = function(){ _ciDrawing=false; };
+  c.ontouchstart = function(e){ e.preventDefault(); _ciDrawing=true; var pos=ciGetPos(e.touches[0],c); _ciLastX=pos.x; _ciLastY=pos.y; };
+  c.ontouchmove = function(e){ e.preventDefault(); if(!_ciDrawing) return; var pos=ciGetPos(e.touches[0],c); ciDraw(_ciLastX,_ciLastY,pos.x,pos.y); _ciLastX=pos.x; _ciLastY=pos.y; };
+  c.ontouchend = function(){ _ciDrawing=false; };
+}
+
+function ciGetPos(e, canvas){
+  var rect = canvas.getBoundingClientRect();
+  return { x: (e.clientX - rect.left), y: (e.clientY - rect.top) };
+}
+
+function ciDraw(x1,y1,x2,y2){
+  _ciCtx.beginPath();
+  _ciCtx.moveTo(x1,y1);
+  _ciCtx.lineTo(x2,y2);
+  _ciCtx.stroke();
+}
+
+function ciLimpiarFirma(){
+  if(_ciCtx && _ciCanvas){
+    var rect = _ciCanvas.getBoundingClientRect();
+    _ciCtx.clearRect(0,0,rect.width * (window.devicePixelRatio||1), 160*(window.devicePixelRatio||1));
+  }
+}
+
+function cerrarCIFirmaModal(){
+  document.getElementById('ci-firma-overlay').classList.remove('open');
+  _ciDrawing = false;
+}
+
+function ciGuardarFirmaPaciente(){
+  if(!_ciCanvas) return;
+  var dataURL = _ciCanvas.toDataURL('image/png');
+  // Verificar que no esté en blanco
+  var tempCtx = document.createElement('canvas').getContext('2d');
+  var img = new Image();
+  img.onload = function(){
+    var check = document.createElement('canvas');
+    check.width = _ciCanvas.width; check.height = _ciCanvas.height;
+    var cc = check.getContext('2d');
+    cc.drawImage(img,0,0);
+    var data = cc.getImageData(0,0,check.width,check.height).data;
+    var hasContent = false;
+    for(var i=3;i<data.length;i+=4){ if(data[i]>10){ hasContent=true; break; } }
+    if(!hasContent){ toast('Por favor dibuja tu firma antes de aceptar'); return; }
+    // Guardar en el consentimiento
+    var ci = DB.get('consentimiento_'+_ciPacId)||{};
+    ci.firmaPaciente = dataURL;
+    DB.set('consentimiento_'+_ciPacId, ci);
+    cerrarCIFirmaModal();
+    renderPacConsentimiento(_ciPacId);
+    toast('✅ Firma del paciente guardada');
+  };
+  img.src = dataURL;
+}
+
+function ciGuardarConsentimiento(pid){
+  var ci = DB.get('consentimiento_'+pid)||{};
+  ci.firmaPsicologa = FIRMA_DATA||'';
+  ci.fechaFirma = ci.fechaFirma || new Date().toISOString();
+  ci.firmaPaciente = ci.firmaPaciente||'';
+  DB.set('consentimiento_'+pid, ci);
+  renderPacConsentimiento(pid);
+  toast('💾 Consentimiento guardado');
+}
+
+function ciLimpiarFirmaPaciente(pid){
+  if(!confirm('¿Limpiar la firma del paciente? El resto del consentimiento se conservará.')) return;
+  var ci = DB.get('consentimiento_'+pid)||{};
+  ci.firmaPaciente = '';
+  DB.set('consentimiento_'+pid, ci);
+  renderPacConsentimiento(pid);
+  toast('🧹 Firma del paciente eliminada');
+}
+
+function ciEliminarConsentimiento(pid){
+  if(!confirm('¿Eliminar el consentimiento completo? Esta acción no se puede deshacer.')) return;
+  DB.set('consentimiento_'+pid, null);
+  delete DB._cache['consentimiento_'+pid];
+  try { localStorage.removeItem('consentimiento_'+pid); } catch(e){}
+  renderPacConsentimiento(pid);
+  toast('🗑️ Consentimiento eliminado');
+}
+
+function ciGenerarPDF(pid){
+  var pacs = getPacientes();
+  var pac = pacs.find(p=>p.id===pid)||{};
+  var ci = DB.get('consentimiento_'+pid)||{};
+  var LOGO_B64 = document.getElementById('logo-img')&&document.getElementById('logo-img').src ? document.getElementById('logo-img').src : '';
+  var fechaHoy = ci.fechaFirma ? new Date(ci.fechaFirma).toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'}) : new Date().toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'});
+  function esc(v){ return (v||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  // Asegurar que la firma de la psicóloga siempre esté presente
+  if(!ci.firmaPsicologa) ci.firmaPsicologa = FIRMA_DATA||'';
+  var html = ciGenerarHTMLConsentimiento(pac, ci, LOGO_B64, fechaHoy, esc);
+
+  var blob = new Blob([html], {type:'text/html;charset=utf-8'});
+  var url; try { url = URL.createObjectURL(blob); } catch(e){ url = null; }
+  var opened = false;
+  if(url && !url.startsWith('blob:null')){ var w = window.open(url,'_blank'); opened=!!w; }
+  if(!opened){ descargarArchivo(html,'ConsentimientoInformado_'+(pac.nombre||'').replace(/\s+/g,'_')+'.html','text/html;charset=utf-8'); toast('Consentimiento descargado'); }
+  else { setTimeout(()=>URL.revokeObjectURL(url),30000); }
+}
+
+function ciGenerarHTMLConsentimiento(pac, ci, LOGO_B64, fechaHoy, esc){
+  // Calcular edad si hay fecha de nacimiento
+  var edadTexto = '';
+  if(pac.fnac){
+    var hoy = new Date();
+    var fn = new Date(pac.fnac);
+    var edad = hoy.getFullYear() - fn.getFullYear();
+    var m = hoy.getMonth() - fn.getMonth();
+    if(m < 0 || (m === 0 && hoy.getDate() < fn.getDate())) edad--;
+    edadTexto = edad + ' años';
+  }
+  // Modalidad
+  var modalidadTexto = pac.modalidad === 'presencial' ? '🏠 Presencial' : '💻 Virtual';
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Consentimiento - ${esc(pac.nombre)}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Lato',Arial,sans-serif;font-size:12.5px;color:#3a1a00;background:#fff;line-height:1.65}
+  .page{max-width:780px;margin:0 auto;padding:36px 40px 50px}
+
+  /* CABECERA */
+  .header{display:flex;align-items:center;gap:16px;border-bottom:2px solid #cd8e9d;padding-bottom:14px;margin-bottom:20px}
+  .logo-wrap img{width:72px;height:72px;object-fit:contain;border-radius:8px}
+  .logo-placeholder{width:72px;height:72px;background:#fadae1;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.6rem}
+  .prof-info{flex:1}
+  .prof-name{font-size:1.1rem;font-weight:700;color:#3a1a00;letter-spacing:.02em}
+  .prof-title{font-size:.78rem;color:#888;margin-top:1px}
+  .prof-contact{font-size:.76rem;color:#888;margin-top:2px}
+
+  /* TÍTULO CENTRAL */
+  .ci-title-band{text-align:center;border-top:1.5px solid #cd8e9d;border-bottom:1.5px solid #cd8e9d;padding:10px 0;margin-bottom:20px}
+  .ci-title-band h2{font-size:.95rem;font-weight:700;letter-spacing:.08em;color:#3a1a00}
+
+  /* SECCIÓN */
+  .sec-label{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#cd8e9d;border-bottom:1px solid #e8d0d6;padding-bottom:4px;margin-bottom:10px;margin-top:16px}
+
+  /* DATOS DEL PACIENTE */
+  .datos-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 24px;margin-bottom:4px}
+  .dato-row{display:flex;gap:6px;font-size:.82rem}
+  .dato-label{font-weight:700;color:#3a1a00;min-width:80px}
+  .dato-val{color:#3a1a00}
+
+  /* MOTIVO DE CONSULTA */
+  .motivo-box{font-size:.82rem;line-height:1.7;padding:8px 0;min-height:28px;color:#3a1a00}
+
+  /* CONSENTIMIENTO TERAPÉUTICO */
+  .consent-text{font-size:.82rem;line-height:1.75;text-align:justify;color:#3a1a00;margin-bottom:4px}
+
+  /* TABLA HONORARIOS */
+  .hon-table{width:100%;border-collapse:collapse;margin-top:8px;margin-bottom:8px;font-size:.82rem}
+  .hon-table thead tr{background:#cd8e9d;color:#fff}
+  .hon-table thead th{padding:7px 12px;text-align:left;font-weight:700;font-size:.78rem}
+  .hon-table tbody tr{border-bottom:1px solid #f0dde2}
+  .hon-table tbody tr:last-child{border-bottom:none}
+  .hon-table tbody td{padding:6px 12px;color:#3a1a00}
+  .metodos-pago{font-size:.8rem;margin-top:6px;color:#3a1a00}
+  .metodos-pago strong{font-weight:700}
+
+  /* DATOS PERSONALES */
+  .datos-pers-text{font-size:.82rem;line-height:1.72;color:#3a1a00}
+
+  /* DOCUMENTOS ACEPTADOS */
+  .docs-list{list-style:none;font-size:.82rem;line-height:1.9;color:#3a1a00}
+  .docs-list li::before{content:'✅ ';margin-right:4px}
+
+  /* FIRMAS */
+  .firmas{display:flex;gap:40px;justify-content:space-around;margin-top:36px;padding-top:20px;border-top:1px solid #e8d0d6}
+  .firma-bloque{flex:1;text-align:center;max-width:240px}
+  .firma-img{height:68px;object-fit:contain;display:block;margin:0 auto 4px;mix-blend-mode:multiply}
+  .firma-linea{border-top:1.5px solid #3a1a00;padding-top:6px;font-size:.82rem;color:#3a1a00}
+  .firma-sub{font-size:.72rem;color:#888;margin-top:2px}
+
+  /* PIE */
+  .footer-note{margin-top:22px;border-top:1px solid #e8d0d6;padding-top:10px;font-size:.7rem;color:#aaa;text-align:center}
+
+  @media print{
+    body{font-size:12px}
+    .page{padding:20px 24px 30px}
+    .no-print{display:none!important}
+    @page{margin:1.2cm}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- CABECERA -->
+  <div class="header">
+    <div class="logo-wrap">
+      ${LOGO_B64
+        ? `<img src="${LOGO_B64}" alt="Logo">`
+        : `<div class="logo-placeholder">🌸</div>`}
+    </div>
+    <div class="prof-info">
+      <div class="prof-name">Luisa Fernanda Garcés García</div>
+      <div class="prof-title">Psicóloga Titulada &middot; T.P. 174366 &middot; C.C. 1036602429</div>
+      <div class="prof-contact">psicoluisafernandagarces@gmail.com &middot; 324 638 1485 &middot; Medellín</div>
+    </div>
+  </div>
+
+  <!-- TÍTULO -->
+  <div class="ci-title-band">
+    <h2>CONSENTIMIENTO INFORMADO FIRMADO DIGITALMENTE</h2>
+  </div>
+
+  <!-- DATOS DEL PACIENTE -->
+  <div class="sec-label">DATOS DEL PACIENTE</div>
+  <div class="datos-grid">
+    <div class="dato-row"><span class="dato-label">Nombre:</span><span class="dato-val">${esc(pac.nombre)||''}</span></div>
+    <div class="dato-row"><span class="dato-label">Cédula:</span><span class="dato-val">${esc(pac.cc)||''}</span></div>
+    <div class="dato-row"><span class="dato-label">Edad:</span><span class="dato-val">${edadTexto||''}</span></div>
+    <div class="dato-row"><span class="dato-label">Tel:</span><span class="dato-val">${esc(pac.tel||pac.telefono||'')}</span></div>
+    <div class="dato-row"><span class="dato-label">Modalidad:</span><span class="dato-val">${modalidadTexto}</span></div>
+    <div class="dato-row"><span class="dato-label">Fecha:</span><span class="dato-val">${fechaHoy}</span></div>
+  </div>
+
+  <!-- MOTIVO DE CONSULTA -->
+  <div class="sec-label">MOTIVO DE CONSULTA</div>
+  <div class="motivo-box">${esc(pac.motivo||ci.motivo||'')}</div>
+
+  <!-- CONSENTIMIENTO TERAPÉUTICO -->
+  <div class="sec-label">CONSENTIMIENTO TERAPÉUTICO</div>
+  <p class="consent-text">Yo, <strong>${esc(pac.nombre)}</strong>${pac.cc?' (C.C. '+esc(pac.cc)+')':''}, declaro haber sido informado/a sobre el proceso terapéutico por la psicóloga Luisa Fernanda Garcés. Entiendo que mi participación es voluntaria y que la información es confidencial salvo riesgo inminente o disposición legal.</p>
+
+  <!-- POLÍTICA DE CANCELACIONES -->
+  <div class="sec-label">POLÍTICA DE CANCELACIONES</div>
+  <p style="font-size:.82rem;margin-bottom:8px;color:#3a1a00">Cancelaciones con menos de 24h o inasistencia sin aviso: cobro total de la sesión.</p>
+  <table class="hon-table">
+    <thead><tr><th>Servicio</th><th>Valor</th></tr></thead>
+    <tbody>
+      <tr><td>Sesión individual</td><td>$80.000</td></tr>
+      <tr><td>Pareja/familia</td><td>$140.000</td></tr>
+      <tr><td>Evaluación individual</td><td>$140.000</td></tr>
+      <tr><td>Evaluación pareja</td><td>$160.000</td></tr>
+    </tbody>
+  </table>
+  <p class="metodos-pago"><strong>Métodos de pago:</strong> Efectivo &middot; Nu &middot; Davibank &middot; Nequi &middot; Breve</p>
+
+  <!-- DATOS PERSONALES -->
+  <div class="sec-label">DATOS PERSONALES — Ley 1581/2012</div>
+  <p class="datos-pers-text">Autorizo el tratamiento de mis datos personales y de salud para la prestación del servicio psicológico y obligaciones legales.</p>
+
+  <!-- DOCUMENTOS ACEPTADOS -->
+  <div class="sec-label">DOCUMENTOS ACEPTADOS</div>
+  <ul class="docs-list">
+    <li>Consentimiento terapéutico</li>
+    <li>Política de cancelaciones y honorarios</li>
+    <li>Autorización datos personales (Ley 1581/2012)</li>
+  </ul>
+
+  <!-- FIRMAS -->
+  <div class="firmas">
+    <div class="firma-bloque">
+      ${ci.firmaPaciente
+        ? `<img src="${ci.firmaPaciente}" class="firma-img" alt="Firma paciente">`
+        : `<div style="height:68px;"></div>`}
+      <div class="firma-linea">${esc(pac.nombre)}</div>
+      <div class="firma-sub">Paciente &middot; C.C. ${esc(pac.cc)||''}</div>
+    </div>
+    <div class="firma-bloque">
+      ${ci.firmaPsicologa
+        ? `<img src="${ci.firmaPsicologa}" class="firma-img" alt="Firma psicóloga">`
+        : `<div style="height:68px;"></div>`}
+      <div class="firma-linea">Luisa Fernanda Garcés García</div>
+      <div class="firma-sub">Psicóloga &middot; T.P. 174366</div>
+    </div>
+  </div>
+
+  <!-- PIE -->
+  <div class="footer-note">Documento digital &middot; ${fechaHoy} &middot; Confidencial</div>
+
+</div>
+<div class="no-print" style="position:fixed;bottom:24px;right:24px;display:flex;flex-direction:column;gap:10px;z-index:999">
+  <button onclick="window.print()" style="background:#cd8e9d;color:#fff;border:none;padding:12px 22px;border-radius:24px;font-size:.9rem;cursor:pointer;box-shadow:0 4px 16px rgba(100,48,0,.2)">🖨️ Imprimir / Guardar PDF</button>
+  <button onclick="window.close()" style="background:#fadae1;color:#643000;border:1px solid #cd8e9d;padding:10px 22px;border-radius:24px;font-size:.9rem;cursor:pointer">✕ Cerrar</button>
+</div>
+</body>
+</html>`;
+}
+
+function exportarHistoriaClinicaConCI(pacId){
+  // Primero generar el consentimiento, luego la historia clínica con nota al pie
+  // En este caso abrimos ambos en tabs separados
+  ciGenerarPDF(pacId);
+  setTimeout(function(){ exportarHistoriaClinica(pacId); }, 600);
+  toast('📄 Se abrirán dos documentos: consentimiento e historia clínica');
+}
+
+
 function abrirDetalleSesion(pid, sid){
   const ses = DB.get('sesiones_'+pid)||[];
   const s = ses.find(x=>x.id===sid);
@@ -6523,7 +6970,8 @@ function ilGenerarHTMLPreview(datos){
     +(datos.recColaborador?'<em style="font-weight:700;color:#a0536a;font-size:.85rem">Para el Colaborador</em><div style="font-size:.88rem;margin:8px 0 14px">'+datos.recColaborador+'</div>':'')
     +(datos.recEmpresa?'<em style="font-weight:700;color:#a0536a;font-size:.85rem">Para la Empresa — Plan de Intervención (Ley 2460)</em><div style="font-size:.88rem;margin:8px 0 24px">'+datos.recEmpresa+'</div>':''):'')
   +'<div style="border-top:1.5px solid #cd8e9d;padding-top:24px;text-align:center;margin-top:8px">'
-    +'<img src="'+FIRMA_DATA+'" alt="Firma" style="height:72px;object-fit:contain;display:block;margin:0 auto 8px;mix-blend-mode:multiply;">'
+    +'<div style="font-size:.8rem;font-weight:700;color:#a0536a;letter-spacing:.5px;text-transform:uppercase;margin-bottom:16px">FIRMA DE LA PSICÓLOGA</div>'
+    +'<div style="width:180px;border-bottom:1.5px solid #643000;margin:40px auto 8px"></div>'
     +'<div style="font-weight:700;color:#643000;font-size:.95rem">Luisa Fernanda Garcés García</div>'
     +'<div style="font-size:.78rem;color:#a0536a;margin-top:2px">Psicóloga Titulada · T.P. No. 174366</div>'
     +'<div style="font-size:.75rem;color:#cd8e9d">C.C. 1036602429 · 3246381453 · luisafgarces@gmail.com</div>'
