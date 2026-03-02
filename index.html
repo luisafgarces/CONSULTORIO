@@ -4473,6 +4473,20 @@ const CAMPOS_POR_TIPO = {
 };
 
 function renderCamposEspecificos(tipo) {
+  if(tipo === 'informe_laboral_psi') {
+    document.getElementById('doc-campos-especificos').innerHTML = `
+      <div style="text-align:center;padding:28px 16px">
+        <div style="font-size:2.5rem;margin-bottom:12px">🏢</div>
+        <div style="font-family:'Playfair Display',serif;font-size:1.1rem;font-weight:700;color:var(--text);margin-bottom:8px">Informe Laboral Psicológico</div>
+        <p style="font-size:.88rem;color:var(--strong);margin-bottom:20px;max-width:400px;margin-left:auto;margin-right:auto">
+          Este tipo de informe tiene su propio módulo especializado con todos los campos de evaluación psicosocial, instrumentos y examen mental.
+        </p>
+        <button class="btn primary" onclick="goPage('informes')" style="font-size:.95rem;padding:12px 28px">
+          📋 Ir al módulo de Informes Laborales
+        </button>
+      </div>`;
+    return;
+  }
   const campos = CAMPOS_POR_TIPO[tipo]||[];
   document.getElementById('doc-campos-especificos').innerHTML = campos.map(c=>`
     <div class="doc-field-group">
@@ -6932,7 +6946,15 @@ function ilGenerarHTMLPreview(datos){
     +(datos.jornada?'<tr><td><strong>Jornada Laboral:</strong></td><td>'+datos.jornada+'</td></tr>':'')
     +'</table>'
   +ilSeccion('3. INSTRUMENTOS Y TÉCNICAS UTILIZADAS')
-  +(datos.instrumentos&&datos.instrumentos.length ? datos.instrumentos.map(function(i){ return '<div style="padding:3px 0;font-size:.88rem">• '+i+'</div>'; }).join('') : '')
+  +(function(){
+    if(datos.instrumentos && Array.isArray(datos.instrumentos) && datos.instrumentos.length){
+      return datos.instrumentos.map(function(i){ return '<div style="padding:3px 0;font-size:.88rem">• '+i+'</div>'; }).join('');
+    } else if(datos.instrumentos && typeof datos.instrumentos === 'string' && datos.instrumentos.trim()){
+      return datos.instrumentos.split(/\n|,|;/).filter(Boolean).map(function(i){ return '<div style="padding:3px 0;font-size:.88rem">• '+i.trim()+'</div>'; }).join('');
+    } else {
+      return '<div style="padding:3px 0;font-size:.88rem;color:#a0536a;font-style:italic">No especificado</div>';
+    }
+  })()
   +'<div style="margin-bottom:24px"></div>'
   +ilSeccion('4. ANÁLISIS DE RESULTADOS')
   +(datos.resSocio?'<div style="margin-bottom:12px"><em style="font-weight:700;color:#a0536a">Área Sociodemográfica</em><div style="font-size:.88rem;margin-top:4px">'+datos.resSocio+'</div></div>':'')
