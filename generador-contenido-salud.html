@@ -513,8 +513,11 @@ function renderHistory(){
   const typeLabels={consejo:'💡 Consejo',promocion:'🎯 Promo',testimonio:'⭐ Testimonio',educativo:'📚 Educativo',presentacion:'👋 Presentación',motivacion:'🌿 Motivación'};
   const netLabels={instagram:'📸 Instagram',whatsapp:'💬 WhatsApp'};
   grid.innerHTML=history.map(h=>`
-    <div class="history-card">
-      <button class="history-copy" onclick="copyHistoryItem(${h.id})">📋 Copiar</button>
+    <div class="history-card" id="hcard-${h.id}">
+      <div style="display:flex;gap:6px;position:absolute;top:12px;right:12px;">
+        <button class="history-copy" onclick="copyHistoryItem(${h.id})">📋</button>
+        <button class="history-copy" style="color:#c0706a;border-color:rgba(192,112,106,.3)" onclick="deleteHistoryItem(${h.id})">🗑</button>
+      </div>
       <div class="history-date">${h.date}</div>
       <div class="history-text">${h.text}</div>
       <div class="history-tags">
@@ -529,6 +532,14 @@ function copyHistoryItem(id){
   const history=JSON.parse(localStorage.getItem('content_history')||'[]');
   const item=history.find(h=>h.id===id);
   if(item){ navigator.clipboard.writeText(item.text).then(()=>showToast('✓ ¡Texto copiado!')); }
+}
+
+function deleteHistoryItem(id){
+  let history=JSON.parse(localStorage.getItem('content_history')||'[]');
+  history=history.filter(h=>h.id!==id);
+  localStorage.setItem('content_history',JSON.stringify(history));
+  renderHistory();
+  showToast('🗑 Post eliminado');
 }
 
 function clearHistory(){
