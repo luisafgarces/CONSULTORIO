@@ -1360,8 +1360,15 @@ input[type=range] { accent-color: var(--border); flex: 1; }
             <option value="140000">Pareja / Familia · $140.000</option>
             <option value="140000b">Evaluación individual · $140.000</option>
             <option value="160000">Evaluación pareja · $160.000</option>
+            <option value="especial">🌟 Tarifa especial</option>
             <option value="custom">Otro monto</option>
           </select>
+        </div>
+        <div class="field" id="campo-tarifa-especial" style="display:none">
+          <label>Monto tarifa especial</label>
+          <input type="number" id="r_monto_especial" placeholder="Ej: 60000">
+          <label style="margin-top:8px;font-size:0.78rem;color:var(--border)">Motivo (opcional)</label>
+          <input type="text" id="r_motivo_especial" placeholder="Ej: Estudiante, proceso largo...">
         </div>
         <div class="field"><label>Método de pago</label>
           <select id="r_metodo">
@@ -1889,6 +1896,7 @@ input[type=range] { accent-color: var(--border); flex: 1; }
       <button class="pac-hist-btn" onclick="switchPacTab('histclinica',this)">🏥 Historia Clínica</button>
       <button class="pac-hist-btn" onclick="switchPacTab('informes',this)">🏢 Informes Laborales</button>
       <button class="pac-hist-btn" onclick="switchPacTab('consentimiento',this)">✅ Consentimiento</button>
+      <button class="pac-hist-btn" onclick="switchPacTab('documentos',this)">📎 Documentos</button>
     </div>
     <div class="pac-hist-section active" id="pac-tab-datos"></div>
     <div class="pac-hist-section" id="pac-tab-sesiones"></div>
@@ -1897,6 +1905,7 @@ input[type=range] { accent-color: var(--border); flex: 1; }
     <div class="pac-hist-section" id="pac-tab-histclinica"></div>
     <div class="pac-hist-section" id="pac-tab-informes"></div>
     <div class="pac-hist-section" id="pac-tab-consentimiento"></div>
+    <div class="pac-hist-section" id="pac-tab-documentos"></div>
     <div class="btn-row" style="margin-top:20px">
       <button class="btn danger" onclick="eliminarPaciente(_pacModalId)">🗑 Eliminar Paciente</button>
       <button class="btn primary" onclick="guardarPacienteModal()">💾 Guardar Cambios</button>
@@ -4125,7 +4134,7 @@ var mesActual = new Date().getMonth();
 var anioActual = new Date().getFullYear();
 var reciboActual = null;
 var mesesFin = ['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
-var tiposLabel = {'80000':'Sesi\u00f3n individual','140000':'Sesi\u00f3n pareja/familia','140000b':'Evaluaci\u00f3n individual','160000':'Evaluaci\u00f3n pareja','custom':'Otro'};
+var tiposLabel = {'80000':'Sesi\u00f3n individual','140000':'Sesi\u00f3n pareja/familia','140000b':'Evaluaci\u00f3n individual','160000':'Evaluaci\u00f3n pareja','especial':'Tarifa especial','custom':'Otro'};
 var metodoLabel = {'efectivo':'Efectivo','nu':'Nu','davibank':'Davibank','nequi':'Nequi','breve':'Breve'};
 
 function finHoy(){ return new Date().toISOString().split('T')[0]; }
@@ -4134,6 +4143,7 @@ function formatPesos(n){ return '$'+Number(n).toLocaleString('es-CO'); }
 function getMonto(){
   var tipo=document.getElementById('r_tipo').value;
   if(tipo==='custom') return parseInt(document.getElementById('r_monto_custom').value)||0;
+  if(tipo==='especial') return parseInt(document.getElementById('r_monto_especial').value)||0;
   if(tipo==='140000b') return 140000;
   return parseInt(tipo);
 }
@@ -4142,6 +4152,7 @@ document.addEventListener('DOMContentLoaded',()=>{
   var rTipo=document.getElementById('r_tipo');
   if(rTipo) rTipo.addEventListener('change',function(){
     document.getElementById('campo-monto-custom').style.display=this.value==='custom'?'block':'none';
+    document.getElementById('campo-tarifa-especial').style.display=this.value==='especial'?'block':'none';
   });
   var rF=document.getElementById('r_fecha'); if(rF) rF.value=finHoy();
   var gF=document.getElementById('g_fecha'); if(gF) gF.value=finHoy();
@@ -4162,7 +4173,9 @@ function registrarPago(abrirR){
   var estado=document.getElementById('r_estado').value;
   var tipoVal=document.getElementById('r_tipo').value;
   if(!paciente||!monto){ toast('Por favor completa el nombre y el monto'); return null; }
-  var reg={id:Date.now(),tipo:'ingreso',paciente,fecha,monto,metodo,estado,fechaRecibo:finHoy(),tipoSesion:tipoVal==='custom'?'Otro':(tiposLabel[tipoVal]||'Sesi\u00f3n')};
+  var motivoEspecial = tipoVal==='especial' ? (document.getElementById('r_motivo_especial').value.trim()||'') : '';
+  var tipoSesionLabel = tipoVal==='custom' ? 'Otro' : tipoVal==='especial' ? ('🌟 Tarifa especial'+(motivoEspecial?' · '+motivoEspecial:'')) : (tiposLabel[tipoVal]||'Sesi\u00f3n');
+  var reg={id:Date.now(),tipo:'ingreso',paciente,fecha,monto,metodo,estado,fechaRecibo:finHoy(),tipoSesion:tipoSesionLabel,tarifaEspecial:tipoVal==='especial',motivoEspecial};
   registros.push(reg); finGuardar(); renderAll();
   document.getElementById('r_paciente').value='';
   document.getElementById('r_fecha').value=finHoy();
@@ -4252,6 +4265,7 @@ function abrirRecibo(reg){
   document.getElementById('reciboContent').innerHTML=
     '<div class="recibo-logo"><img src="'+document.getElementById("logo-img").src+'" style="max-height:130px;max-width:240px;width:auto;height:auto;object-fit:contain;display:block;margin:0 auto" alt="Logo"></div>'+
     '<hr class="recibo-divider">'+
+    (reg.tarifaEspecial ? '<div style="text-align:center;margin-bottom:10px"><span style="background:#fff8e1;color:#b8860b;border:1px solid #f0d060;padding:4px 14px;border-radius:20px;font-size:0.75rem;font-weight:700;letter-spacing:0.3px">🌟 Tarifa Especial</span></div>' : '')+
     '<div class="recibo-fila"><span>N\u00famero</span><span>'+numRecibo+'</span></div>'+
     '<div class="recibo-fila"><span>Fecha</span><span>'+fecha+'</span></div>'+
     '<div class="recibo-fila"><span>Paciente</span><span>'+reg.paciente+'</span></div>'+
@@ -4306,82 +4320,45 @@ function enviarReciboWA(){
   if(!reciboActual) return;
   var r=reciboActual;
   var fecha=new Date(r.fecha+'T12:00:00').toLocaleDateString('es-CO',{day:'numeric',month:'long',year:'numeric'});
-  var msg='🌸 *Recibo de pago*\n\n*Luisa Fernanda Garc\u00e9s Garc\u00eda*\n*Psic\u00f3loga*\n\nN\u00famero: REC-'+r.id.toString().slice(-6)+'\nFecha: '+fecha+'\nPaciente: '+r.paciente+'\nServicio: '+r.tipoSesion+'\nM\u00e9todo: '+(metodoLabel[r.metodo]||r.metodo)+'\n\n*Total: '+formatPesos(r.monto)+'*\n\n_Gracias por tu confianza 🌸_';
+  var msg='🌸 *Recibo de pago*\n\n*Luisa Fernanda Garc\u00e9s Garc\u00eda*\n*Psic\u00f3loga*\n\nN\u00famero: REC-'+r.id.toString().slice(-6)+'\nFecha: '+fecha+'\nPaciente: '+r.paciente+'\nServicio: '+r.tipoSesion+'\nM\u00e9todo: '+(metodoLabel[r.metodo]||r.metodo)+(r.tarifaEspecial?'\n🌟 _Tarifa especial aplicada_':'')+'\n\n*Total: '+formatPesos(r.monto)+'*\n\n_Gracias por tu confianza 🌸_';
   window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank');
 }
 
 function descargarImagenRecibo(){
   if(!reciboActual) return;
-  var r=reciboActual, esPendiente=r.estado==='pendiente';
-  var canvas=document.getElementById('reciboCanvas');
-  var W=800, H=esPendiente?680:560;
-  canvas.width=W; canvas.height=H;
-  var ctx=canvas.getContext('2d');
-  var g=ctx.createLinearGradient(0,0,0,H);
-  g.addColorStop(0,'#fff8f9'); g.addColorStop(1,'#fadae1');
-  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
-  var fg=ctx.createLinearGradient(0,0,W,0);
-  fg.addColorStop(0,'#c07d8e'); fg.addColorStop(0.5,'#cd8e9d'); fg.addColorStop(1,'#c07d8e');
-  ctx.fillStyle=fg; ctx.fillRect(0,0,W,140);
-  function cf(x,y,rad,a){ctx.save();ctx.globalAlpha=a;ctx.fillStyle='#fff';ctx.beginPath();ctx.arc(x,y,rad,0,Math.PI*2);ctx.fill();ctx.restore();}
-  cf(60,70,60,0.08); cf(740,70,70,0.08);
-  var logo=document.getElementById('logo-img');
-  if(logo&&logo.complete&&logo.naturalWidth){try{ctx.save();ctx.globalAlpha=0.95;ctx.drawImage(logo,W/2-90,5,180,120);ctx.restore();}catch(e){}}
-  ctx.save();ctx.textAlign='center';ctx.fillStyle='#fff';
-  ctx.font='italic bold 18px "Playfair Display",Georgia,serif';
-  ctx.fillText('Recibo de pago',W/2,128);ctx.restore();
-  function rrect(x,y,w,h,rad){ctx.beginPath();ctx.moveTo(x+rad,y);ctx.lineTo(x+w-rad,y);ctx.quadraticCurveTo(x+w,y,x+w,y+rad);ctx.lineTo(x+w,y+h-rad);ctx.quadraticCurveTo(x+w,y+h,x+w-rad,y+h);ctx.lineTo(x+rad,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-rad);ctx.lineTo(x,y+rad);ctx.quadraticCurveTo(x,y,x+rad,y);ctx.closePath();}
-  ctx.save();ctx.fillStyle='rgba(255,255,255,0.93)';
-  ctx.shadowColor='rgba(160,83,106,0.15)';ctx.shadowBlur=20;ctx.shadowOffsetY=4;
-  rrect(50,155,W-100,esPendiente?390:310,18);ctx.fill();ctx.restore();
+  var r=reciboActual;
   var numRecibo='REC-'+r.id.toString().slice(-6);
-  var fechaStr=r.fechaRecibo||new Date().toISOString().split('T')[0];
-  var fecha=new Date(fechaStr+'T12:00:00').toLocaleDateString('es-CO',{day:'numeric',month:'long',year:'numeric'});
-  var metLabels={efectivo:'Efectivo',transferencia:'Transferencia',nequi:'Nequi',daviplata:'Daviplata',otro:'Otro'};
-  function fila(label,valor,y){
-    ctx.save();ctx.fillStyle='#a0536a';ctx.font='bold 12px Lato,Arial';ctx.textAlign='left';ctx.fillText(label.toUpperCase(),90,y);
-    ctx.fillStyle='#643000';ctx.font='15px Lato,Arial';ctx.textAlign='right';ctx.fillText(valor,W-90,y);ctx.restore();
-  }
-  function linea(y){ctx.save();ctx.strokeStyle='#f5d5dc';ctx.lineWidth=1;ctx.beginPath();ctx.moveTo(90,y);ctx.lineTo(W-90,y);ctx.stroke();ctx.restore();}
-  fila('Numero',numRecibo,200); linea(214);
-  fila('Fecha',fecha,240); linea(254);
-  fila('Paciente',r.paciente||'--',280); linea(294);
-  fila('Servicio',r.tipoSesion||'--',320); linea(334);
-  fila('Metodo',metLabels[r.metodo]||r.metodo||'--',360); linea(374);
-  ctx.save();ctx.fillStyle='rgba(255,255,255,0.95)';ctx.shadowColor='rgba(160,83,106,0.18)';ctx.shadowBlur=10;
-  rrect(70,385,W-140,55,12);ctx.fill();ctx.restore();
-  ctx.save();ctx.fillStyle=esPendiente?'#f57c00':'#2e7d32';
-  ctx.font='bold 13px Lato,Arial';ctx.textAlign='left';ctx.fillText(esPendiente?'TOTAL PENDIENTE':'TOTAL PAGADO',90,418);
-  ctx.font='bold 22px Lato,Arial';ctx.textAlign='right';ctx.fillText('$'+Number(r.monto||0).toLocaleString('es-CO'),W-90,418);ctx.restore();
-  ctx.save();ctx.fillStyle=esPendiente?'#fff3e0':'#e8f5e9';
-  rrect(W/2-110,450,220,34,17);ctx.fill();
-  ctx.fillStyle=esPendiente?'#f57c00':'#2e7d32';ctx.font='bold 13px Lato,Arial';ctx.textAlign='center';
-  ctx.fillText(esPendiente?'Pago pendiente':'Pagado',W/2,472);ctx.restore();
-  ctx.save();ctx.textAlign='center';ctx.fillStyle='#cd8e9d';ctx.globalAlpha=0.8;
-  ctx.font='italic 13px "Playfair Display",Georgia,serif';
-  ctx.fillText('Luisa Fernanda Garc\u00e9s Garc\u00eda \u00b7 Psic\u00f3loga \u00b7 TP 174366',W/2,H-20);ctx.restore();
-  if(esPendiente){
-    var qrSize=140,qrX=W/2-70,qrY=500;
-    var tempId='_tmpQRdl';
-    var tmpEl=document.getElementById(tempId);
-    if(!tmpEl){tmpEl=document.createElement('canvas');tmpEl.id=tempId;tmpEl.style.cssText='position:fixed;left:-9999px';document.body.appendChild(tmpEl);}
-    var qrData='Pago pendiente | '+r.paciente+' | '+(r.tipoSesion||'')+' | $'+Number(r.monto||0).toLocaleString('es-CO')+' | Ref:'+numRecibo;
-    generarQRCanvas(tempId,qrData,qrSize);
-    setTimeout(function(){
-      var qc=document.getElementById(tempId);
-      ctx.save();ctx.fillStyle='#fff';ctx.shadowColor='rgba(160,83,106,0.15)';ctx.shadowBlur=10;
-      rrect(qrX-10,qrY-10,qrSize+20,qrSize+40,10);ctx.fill();ctx.restore();
-      try{ctx.drawImage(qc,qrX,qrY);}catch(e){}
-      ctx.save();ctx.textAlign='center';ctx.fillStyle='#a0536a';ctx.font='11px Lato,Arial';
-      ctx.fillText('Escanea para confirmar el pago',W/2,qrY+qrSize+22);ctx.restore();
+  var elemento=document.getElementById('reciboContent');
+  if(!elemento){ toast('No se encontró el recibo'); return; }
+
+  // Cargar html2canvas dinámicamente si no está disponible
+  function capturar(){
+    toast('Generando imagen...');
+    html2canvas(elemento, {
+      scale: 2,
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: null,
+      logging: false
+    }).then(function(canvas){
       var a=document.createElement('a');
       a.download='Recibo_'+(r.paciente||'').replace(/\s+/g,'_')+'_'+numRecibo+'.png';
-      a.href=canvas.toDataURL('image/png');a.click();
-    },1800);
+      a.href=canvas.toDataURL('image/png');
+      a.click();
+    }).catch(function(e){
+      toast('Error al generar imagen');
+      console.error(e);
+    });
+  }
+
+  if(window.html2canvas){
+    capturar();
   } else {
-    var a=document.createElement('a');
-    a.download='Recibo_'+(r.paciente||'').replace(/\s+/g,'_')+'_'+numRecibo+'.png';
-    a.href=canvas.toDataURL('image/png');a.click();
+    var s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js';
+    s.onload=capturar;
+    s.onerror=function(){ toast('No se pudo cargar html2canvas'); };
+    document.head.appendChild(s);
   }
 }
 
@@ -4929,6 +4906,114 @@ function switchPacTab(tab,btn){
   btn.classList.add("active");
   if(tab==='informes') renderPacInformes(_pacModalId);
   if(tab==='consentimiento') renderPacConsentimiento(_pacModalId);
+  if(tab==='documentos') renderPacDocumentos(_pacModalId);
+}
+
+// ===================== DOCUMENTOS PDF POR PACIENTE =====================
+function escDoc(s){ if(!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+function renderPacDocumentos(pid){
+  var el = document.getElementById('pac-tab-documentos');
+  if(!el) return;
+  var docs = obtenerDocumentosPac(pid);
+  var html = '';
+  html += '<div class="sec-title">📎 Documentos del Paciente</div>';
+  html += '<div style="margin-bottom:16px">';
+  html += '<label id="lbl-subir-pdf-' + pid + '" style="display:inline-block;cursor:pointer;background:var(--primary);color:#fff;padding:8px 18px;border-radius:20px;font-size:.85rem;font-family:Lato,sans-serif">';
+  html += '➕ Subir PDF</label>';
+  html += '<span style="font-size:.75rem;color:#aaa;margin-left:12px">Máx. recomendado: 2 MB</span>';
+  html += '</div>';
+  if(docs.length===0){
+    html += '<div style="text-align:center;padding:30px;color:#bbb;font-size:.9rem">No hay documentos adjuntos aún</div>';
+  } else {
+    html += '<div style="display:flex;flex-direction:column;gap:10px">';
+    docs.forEach(function(doc, i){
+      var fechaStr = doc.fecha ? new Date(doc.fecha).toLocaleDateString('es-CO',{day:'2-digit',month:'short',year:'numeric'}) : '';
+      var sizeStr = doc.size ? (doc.size > 1048576 ? (doc.size/1048576).toFixed(1)+' MB' : Math.round(doc.size/1024)+' KB') : '';
+      html += '<div style="display:flex;align-items:center;gap:10px;background:#fff8fa;border:1.5px solid #f0dde5;border-radius:12px;padding:10px 14px">';
+      html += '<span style="font-size:1.6rem">📄</span>';
+      html += '<div style="flex:1;min-width:0">';
+      html += '<div style="font-size:.88rem;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">' + escDoc(doc.nombre) + '</div>';
+      html += '<div style="font-size:.75rem;color:#aaa">' + fechaStr + (sizeStr ? ' · ' + sizeStr : '') + '</div>';
+      html += '</div>';
+      html += '<button class="btn" data-pid="' + pid + '" data-idx="' + i + '" style="font-size:.78rem;padding:5px 12px;background:#cd8e9d;color:#fff;border:none;border-radius:14px;cursor:pointer;font-family:Lato,sans-serif" onclick="verDocumentoPac(this.dataset.pid, parseInt(this.dataset.idx))">👁 Ver</button>';
+      html += '<button class="btn danger" data-pid="' + pid + '" data-idx="' + i + '" style="font-size:.78rem;padding:5px 10px" onclick="eliminarDocumentoPac(this.dataset.pid, parseInt(this.dataset.idx))">🗑</button>';
+      html += '</div>';
+    });
+    html += '</div>';
+  }
+  el.innerHTML = html;
+  // Attach file input via JS to avoid inline quote issues
+  var lbl = document.getElementById('lbl-subir-pdf-' + pid);
+  if(lbl){
+    var inp = document.createElement('input');
+    inp.type = 'file';
+    inp.accept = 'application/pdf';
+    inp.style.display = 'none';
+    inp.addEventListener('change', function(e){ subirDocumentoPac(e, pid); });
+    lbl.appendChild(inp);
+    lbl.addEventListener('click', function(){ inp.click(); });
+  }
+}
+
+function obtenerDocumentosPac(pid){
+  return DB.get('docs_pac_'+pid) || [];
+}
+
+function subirDocumentoPac(event, pid){
+  var file = event.target.files[0];
+  if(!file) return;
+  if(file.type !== 'application/pdf'){ toast('Solo se permiten archivos PDF'); return; }
+  var maxSize = 3 * 1024 * 1024; // 3MB
+  if(file.size > maxSize){ toast('El archivo es muy grande (máx. 3 MB)'); return; }
+  toast('Cargando PDF...');
+  var reader = new FileReader();
+  reader.onload = function(e){
+    var docs = obtenerDocumentosPac(pid);
+    docs.push({ nombre: file.name, fecha: new Date().toISOString(), size: file.size, data: e.target.result });
+    DB.set('docs_pac_'+pid, docs);
+    toast('✅ Documento guardado');
+    renderPacDocumentos(pid);
+  };
+  reader.onerror = function(){ toast('Error al leer el archivo'); };
+  reader.readAsDataURL(file);
+}
+
+function verDocumentoPac(pid, idx){
+  var docs = obtenerDocumentosPac(pid);
+  var doc = docs[idx];
+  if(!doc) return;
+  var overlay = document.getElementById('pdf-viewer-overlay');
+  var frame = document.getElementById('pdf-viewer-frame');
+  var title = document.getElementById('pdf-viewer-title');
+  title.textContent = doc.nombre;
+  frame.src = doc.data;
+  overlay.style.display = 'flex';
+  overlay._docData = doc.data;
+  overlay._docNombre = doc.nombre;
+}
+
+function cerrarPdfViewer(){
+  var overlay = document.getElementById('pdf-viewer-overlay');
+  overlay.style.display = 'none';
+  document.getElementById('pdf-viewer-frame').src = '';
+}
+
+function descargarDocViewer(){
+  var overlay = document.getElementById('pdf-viewer-overlay');
+  var a = document.createElement('a');
+  a.href = overlay._docData;
+  a.download = overlay._docNombre || 'documento.pdf';
+  a.click();
+}
+
+function eliminarDocumentoPac(pid, idx){
+  if(!confirm('¿Eliminar este documento?')) return;
+  var docs = obtenerDocumentosPac(pid);
+  docs.splice(idx, 1);
+  DB.set('docs_pac_'+pid, docs);
+  toast('Documento eliminado');
+  renderPacDocumentos(pid);
 }
 
 function renderPacInformes(pid){
@@ -7172,5 +7257,18 @@ function ilEliminar(id){
 
 
 </script>
+
+<!-- PDF VIEWER MODAL -->
+<div id="pdf-viewer-overlay" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.85);z-index:9999;flex-direction:column">
+  <div style="display:flex;align-items:center;justify-content:space-between;padding:12px 20px;background:#1a1a1a">
+    <span id="pdf-viewer-title" style="color:#fff;font-family:Lato,sans-serif;font-size:.95rem;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:70%"></span>
+    <div style="display:flex;gap:10px">
+      <button onclick="descargarDocViewer()" style="background:#cd8e9d;color:#fff;border:none;border-radius:16px;padding:6px 16px;font-size:.82rem;cursor:pointer;font-family:Lato,sans-serif">⬇ Descargar</button>
+      <button onclick="cerrarPdfViewer()" style="background:#444;color:#fff;border:none;border-radius:16px;padding:6px 16px;font-size:.82rem;cursor:pointer;font-family:Lato,sans-serif">✕ Cerrar</button>
+    </div>
+  </div>
+  <iframe id="pdf-viewer-frame" style="flex:1;border:none;width:100%;height:calc(100vh - 52px)"></iframe>
+</div>
+
 </body>
 </html>
