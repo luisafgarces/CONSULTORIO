@@ -101,7 +101,7 @@ body { font-family: 'Lato', sans-serif; background: var(--white); color: var(--t
 
 /* SIDEBAR */
 #sidebar {
-  width: var(--sidebar-w); min-height: 100vh; background: var(--bg);
+  width: var(--sidebar-w); height: 100vh; background: var(--bg);
   border-right: 2px solid var(--border); display: flex; flex-direction: column;
   position: fixed; left: 0; top: 0; z-index: 200;
   transition: width 0.28s cubic-bezier(.4,0,.2,1), transform 0.28s cubic-bezier(.4,0,.2,1);
@@ -568,6 +568,8 @@ input[type=range] { accent-color: var(--border); flex: 1; }
 
     <button class="nav-btn" onclick="goPage('herramientas');cerrarSidebarMobile()"><span class="icon">🔧</span><span class="nav-label"> Herramientas TCC</span></button>
     <button class="nav-btn" onclick="goPage('cumpleanos');cerrarSidebarMobile()"><span class="icon">🎂</span><span class="nav-label"> Cumpleaños</span></button>
+    <div class="nav-section">Reportes</div>
+    <button class="nav-btn" onclick="goPage('informe-global');cerrarSidebarMobile()"><span class="icon">📊</span><span class="nav-label"> Informe Global</span></button>
   </nav>
   <div class="version">
     <div style="margin-bottom:8px;font-size:0.65rem;color:var(--border)">Suite Clínica v1.0 · 2025</div>
@@ -1653,25 +1655,25 @@ input[type=range] { accent-color: var(--border); flex: 1; }
     <div class="card">
       <div class="sec-title">🧠 Evaluación Clínica — Examen Mental</div>
       <div class="row col2">
-        <div class="fg"><label class="lbl">Aspecto y Actitud</label><input type="text" id="il-em-aspecto" value="Se presenta aseada, con vestimenta acorde a la situación. Actitud colaboradora, receptiva y atenta."></div>
-        <div class="fg"><label class="lbl">Conciencia y Orientación</label><input type="text" id="il-em-conciencia" value="Alerta, consciente, orientada autopsíquica y alopsíquicamente."></div>
+        <div class="fg"><label class="lbl">Aspecto y Actitud</label><input type="text" id="il-em-aspecto" placeholder="Aspecto general, vestimenta, actitud..." value=""></div>
+        <div class="fg"><label class="lbl">Conciencia y Orientación</label><input type="text" id="il-em-conciencia" placeholder="Estado de conciencia y orientación..." value=""></div>
       </div>
       <div class="row col2">
-        <div class="fg"><label class="lbl">Lenguaje</label><input type="text" id="il-em-lenguaje" value="Fluido, coherente y organizado. Sin alteraciones."></div>
-        <div class="fg"><label class="lbl">Pensamiento</label><input type="text" id="il-em-pensamiento" value="Curso y contenido conservados. Sin ideas delirantes o de daño."></div>
+        <div class="fg"><label class="lbl">Lenguaje</label><input type="text" id="il-em-lenguaje" placeholder="Características del lenguaje..." value=""></div>
+        <div class="fg"><label class="lbl">Pensamiento</label><input type="text" id="il-em-pensamiento" placeholder="Curso y contenido del pensamiento..." value=""></div>
       </div>
       <div class="row col2">
-        <div class="fg"><label class="lbl">Sensopercepción</label><input type="text" id="il-em-sensopercepcion" value="Sin alteraciones aparentes. No reporta alucinaciones."></div>
-        <div class="fg"><label class="lbl">Afectividad y Emoción</label><input type="text" id="il-em-afectividad" value="Predominio de eutimia (estado de ánimo normal y estable)."></div>
+        <div class="fg"><label class="lbl">Sensopercepción</label><input type="text" id="il-em-sensopercepcion" placeholder="Alteraciones sensoperceptivas..." value=""></div>
+        <div class="fg"><label class="lbl">Afectividad y Emoción</label><input type="text" id="il-em-afectividad" placeholder="Estado afectivo y emocional..." value=""></div>
       </div>
       <div class="row col2">
-        <div class="fg"><label class="lbl">Memoria y Atención</label><input type="text" id="il-em-memoria" value="Conservadas."></div>
-        <div class="fg"><label class="lbl">Juicio y Raciocinio</label><input type="text" id="il-em-juicio" value="Conservados."></div>
+        <div class="fg"><label class="lbl">Memoria y Atención</label><input type="text" id="il-em-memoria" placeholder="Estado de memoria y atención..." value=""></div>
+        <div class="fg"><label class="lbl">Juicio y Raciocinio</label><input type="text" id="il-em-juicio" placeholder="Juicio y raciocinio..." value=""></div>
       </div>
-      <div class="fg"><label class="lbl">Conciencia de Enfermedad</label><input type="text" id="il-em-conciencia-enf" value="No aplica (no hay enfermedad mental actual)."></div>
+      <div class="fg"><label class="lbl">Conciencia de Enfermedad</label><input type="text" id="il-em-conciencia-enf" placeholder="Conciencia de enfermedad o insight..." value=""></div>
 
       <div class="subsec" style="margin-top:18px">Impresión Diagnóstica</div>
-      <div class="fg"><textarea id="il-impresion" rows="3" placeholder="Impresión diagnóstica y hallazgos clínicos relevantes...">Evaluada sin evidencia de psicopatología activa en el momento actual. Se descarta presencia de sintomatología ansiosa o depresiva clínicamente significativa con base en los resultados de las pruebas y la entrevista clínica.</textarea></div>
+      <div class="fg"><textarea id="il-impresion" rows="3" placeholder="Impresión diagnóstica y hallazgos clínicos relevantes..."></textarea></div>
 
       <div class="subsec">Plan de Intervención Sugerido</div>
       <div class="fg"><textarea id="il-plan-intervencion" rows="3" placeholder="Remisión a EPS, pausas activas, evaluación ergonómica, seguimiento..."></textarea></div>
@@ -1722,6 +1724,53 @@ input[type=range] { accent-color: var(--border); flex: 1; }
       </div>
       <div id="il-preview-content" style="padding:28px"></div>
     </div>
+  </div>
+</div>
+
+<!-- ========== INFORME GLOBAL DE EMPRESA ========== -->
+<div class="page" id="page-informe-global">
+  <div class="page-header">
+    <h1>Informe Global de Empresa 📊</h1>
+    <p>Consolida y unifica los informes laborales de múltiples colaboradores en un único reporte empresarial</p>
+  </div>
+
+  <!-- FILTROS -->
+  <div class="card" style="margin-bottom:20px">
+    <div style="font-family:'Playfair Display',serif;font-size:1rem;font-weight:700;color:var(--text);margin-bottom:14px">⚙️ Configurar Informe Global</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:14px">
+      <div class="fg">
+        <label class="fl">Empresa</label>
+        <select id="ig-empresa-sel" onchange="igFiltrarEmpresas()" style="width:100%;padding:9px 12px;border:1.5px solid var(--bg);border-radius:10px;background:#fff8f9;color:var(--text);font-family:Lato,sans-serif;font-size:.88rem">
+          <option value="">— Todas las empresas —</option>
+        </select>
+      </div>
+      <div class="fg">
+        <label class="fl">Período (desde)</label>
+        <input type="date" id="ig-fecha-desde" style="width:100%;padding:9px 12px;border:1.5px solid var(--bg);border-radius:10px;background:#fff8f9;color:var(--text);font-family:Lato,sans-serif;font-size:.88rem;box-sizing:border-box">
+      </div>
+    </div>
+    <div style="display:flex;gap:10px;flex-wrap:wrap">
+      <button class="btn primary" onclick="igGenerar()">📊 Generar Informe Global</button>
+      <button class="btn" onclick="igExportarPDF()">🖨️ Exportar PDF</button>
+      <button class="btn" onclick="igLimpiar()">✕ Limpiar</button>
+    </div>
+  </div>
+
+  <!-- RESULTADO -->
+  <div id="ig-resultado" style="display:none">
+    <!-- Resumen estadístico -->
+    <div id="ig-stats" class="card" style="margin-bottom:18px"></div>
+    <!-- Tabla colaboradores -->
+    <div id="ig-tabla" class="card" style="margin-bottom:18px"></div>
+    <!-- Análisis grupal -->
+    <div id="ig-analisis" class="card" style="margin-bottom:18px"></div>
+  </div>
+
+  <div id="ig-vacio" style="text-align:center;padding:60px 20px;color:var(--border)">
+    <div style="font-size:2.5rem;margin-bottom:12px">📂</div>
+    <div style="font-family:'Playfair Display',serif;font-size:1.1rem;color:var(--text);margin-bottom:6px">Sin informes aún</div>
+    <div style="font-size:.83rem">Genera y guarda informes laborales individuales desde el módulo <strong>Informes Laborales</strong> para luego unificarlos aquí.</div>
+    <button class="btn primary" style="margin-top:18px" onclick="goPage('informes')">🏢 Ir a Informes Laborales</button>
   </div>
 </div>
 
@@ -2242,6 +2291,7 @@ function goPage(name){
   if(name==='finanzas') renderAll();
   if(name==='documentos') renderDocumentos();
   if(name==='informes') ilInit();
+  if(name==='informe-global') igInit();
 }
 
 // ===================== TABS =====================
@@ -7181,16 +7231,7 @@ function ilLimpiarFormulario(){
   ['il-sel-pac','il-genero','il-estadocivil','il-escolaridad','il-jornada'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
   document.getElementById('il-fecha').value=new Date().toISOString().split('T')[0];
   document.getElementById('il-objetivo').value='Valoración Psicológica Global';
-  document.getElementById('il-em-aspecto').value='Se presenta aseada, con vestimenta acorde a la situación. Actitud colaboradora, receptiva y atenta.';
-  document.getElementById('il-em-conciencia').value='Alerta, consciente, orientada autopsíquica y alopsíquicamente.';
-  document.getElementById('il-em-lenguaje').value='Fluido, coherente y organizado. Sin alteraciones.';
-  document.getElementById('il-em-pensamiento').value='Curso y contenido conservados. Sin ideas delirantes o de daño.';
-  document.getElementById('il-em-sensopercepcion').value='Sin alteraciones aparentes. No reporta alucinaciones.';
-  document.getElementById('il-em-afectividad').value='Predominio de eutimia (estado de ánimo normal y estable).';
-  document.getElementById('il-em-memoria').value='Conservadas.';
-  document.getElementById('il-em-juicio').value='Conservados.';
-  document.getElementById('il-em-conciencia-enf').value='No aplica (no hay enfermedad mental actual).';
-  document.getElementById('il-impresion').value='Evaluada sin evidencia de psicopatología activa en el momento actual. Se descarta presencia de sintomatología ansiosa o depresiva clínicamente significativa con base en los resultados de las pruebas y la entrevista clínica.';
+  ['il-em-aspecto','il-em-conciencia','il-em-lenguaje','il-em-pensamiento','il-em-sensopercepcion','il-em-afectividad','il-em-memoria','il-em-juicio','il-em-conciencia-enf','il-impresion'].forEach(function(id){ var el=document.getElementById(id); if(el) el.value=''; });
   ilActualizarNiveles();
 }
 
@@ -7253,6 +7294,213 @@ function ilEliminar(id){
   lista = lista.filter(function(i){ return i.id!==id; });
   DB.set('informes_laborales', lista);
   ilRenderHistorial();
+}
+
+// ==================== INFORME GLOBAL ====================
+function igInit(){
+  var lista = DB.get('informes_laborales')||[];
+  var sel = document.getElementById('ig-empresa-sel');
+  // Rebuild empresa options
+  var firstOpt = sel.options[0];
+  sel.innerHTML = '';
+  sel.appendChild(firstOpt);
+  var empresas = [];
+  lista.forEach(function(inf){
+    if(inf.empresa && empresas.indexOf(inf.empresa)===-1) empresas.push(inf.empresa);
+  });
+  empresas.sort().forEach(function(e){
+    var o = document.createElement('option'); o.value=e; o.textContent=e; sel.appendChild(o);
+  });
+  if(!lista.length){
+    document.getElementById('ig-vacio').style.display='';
+    document.getElementById('ig-resultado').style.display='none';
+  } else {
+    document.getElementById('ig-vacio').style.display='none';
+  }
+}
+
+function igFiltrarEmpresas(){ /* just for future use */ }
+
+function igGenerar(){
+  var lista = DB.get('informes_laborales')||[];
+  if(!lista.length){ alert('No hay informes laborales guardados todavía.'); return; }
+  var empresa = document.getElementById('ig-empresa-sel').value;
+  var desde = document.getElementById('ig-fecha-desde').value;
+  if(empresa) lista = lista.filter(function(i){ return i.empresa===empresa; });
+  if(desde) lista = lista.filter(function(i){ return (i.fecha||'')>=desde; });
+  if(!lista.length){ alert('No hay informes que coincidan con los filtros seleccionados.'); return; }
+
+  // Stats
+  var n = lista.length;
+  var phqVals = lista.map(function(i){ return parseInt(i.phq9)||0; });
+  var gadVals = lista.map(function(i){ return parseInt(i.gad7)||0; });
+  var avgPhq = (phqVals.reduce(function(a,b){return a+b;},0)/n).toFixed(1);
+  var avgGad = (gadVals.reduce(function(a,b){return a+b;},0)/n).toFixed(1);
+  var nivelesPhq = {minima:0,leve:0,moderada:0,moderadaSev:0,severa:0};
+  phqVals.forEach(function(v){
+    if(v<=4) nivelesPhq.minima++;
+    else if(v<=9) nivelesPhq.leve++;
+    else if(v<=14) nivelesPhq.moderada++;
+    else if(v<=19) nivelesPhq.moderadaSev++;
+    else nivelesPhq.severa++;
+  });
+  var nivelesGad = {minima:0,leve:0,moderada:0,severa:0};
+  gadVals.forEach(function(v){
+    if(v<=4) nivelesGad.minima++;
+    else if(v<=9) nivelesGad.leve++;
+    else if(v<=14) nivelesGad.moderada++;
+    else nivelesGad.severa++;
+  });
+  var empresaNombre = empresa || 'Varias empresas';
+  var fechaInforme = new Date().toLocaleDateString('es-CO',{day:'numeric',month:'long',year:'numeric'});
+
+  // Render stats card
+  document.getElementById('ig-stats').innerHTML =
+    '<div style="font-family:\'Playfair Display\',serif;font-size:1.05rem;font-weight:700;color:var(--text);margin-bottom:16px">📈 Estadísticas Grupales — '+empresaNombre+'</div>'
+    +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:18px">'
+    +igStatCard('👥','Colaboradores Evaluados',n,'','#cd8e9d')
+    +igStatCard('🧠','Promedio PHQ-9',avgPhq+'/27',ilGetNivelPHQ9(Math.round(avgPhq)).label,ilGetNivelPHQ9(Math.round(avgPhq)).color)
+    +igStatCard('😰','Promedio GAD-7',avgGad+'/21',ilGetNivelGAD7(Math.round(avgGad)).label,ilGetNivelGAD7(Math.round(avgGad)).color)
+    +igStatCard('⚠️','Con PHQ-9 ≥ Moderado',nivelesPhq.moderada+nivelesPhq.moderadaSev+nivelesPhq.severa,'de '+n+' evaluados','#ff9800')
+    +'</div>'
+    +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">'
+    +'<div><div style="font-size:.75rem;font-weight:700;color:var(--strong);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Distribución Depresión (PHQ-9)</div>'
+    +igBarra('Mínima/Sin depresión',nivelesPhq.minima,n,'#6aaa6a')
+    +igBarra('Leve',nivelesPhq.leve,n,'#ffc107')
+    +igBarra('Moderada',nivelesPhq.moderada,n,'#ff9800')
+    +igBarra('Moderadamente severa',nivelesPhq.moderadaSev,n,'#f44336')
+    +igBarra('Severa',nivelesPhq.severa,n,'#b71c1c')
+    +'</div>'
+    +'<div><div style="font-size:.75rem;font-weight:700;color:var(--strong);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Distribución Ansiedad (GAD-7)</div>'
+    +igBarra('Mínima',nivelesGad.minima,n,'#6aaa6a')
+    +igBarra('Leve',nivelesGad.leve,n,'#ffc107')
+    +igBarra('Moderada',nivelesGad.moderada,n,'#ff9800')
+    +igBarra('Severa',nivelesGad.severa,n,'#f44336')
+    +'</div></div>';
+
+  // Render tabla
+  document.getElementById('ig-tabla').innerHTML =
+    '<div style="font-family:\'Playfair Display\',serif;font-size:1.05rem;font-weight:700;color:var(--text);margin-bottom:14px">👥 Detalle por Colaborador</div>'
+    +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.82rem">'
+    +'<thead><tr style="background:var(--bg)">'
+    +'<th style="padding:8px 12px;text-align:left;color:var(--text);font-weight:700;border-radius:8px 0 0 8px">Colaborador</th>'
+    +'<th style="padding:8px 12px;text-align:left;color:var(--text);font-weight:700">Cargo</th>'
+    +'<th style="padding:8px 12px;text-align:center;color:var(--text);font-weight:700">Fecha</th>'
+    +'<th style="padding:8px 12px;text-align:center;color:var(--text);font-weight:700">PHQ-9</th>'
+    +'<th style="padding:8px 12px;text-align:center;color:var(--text);font-weight:700">GAD-7</th>'
+    +'<th style="padding:8px 12px;text-align:center;color:var(--text);font-weight:700;border-radius:0 8px 8px 0">Nivel Riesgo</th>'
+    +'</tr></thead><tbody>'
+    +lista.map(function(inf,i){
+      var phq=parseInt(inf.phq9)||0, gad=parseInt(inf.gad7)||0;
+      var nPhq=ilGetNivelPHQ9(phq), nGad=ilGetNivelGAD7(gad);
+      var riesgo = igNivelRiesgo(phq,gad);
+      return '<tr style="border-bottom:1px solid var(--bg);'+(i%2===0?'background:#fff8f9':'background:#fff')+'">'
+        +'<td style="padding:8px 12px;font-weight:700;color:var(--text)">'+(inf.nombre||'—')+'</td>'
+        +'<td style="padding:8px 12px;color:var(--strong)">'+(inf.cargo||'—')+'</td>'
+        +'<td style="padding:8px 12px;text-align:center;color:var(--strong)">'+(inf.fecha||'—')+'</td>'
+        +'<td style="padding:8px 12px;text-align:center"><span style="background:'+nPhq.color+'22;color:'+nPhq.color+';border-radius:8px;padding:2px 8px;font-weight:700">'+phq+'</span></td>'
+        +'<td style="padding:8px 12px;text-align:center"><span style="background:'+nGad.color+'22;color:'+nGad.color+';border-radius:8px;padding:2px 8px;font-weight:700">'+gad+'</span></td>'
+        +'<td style="padding:8px 12px;text-align:center"><span style="background:'+riesgo.color+'22;color:'+riesgo.color+';border-radius:10px;padding:3px 10px;font-size:.75rem;font-weight:700">'+riesgo.label+'</span></td>'
+        +'</tr>';
+    }).join('')
+    +'</tbody></table></div>';
+
+  // Render análisis grupal
+  var riesgosAltos = lista.filter(function(i){ var r=igNivelRiesgo(parseInt(i.phq9)||0,parseInt(i.gad7)||0); return r.nivel>=3; });
+  document.getElementById('ig-analisis').innerHTML =
+    '<div style="font-family:\'Playfair Display\',serif;font-size:1.05rem;font-weight:700;color:var(--text);margin-bottom:14px">📋 Análisis y Recomendaciones Grupales</div>'
+    +(riesgosAltos.length?'<div style="background:#fff3cd;border:1.5px solid #ffc107;border-radius:10px;padding:12px 16px;margin-bottom:14px;font-size:.85rem"><strong>⚠️ Atención:</strong> '+riesgosAltos.length+' colaborador(es) presentan niveles de riesgo moderado o severo: '+riesgosAltos.map(function(i){return '<strong>'+i.nombre+'</strong>';}).join(', ')+'. Se recomienda intervención prioritaria.</div>':'')
+    +'<div style="font-size:.85rem;color:var(--text);line-height:1.8">'
+    +'<p>La evaluación grupal de <strong>'+n+' colaboradores</strong> de <em>'+empresaNombre+'</em> arroja un promedio de <strong>PHQ-9: '+avgPhq+'</strong> ('+ilGetNivelPHQ9(Math.round(avgPhq)).label+') y <strong>GAD-7: '+avgGad+'</strong> ('+ilGetNivelGAD7(Math.round(avgGad)).label+') para el grupo evaluado, en el marco de la Ley 2460 de 2025.</p>'
+    +(nivelesPhq.moderada+nivelesPhq.moderadaSev+nivelesPhq.severa>0?'<p>Se identifica que <strong>'+(nivelesPhq.moderada+nivelesPhq.moderadaSev+nivelesPhq.severa)+' colaborador(es)</strong> presentan sintomatología depresiva de moderada a severa, lo cual requiere seguimiento psicológico individual prioritario.</p>':'')
+    +(nivelesGad.moderada+nivelesGad.severa>0?'<p>En ansiedad, <strong>'+(nivelesGad.moderada+nivelesGad.severa)+' colaborador(es)</strong> reportan niveles moderados a severos, sugiriendo la implementación de estrategias de manejo del estrés laboral.</p>':'')
+    +'<p><strong>Recomendaciones para la empresa (Ley 2460 de 2025):</strong></p>'
+    +'<ul style="margin:8px 0 0 18px;font-size:.84rem">'
+    +(riesgosAltos.length?'<li>Iniciar procesos de intervención psicológica individual para colaboradores con riesgo moderado-severo.</li>':'')
+    +'<li>Fortalecer los programas de bienestar laboral y salud mental en el plan de trabajo anual.</li>'
+    +'<li>Implementar jornadas de psicoeducación grupal sobre manejo del estrés y autocuidado.</li>'
+    +'<li>Revisar factores intralaborales y extralaborales que puedan estar incidiendo en la salud mental del equipo.</li>'
+    +'<li>Realizar seguimiento semestral con nueva evaluación psicosocial del grupo.</li>'
+    +'</ul>'
+    +'</div>'
+    +'<div style="margin-top:16px;padding-top:14px;border-top:1.5px solid var(--bg);font-size:.78rem;color:var(--border);text-align:right">Generado el '+fechaHoy()+' · Luisa Fernanda Garcés García · T.P. No. 174366</div>';
+
+  document.getElementById('ig-resultado').style.display='';
+  document.getElementById('ig-vacio').style.display='none';
+}
+
+function igStatCard(icon,titulo,valor,sub,color){
+  return '<div style="background:var(--soft,#fadae1);border-radius:14px;padding:16px;text-align:center">'
+    +'<div style="font-size:1.5rem;margin-bottom:4px">'+icon+'</div>'
+    +'<div style="font-size:.72rem;color:var(--strong);text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px">'+titulo+'</div>'
+    +'<div style="font-family:\'Playfair Display\',serif;font-size:1.3rem;font-weight:700;color:'+color+'">'+valor+'</div>'
+    +(sub?'<div style="font-size:.72rem;color:'+color+';font-weight:700;margin-top:2px">'+sub+'</div>':'')
+    +'</div>';
+}
+
+function igBarra(label,val,total,color){
+  var pct = total>0 ? Math.round(val/total*100) : 0;
+  return '<div style="margin-bottom:7px">'
+    +'<div style="display:flex;justify-content:space-between;font-size:.74rem;margin-bottom:3px"><span>'+label+'</span><span style="font-weight:700;color:'+color+'">'+val+' ('+pct+'%)</span></div>'
+    +'<div style="height:8px;background:var(--bg);border-radius:4px;overflow:hidden">'
+    +'<div style="height:100%;width:'+pct+'%;background:'+color+';border-radius:4px;transition:.3s"></div>'
+    +'</div></div>';
+}
+
+function igNivelRiesgo(phq,gad){
+  var max = Math.max(phq/27, gad/21);
+  if(max<0.15) return {label:'Sin riesgo',color:'#6aaa6a',nivel:1};
+  if(max<0.33) return {label:'Bajo',color:'#8bc34a',nivel:2};
+  if(max<0.52) return {label:'Moderado',color:'#ff9800',nivel:3};
+  if(max<0.74) return {label:'Alto',color:'#f44336',nivel:4};
+  return {label:'Muy alto',color:'#b71c1c',nivel:5};
+}
+
+function igLimpiar(){
+  document.getElementById('ig-empresa-sel').value='';
+  document.getElementById('ig-fecha-desde').value='';
+  document.getElementById('ig-resultado').style.display='none';
+}
+
+function igExportarPDF(){
+  var stats = document.getElementById('ig-stats');
+  var tabla = document.getElementById('ig-tabla');
+  var analisis = document.getElementById('ig-analisis');
+  if(!stats.innerHTML){ alert('Primero genera el informe global.'); return; }
+  var logoImg = document.getElementById('logo-img');
+  var logoSrc = logoImg ? logoImg.src : '';
+  var empresa = document.getElementById('ig-empresa-sel').value || 'Varias empresas';
+  var contenido = '<div style="font-family:\'Lato\',sans-serif;color:#643000;max-width:900px;margin:0 auto;font-size:13px">'
+    +'<div style="display:flex;align-items:center;gap:16px;padding-bottom:14px;border-bottom:2px solid #cd8e9d;margin-bottom:24px">'
+    +(logoSrc?'<img src="'+logoSrc+'" style="height:60px;object-fit:contain">':'')
+    +'<div><div style="font-family:\'Playfair Display\',serif;font-size:1.15rem;font-weight:700">Luisa Fernanda Garcés García</div>'
+    +'<div style="font-size:.75rem;color:#cd8e9d;text-transform:uppercase;letter-spacing:1px">Psicóloga · TP 174366</div></div></div>'
+    +'<div style="text-align:center;margin-bottom:28px">'
+    +'<div style="font-family:\'Playfair Display\',serif;font-size:1.5rem;font-weight:700">INFORME GLOBAL PSICOLÓGICO LABORAL</div>'
+    +'<div style="font-size:.85rem;color:#a0536a;font-style:italic;margin-top:4px">Evaluación Grupal de Salud Mental y Riesgo Psicosocial — Ley 2460 de 2025</div>'
+    +'<div style="font-size:.8rem;color:#cd8e9d;margin-top:6px">Empresa: <strong style="color:#643000">'+empresa+'</strong> · Generado: '+fechaHoy()+'</div>'
+    +'<div style="width:60px;height:3px;background:#cd8e9d;margin:12px auto 0;border-radius:2px"></div></div>'
+    +stats.outerHTML
+    +'<div style="margin:20px 0"></div>'
+    +tabla.outerHTML
+    +'<div style="margin:20px 0"></div>'
+    +analisis.outerHTML
+    +'</div>';
+  var ventana = window.open('','_blank','width=950,height=750');
+  ventana.document.write('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Informe Global — '+empresa+'</title>'
+    +'<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">'
+    +'<style>body{font-family:\'Lato\',sans-serif;color:#643000;background:#fff;padding:28px;margin:0}@media print{.no-print{display:none!important}@page{margin:1.5cm}}</style>'
+    +'</head><body><div class="no-print" style="margin-bottom:18px;display:flex;gap:12px">'
+    +'<button onclick="window.print()" style="background:#cd8e9d;color:#fff;border:none;border-radius:20px;padding:9px 22px;font-size:.88rem;cursor:pointer;font-family:Lato,sans-serif">🖨️ Imprimir / Guardar PDF</button>'
+    +'<button onclick="window.close()" style="background:transparent;color:#643000;border:1.5px solid #cd8e9d;border-radius:20px;padding:9px 22px;font-size:.88rem;cursor:pointer;font-family:Lato,sans-serif">✕ Cerrar</button>'
+    +'</div>'+contenido+'</body></html>');
+  ventana.document.close();
+}
+
+function fechaHoy(){
+  var d=new Date();
+  var m=['enero','febrero','marzo','abril','mayo','junio','julio','agosto','septiembre','octubre','noviembre','diciembre'];
+  return d.getDate()+' de '+m[d.getMonth()]+' de '+d.getFullYear();
 }
 
 
