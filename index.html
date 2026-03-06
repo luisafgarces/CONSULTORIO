@@ -7321,6 +7321,281 @@ function igInit(){
 
 function igFiltrarEmpresas(){ /* just for future use */ }
 
+function igBuildHTML(lista, empresa, logoSrc){
+  var n = lista.length;
+  var phqVals = lista.map(function(i){ return parseInt(i.phq9)||0; });
+  var gadVals = lista.map(function(i){ return parseInt(i.gad7)||0; });
+  var avgPhq = (phqVals.reduce(function(a,b){return a+b;},0)/n).toFixed(1);
+  var avgGad = (gadVals.reduce(function(a,b){return a+b;},0)/n).toFixed(1);
+  var empresaNombre = empresa || (lista[0]&&lista[0].empresa) || '—';
+  var nit = (lista[0]&&lista[0].nit) || '—';
+  var arl = (lista[0]&&lista[0].arl) || '[Nombre de la ARL]';
+  var objetivo = (lista[0]&&lista[0].objetivo) || 'Consolidar los resultados de las evaluaciones psicológicas ocupacionales realizadas a colaboradores de la empresa, en cumplimiento de la Ley 2460 de 2025 para el monitoreo de factores de riesgo psicosocial y la formulación de estrategias de promoción y prevención en salud mental en el ámbito laboral.';
+
+  // Periodo
+  var fechas = lista.map(function(i){ return i.fecha||''; }).filter(Boolean).sort();
+  var periodo = fechas.length ? (fechas[0] === fechas[fechas.length-1] ? fechas[0] : fechas[0]+' — '+fechas[fechas.length-1]) : '—';
+
+  // Instrumentos
+  var instrSet = {};
+  lista.forEach(function(i){ if(i.instrumentos&&i.instrumentos.length) i.instrumentos.forEach(function(ins){ instrSet[ins]=1; }); });
+  var instrList = Object.keys(instrSet);
+  if(!instrList.length) instrList = ['Entrevista semiestructurada (anamnesis)','Observación de conducta (Examen Mental)','Cuestionario de Salud del Paciente (PHQ-9) para tamizaje de depresión','Trastorno de Ansiedad Generalizada (GAD-7) para tamizaje de ansiedad'];
+
+  // Genero
+  var nMuj=0,nHom=0,nOtro=0;
+  lista.forEach(function(i){
+    var g=(i.genero||'').toLowerCase();
+    if(g.indexOf('femen')>=0) nMuj++;
+    else if(g.indexOf('masc')>=0) nHom++;
+    else nOtro++;
+  });
+
+  // Edades
+  var edades = lista.map(function(i){ return parseInt(i.edad)||0; }).filter(function(e){ return e>0; });
+  var edadMin = edades.length ? Math.min.apply(null,edades) : 0;
+  var edadMax = edades.length ? Math.max.apply(null,edades) : 0;
+  var edadStr = edades.length ? edadMin+(edadMax!==edadMin?' y '+edadMax:'')+' años' : '[Datos]';
+
+  // Riesgos intralaborales/extralaborales consolidados
+  var riesgosIntra = lista.map(function(i){ return (i.resIntra||'').trim(); }).filter(Boolean);
+  var riesgosExtra = lista.map(function(i){ return (i.resExtra||'').trim(); }).filter(Boolean);
+
+  // PHQ niveles
+  var nivelesPhq = {minima:0,leve:0,moderada:0,moderadaSev:0,severa:0};
+  phqVals.forEach(function(v){
+    if(v<=4) nivelesPhq.minima++;
+    else if(v<=9) nivelesPhq.leve++;
+    else if(v<=14) nivelesPhq.moderada++;
+    else if(v<=19) nivelesPhq.moderadaSev++;
+    else nivelesPhq.severa++;
+  });
+  var nivelesGad = {minima:0,leve:0,moderada:0,severa:0};
+  gadVals.forEach(function(v){
+    if(v<=4) nivelesGad.minima++;
+    else if(v<=9) nivelesGad.leve++;
+    else if(v<=14) nivelesGad.moderada++;
+    else nivelesGad.severa++;
+  });
+
+  // Nivel riesgo general
+  var riesgosAltos = lista.filter(function(i){ var r=igNivelRiesgo(parseInt(i.phq9)||0,parseInt(i.gad7)||0); return r.nivel>=3; });
+  var pctSano = Math.round((nivelesPhq.minima/n)*100);
+
+  // Conclusiones consolidadas
+  var concArr = lista.map(function(i){ return (i.conclusiones||'').trim(); }).filter(Boolean);
+
+  // Recomendaciones consolidadas
+  var recEmpresaArr = lista.map(function(i){ return (i.recEmpresa||'').trim(); }).filter(Boolean);
+  var recColabArr = lista.map(function(i){ return (i.recColaborador||'').trim(); }).filter(Boolean);
+
+  var S = '<div style="font-family:\'Lato\',sans-serif;color:#643000;max-width:900px;margin:0 auto;font-size:13px;line-height:1.7">';
+
+  // ENCABEZADO
+  S += '<div style="text-align:center;padding:28px 0 18px;border-bottom:3px solid #cd8e9d;margin-bottom:28px">';
+  if(logoSrc) S += '<img src="'+logoSrc+'" style="height:64px;object-fit:contain;margin-bottom:10px;display:block;margin-left:auto;margin-right:auto">';
+  S += '<div style="font-family:\'Playfair Display\',serif;font-size:1.6rem;font-weight:700;letter-spacing:.5px;color:#643000;text-transform:uppercase">Informe Consolidado de Gestión en Salud Mental</div>';
+  S += '<div style="font-size:.93rem;color:#a0536a;font-style:italic;margin-top:6px">Evaluación de Factores de Riesgo Psicosocial y Salud Mental</div>';
+  S += '<div style="font-size:.82rem;color:#cd8e9d;font-weight:700;letter-spacing:1px;margin-top:4px">Ley 2460 de 2025</div>';
+  S += '</div>';
+
+  // SECCIÓN 1 - DATOS DE IDENTIFICACIÓN
+  S += igSecTitle('1. DATOS DE IDENTIFICACIÓN DEL RESPONSABLE');
+  S += '<table style="width:100%;border-collapse:collapse;font-size:.86rem;margin-bottom:18px">';
+  var filas1 = [
+    ['Profesional que elabora el informe','Luisa Fernanda Garcés García'],
+    ['Profesión / Tarjeta Profesional','Psicóloga / TP 174366'],
+    ['Empresa contratante',empresaNombre],
+    ['NIT',nit],
+    ['ARL a la que está afiliada',arl],
+    ['Período de las evaluaciones',periodo],
+    ['Objetivo del informe',objetivo]
+  ];
+  filas1.forEach(function(f,idx){
+    S += '<tr style="'+(idx%2===0?'background:#fff8f9':'background:#fff')+';border-bottom:1px solid #f0dde5">';
+    S += '<td style="padding:7px 12px;font-weight:700;color:#a0536a;width:35%;vertical-align:top">'+f[0]+'</td>';
+    S += '<td style="padding:7px 12px;color:#643000">'+f[1]+'</td>';
+    S += '</tr>';
+  });
+  S += '</table>';
+
+  // SECCIÓN 2 - METODOLOGÍA
+  S += igSecTitle('2. METODOLOGÍA APLICADA');
+  S += '<p style="margin:0 0 8px;font-size:.86rem">Para la evaluación de los colaboradores se utilizaron las siguientes técnicas e instrumentos:</p>';
+  S += '<ul style="margin:0 0 18px 20px;font-size:.86rem">';
+  instrList.forEach(function(ins){ S += '<li style="margin-bottom:4px">'+ins+'</li>'; });
+  S += '</ul>';
+
+  // SECCIÓN 3 - POBLACIÓN EVALUADA
+  S += igSecTitle('3. POBLACIÓN EVALUADA');
+  S += '<p style="margin:0 0 10px;font-size:.86rem">Se presentan los resultados consolidados de <strong>'+(n===1?n+' (1) colaborador':n+' ('+n+') colaboradores')+'</strong> de la empresa <strong>'+empresaNombre+'</strong>.</p>';
+  S += '<div style="overflow-x:auto;margin-bottom:18px"><table style="width:100%;border-collapse:collapse;font-size:.84rem">';
+  S += '<thead><tr style="background:#f0dde5"><th style="padding:8px 12px;text-align:left;color:#643000;font-weight:700">Nombre del Colaborador</th><th style="padding:8px 12px;text-align:left;color:#643000;font-weight:700">Cargo</th><th style="padding:8px 12px;text-align:left;color:#643000;font-weight:700">Tipo de Vinculación</th><th style="padding:8px 12px;text-align:left;color:#643000;font-weight:700">Antigüedad</th></tr></thead><tbody>';
+  lista.forEach(function(inf,i){
+    S += '<tr style="'+(i%2===0?'background:#fff8f9':'background:#fff')+';border-bottom:1px solid #f0dde5">';
+    S += '<td style="padding:7px 12px;font-weight:700">'+((inf.nombre||'—').toUpperCase())+'</td>';
+    S += '<td style="padding:7px 12px">'+(inf.cargo||'—')+'</td>';
+    var jornada = inf.jornada ? 'Externa (Jornada '+inf.jornada+')' : '—';
+    S += '<td style="padding:7px 12px">'+jornada+'</td>';
+    S += '<td style="padding:7px 12px">'+(inf.antiguedad||'[Dato]')+'</td>';
+    S += '</tr>';
+  });
+  S += '</tbody></table></div>';
+
+  // SECCIÓN 4 - ANÁLISIS CONSOLIDADO
+  S += igSecTitle('4. ANÁLISIS CONSOLIDADO DE RESULTADOS POR ÁREAS');
+
+  S += '<div style="margin-bottom:14px">';
+  S += '<div style="font-size:.88rem;font-weight:700;color:#a0536a;margin-bottom:6px">4.1. Análisis Sociodemográfico Consolidado:</div>';
+  var socioTexto = 'El grupo evaluado está compuesto por ';
+  var partes=[];
+  if(nMuj>0) partes.push(nMuj+(nMuj===1?' mujer':' mujeres'));
+  if(nHom>0) partes.push(nHom+(nHom===1?' hombre':' hombres'));
+  if(nOtro>0) partes.push(nOtro+' otro(s)');
+  socioTexto += partes.join(' y ')+(edades.length?', con edades entre '+edadStr:'')+ '. ';
+  if(lista.some(function(i){ return (i.resSocio||'').trim(); })){
+    var socioArr = lista.map(function(i){ return (i.resSocio||'').trim(); }).filter(Boolean);
+    socioTexto += socioArr.join(' ');
+  } else {
+    socioTexto += 'Se identificaron antecedentes familiares de salud mental en los casos evaluados, lo cual es un factor de riesgo a tener en cuenta en la vigilancia epidemiológica, aunque no implica un diagnóstico actual para los evaluados.';
+  }
+  S += '<p style="font-size:.86rem;margin:0">'+socioTexto+'</p>';
+  S += '</div>';
+
+  S += '<div style="margin-bottom:14px">';
+  S += '<div style="font-size:.88rem;font-weight:700;color:#a0536a;margin-bottom:6px">4.2. Factores de Riesgo Intralaborales Identificados:</div>';
+  if(riesgosIntra.length){
+    S += '<ul style="margin:0 0 0 20px;font-size:.86rem">';
+    lista.forEach(function(inf){
+      if((inf.resIntra||'').trim()) S += '<li style="margin-bottom:5px"><strong>'+(inf.nombre||'').toUpperCase()+(inf.cargo?' ('+inf.cargo+')':'')+':</strong> '+inf.resIntra+'</li>';
+    });
+    S += '</ul>';
+  } else {
+    S += '<ul style="margin:0 0 0 20px;font-size:.86rem"><li>No se identificaron factores de riesgo intralaborales significativos en el período evaluado.</li></ul>';
+  }
+  S += '</div>';
+
+  S += '<div style="margin-bottom:18px">';
+  S += '<div style="font-size:.88rem;font-weight:700;color:#a0536a;margin-bottom:6px">4.3. Factores de Riesgo Extralaborales Identificados:</div>';
+  if(riesgosExtra.length){
+    S += '<ul style="margin:0 0 0 20px;font-size:.86rem">';
+    lista.forEach(function(inf){
+      if((inf.resExtra||'').trim()) S += '<li style="margin-bottom:5px"><strong>'+(inf.nombre||'').toUpperCase()+(inf.cargo?' ('+inf.cargo+')':'')+':</strong> '+inf.resExtra+'</li>';
+    });
+    S += '</ul>';
+  } else {
+    S += '<ul style="margin:0 0 0 20px;font-size:.86rem"><li>No se reportaron factores de riesgo extralaborales significativos. Se destacan estrategias de afrontamiento saludables en los colaboradores evaluados.</li></ul>';
+  }
+  S += '</div>';
+
+  // SECCIÓN 5 - PRUEBAS PSICOMÉTRICAS
+  S += igSecTitle('5. RESULTADOS CONSOLIDADOS DE PRUEBAS PSICOMÉTRICAS');
+
+  S += '<div style="margin-bottom:14px">';
+  S += '<div style="font-size:.88rem;font-weight:700;color:#a0536a;margin-bottom:8px">5.1. PHQ-9 (Depresión):</div>';
+  S += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.84rem">';
+  S += '<thead><tr style="background:#f0dde5"><th style="padding:7px 12px;text-align:left;color:#643000;font-weight:700">Colaborador</th><th style="padding:7px 12px;text-align:center;color:#643000;font-weight:700">Puntaje (0-27)</th><th style="padding:7px 12px;text-align:left;color:#643000;font-weight:700">Nivel</th></tr></thead><tbody>';
+  lista.forEach(function(inf,i){
+    var phq=parseInt(inf.phq9)||0; var nP=ilGetNivelPHQ9(phq);
+    S += '<tr style="'+(i%2===0?'background:#fff8f9':'background:#fff')+';border-bottom:1px solid #f0dde5">';
+    S += '<td style="padding:7px 12px;font-weight:700">'+((inf.nombre||'—').toUpperCase())+'</td>';
+    S += '<td style="padding:7px 12px;text-align:center"><span style="background:'+nP.color+'22;color:'+nP.color+';border-radius:8px;padding:2px 10px;font-weight:700">'+phq+'</span></td>';
+    S += '<td style="padding:7px 12px;color:'+nP.color+';font-weight:700">'+nP.label+'</td>';
+    S += '</tr>';
+  });
+  S += '</tbody></table></div></div>';
+
+  S += '<div style="margin-bottom:18px">';
+  S += '<div style="font-size:.88rem;font-weight:700;color:#a0536a;margin-bottom:8px">5.2. GAD-7 (Ansiedad):</div>';
+  S += '<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.84rem">';
+  S += '<thead><tr style="background:#f0dde5"><th style="padding:7px 12px;text-align:left;color:#643000;font-weight:700">Colaborador</th><th style="padding:7px 12px;text-align:center;color:#643000;font-weight:700">Puntaje (0-21)</th><th style="padding:7px 12px;text-align:left;color:#643000;font-weight:700">Nivel</th></tr></thead><tbody>';
+  lista.forEach(function(inf,i){
+    var gad=parseInt(inf.gad7)||0; var nG=ilGetNivelGAD7(gad);
+    S += '<tr style="'+(i%2===0?'background:#fff8f9':'background:#fff')+';border-bottom:1px solid #f0dde5">';
+    S += '<td style="padding:7px 12px;font-weight:700">'+((inf.nombre||'—').toUpperCase())+'</td>';
+    S += '<td style="padding:7px 12px;text-align:center"><span style="background:'+nG.color+'22;color:'+nG.color+';border-radius:8px;padding:2px 10px;font-weight:700">'+gad+'</span></td>';
+    S += '<td style="padding:7px 12px;color:'+nG.color+';font-weight:700">'+nG.label+'</td>';
+    S += '</tr>';
+  });
+  S += '</tbody></table></div></div>';
+
+  // SECCIÓN 6 - CONCLUSIONES
+  S += igSecTitle('6. CONCLUSIONES CONSOLIDADAS Y DIAGNÓSTICO CUALITATIVO');
+
+  S += '<ul style="margin:0 0 18px 20px;font-size:.86rem">';
+  S += '<li style="margin-bottom:10px"><strong>Ausencia de Psicopatología Activa:</strong> El '+pctSano+'% de los colaboradores evaluados ('+nivelesPhq.minima+' de '+n+') se encuentran en condiciones de salud mental adecuadas para el desempeño de sus cargos, sin evidencia de sintomatología ansiosa o depresiva clínicamente significativa en el momento de la evaluación. Todos los puntajes se ubicaron en los rangos de "mínimo" o "sin depresión/ansiedad".</li>';
+
+  S += '<li style="margin-bottom:10px"><strong>Factores de Riesgo Psicosocial Priorizados (Ley 2460):</strong><ol style="margin:8px 0 0 18px">';
+  if(riesgosIntra.length){
+    riesgosIntra.slice(0,3).forEach(function(r,i){ S += '<li style="margin-bottom:4px">'+r+'</li>'; });
+  } else {
+    S += '<li>No se identificaron factores de riesgo de alto impacto en el período evaluado.</li>';
+  }
+  S += '</ol></li>';
+
+  S += '<li style="margin-bottom:10px"><strong>Factores Protectores:</strong> Se destaca la presencia de estrategias de afrontamiento saludables y redes de apoyo en la totalidad de los evaluados (actividad física, lectura, familia), lo cual mitiga los riesgos identificados.</li>';
+
+  if(concArr.length){
+    concArr.forEach(function(c,i){
+      S += '<li style="margin-bottom:6px">'+c+'</li>';
+    });
+  }
+  S += '</ul>';
+
+  // SECCIÓN 7 - RECOMENDACIONES
+  S += igSecTitle('7. RECOMENDACIONES PARA LA EMPRESA ('+empresaNombre+')<br><span style="font-size:.82rem;font-weight:400;font-style:italic">Plan de Intervención basado en la Ley 2460 de 2025</span>');
+
+  S += '<ul style="margin:0 0 18px 20px;font-size:.86rem">';
+  if(recEmpresaArr.length){
+    lista.forEach(function(inf,i){
+      if((inf.recEmpresa||'').trim()){
+        S += '<li style="margin-bottom:10px">';
+        S += '<strong>7.'+(i+1)+'. Para '+(inf.cargo||inf.nombre||'Colaborador '+i)+':</strong><br>';
+        S += inf.recEmpresa;
+        S += '</li>';
+      }
+    });
+  } else {
+    S += '<li style="margin-bottom:8px"><strong>7.1. Gestión del Riesgo Ergonómico (Prioridad):</strong><br>En articulación con la ARL, realizar evaluación ergonómica de puestos e implementar pausas activas y capacitación en técnicas seguras para todo el personal con demandas físicas.</li>';
+    S += '<li style="margin-bottom:8px"><strong>7.2. Gestión del Riesgo Psicosocial:</strong><br>Monitorear de forma especial a colaboradores cuya modalidad o rol implique mayor carga emocional o superposición de espacios vital y laboral.</li>';
+    S += '<li style="margin-bottom:8px"><strong>7.3. Vigilancia de la Salud Mental por Rol:</strong><br>Incluir a los colaboradores en un programa de monitoreo específico para prevenir el desgaste emocional, ofreciendo espacios de apoyo y fortalecimiento de estrategias de afrontamiento.</li>';
+    S += '<li style="margin-bottom:8px"><strong>7.4. Promoción de la Salud y Factores Protectores:</strong><br>Diseñar e implementar estrategias que fomenten la actividad física, el deporte y el equilibrio vida-trabajo para todos los colaboradores, haciendo uso de los lineamientos de la ARL.</li>';
+    S += '<li style="margin-bottom:8px"><strong>7.5. Seguimiento Periódico:</strong><br>Incluir a los colaboradores en los programas de vigilancia epidemiológica de riesgo psicosocial y realizar seguimiento periódico para monitorear la evolución y la efectividad de las intervenciones.</li>';
+  }
+  if(recColabArr.length){
+    S += '<li style="margin-bottom:8px"><strong>7.'+(recEmpresaArr.length+1)+'. Recomendaciones para colaboradores:</strong><ul style="margin-top:6px">';
+    recColabArr.forEach(function(r){ S += '<li style="margin-bottom:4px">'+r+'</li>'; });
+    S += '</ul></li>';
+  }
+  S += '</ul>';
+
+  // SECCIÓN 8 - FIRMAS
+  S += igSecTitle('8. FIRMAS');
+  S += '<div style="margin-top:16px;font-size:.86rem;text-align:center">';
+  if(typeof FIRMA_DATA !== 'undefined' && FIRMA_DATA && FIRMA_DATA.length > 50){
+    S += '<img src="'+FIRMA_DATA+'" alt="Firma" style="height:70px;object-fit:contain;display:block;margin:0 auto 6px;mix-blend-mode:multiply">';
+  } else {
+    S += '<div style="height:70px;border-bottom:1.5px solid #643000;margin-bottom:6px;width:220px;margin-left:auto;margin-right:auto"></div>';
+  }
+  S += '<div style="border-top:1.5px solid #cd8e9d;padding-top:10px;display:inline-block;min-width:240px">';
+  S += '<div style="font-weight:700;color:#643000">Luisa Fernanda Garcés García</div>';
+  S += '<div style="color:#a0536a;font-size:.82rem">Psicóloga</div>';
+  S += '<div style="color:#643000;font-size:.82rem"><strong>C.C.:</strong> 1.036.602.429</div>';
+  S += '<div style="color:#643000;font-size:.82rem"><strong>T.P.:</strong> 174366</div>';
+  S += '<div style="color:#643000;font-size:.82rem"><strong>Fecha:</strong> '+fechaHoy()+'</div>';
+  S += '</div>';
+  S += '</div>';
+
+  S += '<div style="margin-top:32px;padding-top:12px;border-top:2px solid #cd8e9d;font-size:.75rem;color:#cd8e9d;text-align:center">Informe generado el '+fechaHoy()+' · Luisa Fernanda Garcés García · Psicóloga T.P. No. 174366 · Ley 2460 de 2025</div>';
+
+  S += '</div>';
+  return S;
+}
+
+function igSecTitle(txt){
+  return '<div style="font-family:\'Playfair Display\',serif;font-size:1rem;font-weight:700;color:#fff;background:#cd8e9d;padding:8px 14px;border-radius:8px;margin-bottom:12px;margin-top:4px">'+txt+'</div>';
+}
+
 function igGenerar(){
   var lista = DB.get('informes_laborales')||[];
   if(!lista.length){ alert('No hay informes laborales guardados todavía.'); return; }
@@ -7330,7 +7605,6 @@ function igGenerar(){
   if(desde) lista = lista.filter(function(i){ return (i.fecha||'')>=desde; });
   if(!lista.length){ alert('No hay informes que coincidan con los filtros seleccionados.'); return; }
 
-  // Stats
   var n = lista.length;
   var phqVals = lista.map(function(i){ return parseInt(i.phq9)||0; });
   var gadVals = lista.map(function(i){ return parseInt(i.gad7)||0; });
@@ -7351,17 +7625,17 @@ function igGenerar(){
     else if(v<=14) nivelesGad.moderada++;
     else nivelesGad.severa++;
   });
-  var empresaNombre = empresa || 'Varias empresas';
-  var fechaInforme = new Date().toLocaleDateString('es-CO',{day:'numeric',month:'long',year:'numeric'});
+  var empresaNombre = empresa || (lista[0]&&lista[0].empresa) || 'Varias empresas';
+  var riesgosAltos = lista.filter(function(i){ var r=igNivelRiesgo(parseInt(i.phq9)||0,parseInt(i.gad7)||0); return r.nivel>=3; });
 
-  // Render stats card
+  // STATS CARD - resumen rápido en pantalla
   document.getElementById('ig-stats').innerHTML =
-    '<div style="font-family:\'Playfair Display\',serif;font-size:1.05rem;font-weight:700;color:var(--text);margin-bottom:16px">📈 Estadísticas Grupales — '+empresaNombre+'</div>'
+    '<div style="font-family:\'Playfair Display\',serif;font-size:1.05rem;font-weight:700;color:var(--text);margin-bottom:16px">📈 Resumen Estadístico — '+empresaNombre+'</div>'
     +'<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:18px">'
     +igStatCard('👥','Colaboradores Evaluados',n,'','#cd8e9d')
     +igStatCard('🧠','Promedio PHQ-9',avgPhq+'/27',ilGetNivelPHQ9(Math.round(avgPhq)).label,ilGetNivelPHQ9(Math.round(avgPhq)).color)
     +igStatCard('😰','Promedio GAD-7',avgGad+'/21',ilGetNivelGAD7(Math.round(avgGad)).label,ilGetNivelGAD7(Math.round(avgGad)).color)
-    +igStatCard('⚠️','Con PHQ-9 ≥ Moderado',nivelesPhq.moderada+nivelesPhq.moderadaSev+nivelesPhq.severa,'de '+n+' evaluados','#ff9800')
+    +igStatCard('✅','Sin psicopatología activa',nivelesPhq.minima+' de '+n,'PHQ-9 ≤ 4','#6aaa6a')
     +'</div>'
     +'<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">'
     +'<div><div style="font-size:.75rem;font-weight:700;color:var(--strong);text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">Distribución Depresión (PHQ-9)</div>'
@@ -7378,14 +7652,14 @@ function igGenerar(){
     +igBarra('Severa',nivelesGad.severa,n,'#f44336')
     +'</div></div>';
 
-  // Render tabla
+  // TABLA COLABORADORES - panel central
   document.getElementById('ig-tabla').innerHTML =
-    '<div style="font-family:\'Playfair Display\',serif;font-size:1.05rem;font-weight:700;color:var(--text);margin-bottom:14px">👥 Detalle por Colaborador</div>'
+    '<div style="font-family:\'Playfair Display\',serif;font-size:1.05rem;font-weight:700;color:var(--text);margin-bottom:14px">👥 Población Evaluada</div>'
     +'<div style="overflow-x:auto"><table style="width:100%;border-collapse:collapse;font-size:.82rem">'
     +'<thead><tr style="background:var(--bg)">'
     +'<th style="padding:8px 12px;text-align:left;color:var(--text);font-weight:700;border-radius:8px 0 0 8px">Colaborador</th>'
     +'<th style="padding:8px 12px;text-align:left;color:var(--text);font-weight:700">Cargo</th>'
-    +'<th style="padding:8px 12px;text-align:center;color:var(--text);font-weight:700">Fecha</th>'
+    +'<th style="padding:8px 12px;text-align:center;color:var(--text);font-weight:700">Antigüedad</th>'
     +'<th style="padding:8px 12px;text-align:center;color:var(--text);font-weight:700">PHQ-9</th>'
     +'<th style="padding:8px 12px;text-align:center;color:var(--text);font-weight:700">GAD-7</th>'
     +'<th style="padding:8px 12px;text-align:center;color:var(--text);font-weight:700;border-radius:0 8px 8px 0">Nivel Riesgo</th>'
@@ -7395,9 +7669,9 @@ function igGenerar(){
       var nPhq=ilGetNivelPHQ9(phq), nGad=ilGetNivelGAD7(gad);
       var riesgo = igNivelRiesgo(phq,gad);
       return '<tr style="border-bottom:1px solid var(--bg);'+(i%2===0?'background:#fff8f9':'background:#fff')+'">'
-        +'<td style="padding:8px 12px;font-weight:700;color:var(--text)">'+(inf.nombre||'—')+'</td>'
+        +'<td style="padding:8px 12px;font-weight:700;color:var(--text)">'+((inf.nombre||'—').toUpperCase())+'</td>'
         +'<td style="padding:8px 12px;color:var(--strong)">'+(inf.cargo||'—')+'</td>'
-        +'<td style="padding:8px 12px;text-align:center;color:var(--strong)">'+(inf.fecha||'—')+'</td>'
+        +'<td style="padding:8px 12px;text-align:center;color:var(--strong)">'+(inf.antiguedad||'[Dato]')+'</td>'
         +'<td style="padding:8px 12px;text-align:center"><span style="background:'+nPhq.color+'22;color:'+nPhq.color+';border-radius:8px;padding:2px 8px;font-weight:700">'+phq+'</span></td>'
         +'<td style="padding:8px 12px;text-align:center"><span style="background:'+nGad.color+'22;color:'+nGad.color+';border-radius:8px;padding:2px 8px;font-weight:700">'+gad+'</span></td>'
         +'<td style="padding:8px 12px;text-align:center"><span style="background:'+riesgo.color+'22;color:'+riesgo.color+';border-radius:10px;padding:3px 10px;font-size:.75rem;font-weight:700">'+riesgo.label+'</span></td>'
@@ -7405,25 +7679,16 @@ function igGenerar(){
     }).join('')
     +'</tbody></table></div>';
 
-  // Render análisis grupal
-  var riesgosAltos = lista.filter(function(i){ var r=igNivelRiesgo(parseInt(i.phq9)||0,parseInt(i.gad7)||0); return r.nivel>=3; });
+  // ANÁLISIS - preview del informe completo
+  var logoImg = document.getElementById('logo-img');
+  var logoSrc = logoImg ? logoImg.src : '';
   document.getElementById('ig-analisis').innerHTML =
-    '<div style="font-family:\'Playfair Display\',serif;font-size:1.05rem;font-weight:700;color:var(--text);margin-bottom:14px">📋 Análisis y Recomendaciones Grupales</div>'
-    +(riesgosAltos.length?'<div style="background:#fff3cd;border:1.5px solid #ffc107;border-radius:10px;padding:12px 16px;margin-bottom:14px;font-size:.85rem"><strong>⚠️ Atención:</strong> '+riesgosAltos.length+' colaborador(es) presentan niveles de riesgo moderado o severo: '+riesgosAltos.map(function(i){return '<strong>'+i.nombre+'</strong>';}).join(', ')+'. Se recomienda intervención prioritaria.</div>':'')
-    +'<div style="font-size:.85rem;color:var(--text);line-height:1.8">'
-    +'<p>La evaluación grupal de <strong>'+n+' colaboradores</strong> de <em>'+empresaNombre+'</em> arroja un promedio de <strong>PHQ-9: '+avgPhq+'</strong> ('+ilGetNivelPHQ9(Math.round(avgPhq)).label+') y <strong>GAD-7: '+avgGad+'</strong> ('+ilGetNivelGAD7(Math.round(avgGad)).label+') para el grupo evaluado, en el marco de la Ley 2460 de 2025.</p>'
-    +(nivelesPhq.moderada+nivelesPhq.moderadaSev+nivelesPhq.severa>0?'<p>Se identifica que <strong>'+(nivelesPhq.moderada+nivelesPhq.moderadaSev+nivelesPhq.severa)+' colaborador(es)</strong> presentan sintomatología depresiva de moderada a severa, lo cual requiere seguimiento psicológico individual prioritario.</p>':'')
-    +(nivelesGad.moderada+nivelesGad.severa>0?'<p>En ansiedad, <strong>'+(nivelesGad.moderada+nivelesGad.severa)+' colaborador(es)</strong> reportan niveles moderados a severos, sugiriendo la implementación de estrategias de manejo del estrés laboral.</p>':'')
-    +'<p><strong>Recomendaciones para la empresa (Ley 2460 de 2025):</strong></p>'
-    +'<ul style="margin:8px 0 0 18px;font-size:.84rem">'
-    +(riesgosAltos.length?'<li>Iniciar procesos de intervención psicológica individual para colaboradores con riesgo moderado-severo.</li>':'')
-    +'<li>Fortalecer los programas de bienestar laboral y salud mental en el plan de trabajo anual.</li>'
-    +'<li>Implementar jornadas de psicoeducación grupal sobre manejo del estrés y autocuidado.</li>'
-    +'<li>Revisar factores intralaborales y extralaborales que puedan estar incidiendo en la salud mental del equipo.</li>'
-    +'<li>Realizar seguimiento semestral con nueva evaluación psicosocial del grupo.</li>'
-    +'</ul>'
+    '<div style="font-family:\'Playfair Display\',serif;font-size:1.05rem;font-weight:700;color:var(--text);margin-bottom:14px">📋 Vista Previa del Informe Consolidado</div>'
+    +(riesgosAltos.length?'<div style="background:#fff3cd;border:1.5px solid #ffc107;border-radius:10px;padding:12px 16px;margin-bottom:14px;font-size:.85rem"><strong>⚠️ Atención:</strong> '+riesgosAltos.length+' colaborador(es) presentan niveles de riesgo moderado o severo: '+riesgosAltos.map(function(i){return '<strong>'+(i.nombre||'').toUpperCase()+'</strong>';}).join(', ')+'. Se recomienda intervención prioritaria.</div>':'')
+    +'<div style="background:#fff8f9;border:1.5px solid #f0dde5;border-radius:12px;padding:18px;max-height:500px;overflow-y:auto">'
+    +igBuildHTML(lista, empresaNombre, logoSrc)
     +'</div>'
-    +'<div style="margin-top:16px;padding-top:14px;border-top:1.5px solid var(--bg);font-size:.78rem;color:var(--border);text-align:right">Generado el '+fechaHoy()+' · Luisa Fernanda Garcés García · T.P. No. 174366</div>';
+    +'<div style="margin-top:14px;text-align:right"><button class="btn primary" onclick="igExportarPDF()">🖨️ Exportar Informe Completo PDF</button></div>';
 
   document.getElementById('ig-resultado').style.display='';
   document.getElementById('ig-vacio').style.display='none';
@@ -7464,32 +7729,21 @@ function igLimpiar(){
 
 function igExportarPDF(){
   var stats = document.getElementById('ig-stats');
-  var tabla = document.getElementById('ig-tabla');
-  var analisis = document.getElementById('ig-analisis');
   if(!stats.innerHTML){ alert('Primero genera el informe global.'); return; }
+  var lista = DB.get('informes_laborales')||[];
+  var empresa = document.getElementById('ig-empresa-sel').value;
+  var desde = document.getElementById('ig-fecha-desde').value;
+  if(empresa) lista = lista.filter(function(i){ return i.empresa===empresa; });
+  if(desde) lista = lista.filter(function(i){ return (i.fecha||'')>=desde; });
+  if(!lista.length){ alert('No hay informes que coincidan con los filtros.'); return; }
+  var empresaNombre = empresa || (lista[0]&&lista[0].empresa) || 'Varias empresas';
   var logoImg = document.getElementById('logo-img');
   var logoSrc = logoImg ? logoImg.src : '';
-  var empresa = document.getElementById('ig-empresa-sel').value || 'Varias empresas';
-  var contenido = '<div style="font-family:\'Lato\',sans-serif;color:#643000;max-width:900px;margin:0 auto;font-size:13px">'
-    +'<div style="display:flex;align-items:center;gap:16px;padding-bottom:14px;border-bottom:2px solid #cd8e9d;margin-bottom:24px">'
-    +(logoSrc?'<img src="'+logoSrc+'" style="height:60px;object-fit:contain">':'')
-    +'<div><div style="font-family:\'Playfair Display\',serif;font-size:1.15rem;font-weight:700">Luisa Fernanda Garcés García</div>'
-    +'<div style="font-size:.75rem;color:#cd8e9d;text-transform:uppercase;letter-spacing:1px">Psicóloga · TP 174366</div></div></div>'
-    +'<div style="text-align:center;margin-bottom:28px">'
-    +'<div style="font-family:\'Playfair Display\',serif;font-size:1.5rem;font-weight:700">INFORME GLOBAL PSICOLÓGICO LABORAL</div>'
-    +'<div style="font-size:.85rem;color:#a0536a;font-style:italic;margin-top:4px">Evaluación Grupal de Salud Mental y Riesgo Psicosocial — Ley 2460 de 2025</div>'
-    +'<div style="font-size:.8rem;color:#cd8e9d;margin-top:6px">Empresa: <strong style="color:#643000">'+empresa+'</strong> · Generado: '+fechaHoy()+'</div>'
-    +'<div style="width:60px;height:3px;background:#cd8e9d;margin:12px auto 0;border-radius:2px"></div></div>'
-    +stats.outerHTML
-    +'<div style="margin:20px 0"></div>'
-    +tabla.outerHTML
-    +'<div style="margin:20px 0"></div>'
-    +analisis.outerHTML
-    +'</div>';
-  var ventana = window.open('','_blank','width=950,height=750');
-  ventana.document.write('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Informe Global — '+empresa+'</title>'
+  var contenido = igBuildHTML(lista, empresaNombre, logoSrc);
+  var ventana = window.open('','_blank','width=980,height=800');
+  ventana.document.write('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>Informe Consolidado — '+empresaNombre+'</title>'
     +'<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;600;700&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">'
-    +'<style>body{font-family:\'Lato\',sans-serif;color:#643000;background:#fff;padding:28px;margin:0}@media print{.no-print{display:none!important}@page{margin:1.5cm}}</style>'
+    +'<style>body{font-family:\'Lato\',sans-serif;color:#643000;background:#fff;padding:32px;margin:0}@media print{.no-print{display:none!important}@page{margin:1.5cm}ul,ol{margin-left:18px}}</style>'
     +'</head><body><div class="no-print" style="margin-bottom:18px;display:flex;gap:12px">'
     +'<button onclick="window.print()" style="background:#cd8e9d;color:#fff;border:none;border-radius:20px;padding:9px 22px;font-size:.88rem;cursor:pointer;font-family:Lato,sans-serif">🖨️ Imprimir / Guardar PDF</button>'
     +'<button onclick="window.close()" style="background:transparent;color:#643000;border:1.5px solid #cd8e9d;border-radius:20px;padding:9px 22px;font-size:.88rem;cursor:pointer;font-family:Lato,sans-serif">✕ Cerrar</button>'
