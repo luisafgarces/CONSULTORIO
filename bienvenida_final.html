@@ -262,7 +262,7 @@ body{padding-bottom:env(safe-area-inset-bottom);}
         <div class="politica-cuerpo">
           Circular 73A Nro. 39-79, Oficina 303, Edificio Laureles Colonial<br><br>
           &#128247; <strong>WhatsApp:</strong> 324 638 1485<br>
-          &#9993;&#65039; <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="c2b2b1aba1adaeb7abb1a3a4a7b0aca3aca6a3a5a3b0a1a7b182a5afa3abaeeca1adaf">[email&#160;protected]</a>
+          &#9993;&#65039; <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="c5b5b6aca6aaa9b0acb6a4a3a0b7aba4aba1a4a2a4b7a6a0b685a2a8a4aca9eba6aaa8">[email&#160;protected]</a>
         </div>
       </div>
     </div>
@@ -347,7 +347,7 @@ body{padding-bottom:env(safe-area-inset-bottom);}
         &bull; Cumplimiento de obligaciones legales y deontológicas.<br><br>
         <strong>Derechos del titular:</strong> Conocer, actualizar, rectificar y suprimir mis datos; revocar esta autorización; y presentar quejas ante la Superintendencia de Industria y Comercio (SIC).<br><br>
         Los datos serán tratados con estricta confidencialidad y no serán cedidos a terceros sin autorización previa, salvo obligación legal.<br><br>
-        <strong>Responsable:</strong> Luisa Fernanda Garcés García &middot; <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="f484879d979b98819d87959291869a959a9095939586979187b49399959d98da979b99">[email&#160;protected]</a> &middot; 3246381485
+        <strong>Responsable:</strong> Luisa Fernanda Garcés García &middot; <a href="/cdn-cgi/l/email-protection" class="__cf_email__" data-cfemail="10606379737f7c657963717675627e717e747177716273756350777d71797c3e737f7d">[email&#160;protected]</a> &middot; 3246381485
       </div>
       <div class="check-group">
         <label class="check-label">
@@ -656,30 +656,12 @@ function enviar(){
     waBtnEl.target = '_blank';
   }
 
-  // 7. Enviar datos a Google Sheets (silencioso, no bloquea el flujo)
+  // 7. Enviar a Google Sheets (silencioso)
   try {
     var SCRIPT_URL = 'https://script.google.com/macros/s/AKfycbwJYfDMAx2I5q7j-PKp6fHeC2I1ixukRRcdn2Uxf1uLY0t4RYnPdsck-pOcArlGxY99xw/exec';
-    var payload = {
-      nombre:       nombre,
-      cedula:       cedula,
-      edad:         edad,
-      telefono:     tel,
-      modalidad:    modalidad,
-      terapiaPrevia:terapiaPrevia,
-      referido:     referido,
-      motivo:       motivo,
-      expectativas: expectativas,
-      fechaHora:    fechaHora,
-      tipo:         esEmpresa ? 'Empresa' : 'Particular'
-    };
-    fetch(SCRIPT_URL, {
-      method: 'POST',
-      mode:   'no-cors',
-      headers: { 'Content-Type': 'application/json' },
-      body:   JSON.stringify(payload)
-    }).catch(function(e){ console.warn('Sheets no disponible:', e); });
-  } catch(e){ console.warn('Error enviando a Sheets:', e); }
-
+    var payload = {nombre:nombre,cedula:cedula,edad:edad,telefono:tel,modalidad:modalidad,terapiaPrevia:terapiaPrevia,referido:referido,motivo:motivo,expectativas:expectativas,fechaHora:fechaHora,tipo:esEmpresa?'Empresa':'Particular'};
+    fetch(SCRIPT_URL,{method:'POST',mode:'no-cors',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)}).catch(function(e){console.warn('Sheets:',e);});
+  } catch(e){ console.warn('Sheets error:',e); }
   // 8. Ir a pantalla de confirmación
   goTo(6);
 }
