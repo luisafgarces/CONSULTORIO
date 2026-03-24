@@ -2793,6 +2793,27 @@ function abrirSesion(pid, sid){
   document.getElementById('ses-export-btns').style.display='none';
   document.getElementById('sesion-form').style.display='block';
   document.getElementById('sesion-placeholder').style.display='none';
+  // ── INDICADOR DE SESIÓN BLOQUEADA ──
+  const lockBadge = document.getElementById('ses-lock-badge');
+  if(lockBadge) lockBadge.remove();
+  const corrBox2 = document.getElementById('ses-correcciones-historial');
+  if(corrBox2) corrBox2.remove();
+  if(s.guardada_definitivo){
+    const badge = document.createElement('div');
+    badge.id = 'ses-lock-badge';
+    badge.style.cssText = 'background:#fdf0f3;border:1.5px solid #cd8e9d;border-radius:8px;padding:10px 16px;margin:12px 0;display:flex;align-items:center;gap:8px;';
+    badge.innerHTML = '<span style="font-size:1rem;">🔒</span><span style="font-size:.85rem;color:#643000;"><strong>Sesión guardada definitivamente</strong> · Solo se permiten notas de corrección</span>';
+    const formTitle = document.getElementById('ses-form-title');
+    if(formTitle && formTitle.parentNode) formTitle.parentNode.insertBefore(badge, formTitle.nextSibling);
+    if(s.correcciones && s.correcciones.length > 0){
+      const box = document.createElement('div');
+      box.id = 'ses-correcciones-historial';
+      box.style.cssText = 'background:#fdf0f3;border:1.5px solid #cd8e9d;border-radius:10px;padding:16px;margin:16px 0;';
+      box.innerHTML = '<div style="font-size:.85rem;font-weight:600;color:#cd8e9d;margin-bottom:12px;">📋 Correcciones ('+s.correcciones.length+')</div>'+s.correcciones.map((c,i)=>'<div style="background:white;border-radius:6px;padding:10px 12px;margin-bottom:8px;border-left:3px solid #cd8e9d;"><div style="font-size:.75rem;color:#aaa;margin-bottom:4px;">Corrección '+(i+1)+' · '+c.fechaLegible+'</div><div style="font-size:.88rem;color:#643000;">'+c.texto+'</div></div>').join('');
+      const form = document.getElementById('sesion-form');
+      if(form) form.appendChild(box);
+    }
+  }
 }
 
 function guardarSesion(){
