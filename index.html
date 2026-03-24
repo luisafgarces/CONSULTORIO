@@ -2800,6 +2800,40 @@ function guardarSesion(){
   if(!pid){ toast('Selecciona un paciente'); return; }
   const ses = DB.get('sesiones_'+pid)||[];
   const tipo = document.getElementById('ses-tipo-sesion').value;
+
+  // ── INMUTABILIDAD LEGAL ──
+  // Si la sesión ya existe y fue guardada, NO se permite editar
+  if(currentSesionId){
+    const existente = ses.find(x=>x.id===currentSesionId);
+    if(existente && existente.guardada_definitivo){
+      toast('⚠️ Esta sesión ya fue guardada. Solo puedes agregar una nota de corrección.');
+      // Mostrar campo de corrección si no existe
+      if(!document.getElementById('ses-correccion-box')){
+        const box = document.createElement('div');
+        box.id = 'ses-correccion-box';
+        box.style.cssText = 'background:#fdf0f3;border:1.5px solid #cd8e9d;border-radius:10px;padding:16px;margin:16px 0;';
+        box.innerHTML = `
+          <div style="font-size:.85rem;font-weight:600;color:#cd8e9d;margin-bottom:8px;">
+            ✏️ Nota de corrección — ${new Date().toLocaleString('es-CO')}
+          </div>
+          <textarea id="ses-correccion-texto" placeholder="Describe la corrección o aclaración..." 
+            style="width:100%;min-height:80px;border:1px solid #cd8e9d;border-radius:6px;padding:8px;font-family:inherit;font-size:.9rem;"></textarea>
+          <button onclick="guardarCorreccion('${currentSesionId}','${pid}')" 
+            style="margin-top:8px;background:#cd8e9d;color:white;border:none;border-radius:6px;padding:8px 18px;cursor:pointer;font-size:.85rem;">
+            Guardar corrección
+          </button>
+        `;
+        // Insertarlo antes del botón de guardar
+        const btnGuardar = document.querySelector('#sesion-form .btn-guardar') || 
+                           document.querySelector('[onclick="guardarSesion()"]');
+        if(btnGuardar && btnGuardar.parentNode){
+          btnGuardar.parentNode.insertBefore(box, btnGuardar);
+        }
+      }
+      return;
+    }
+  }
+
   // Gather tests applied
   const testsAplicados = [];
   document.querySelectorAll('#ses-tests-chk input[type=checkbox]:checked').forEach(c=>{
@@ -2810,24 +2844,18 @@ function guardarSesion(){
       testsAplicados.push(c.value);
     }
   });
-  // Gather humores
   const humores = [];
   document.querySelectorAll('#ses-humores input[type=checkbox]:checked').forEach(c=>humores.push(c.value));
-  // Gather t\u00e9cnicas
   const tecnicas = [];
   document.querySelectorAll('#ses-tecnicas input[type=checkbox]:checked').forEach(c=>tecnicas.push(c.value));
-  // Gather tareas check
   const tareasCheck = [];
   document.querySelectorAll('#ses-tareas-check input[type=checkbox]:checked').forEach(c=>tareasCheck.push(c.value));
-  // Gather riesgos
   const riesgos = [];
   document.querySelectorAll('input[name=riesgo]:checked').forEach(c=>riesgos.push(c.value));
-  // Gather recursos
   const recursos = [];
   document.querySelectorAll('input[name=recurso]:checked').forEach(c=>recursos.push(c.value));
-  // Tarea revisi\u00f3n
   const tareaRev = document.querySelector('input[name=ses-tarea-rev]:checked');
-  
+
   const sesData = {
     id: currentSesionId || genId(),
     num: document.getElementById('ses-num').value,
@@ -2854,20 +2882,54 @@ function guardarSesion(){
     ajustes: document.getElementById('ses-ajustes').value,
     notasPriv: document.getElementById('ses-notas-priv').value,
     testsAplicados: testsAplicados,
-    guardada: new Date().toISOString()
+    guardada: new Date().toISOString(),
+    guardada_definitivo: true,        // ← INMUTABILIDAD: marca la sesión como definitiva
+    correcciones: []                  // ← array para futuras correcciones
   };
+
+  // Sesión nueva siempre se agrega, nunca se sobreescribe una existente
   if(currentSesionId){
     const idx = ses.findIndex(x=>x.id===currentSesionId);
-    if(idx>=0) ses[idx]=sesData; else ses.push(sesData);
+    if(idx>=0 && !ses[idx].guardada_definitivo){
+      ses[idx]=sesData;
+    } else if(idx<0){
+      ses.push(sesData);
+    }
   } else {
     ses.push(sesData);
     currentSesionId = sesData.id;
   }
+
   DB.set('sesiones_'+pid, ses);
   renderListaSesiones(pid);
-  toast(tipo==='cancelacion' ? 'Cancelaci\u00f3n registrada \u2713' : 'Sesi\u00f3n guardada \u2713');
-  // Limpiar formulario completamente
+  toast(tipo==='cancelacion' ? 'Cancelación registrada ✓' : 'Sesión guardada definitivamente ✓');
   limpiarFormSesion();
+}
+
+// ── GUARDAR CORRECCIÓN sobre sesión inmutable ──
+function guardarCorreccion(sesionId, pid){
+  const texto = document.getElementById('ses-correccion-texto').value.trim();
+  if(!texto){ toast('Escribe el texto de la corrección'); return; }
+  
+  const ses = DB.get('sesiones_'+pid)||[];
+  const idx = ses.findIndex(x=>x.id===sesionId);
+  if(idx<0){ toast('Sesión no encontrada'); return; }
+  
+  if(!ses[idx].correcciones) ses[idx].correcciones = [];
+  ses[idx].correcciones.push({
+    texto: texto,
+    fecha: new Date().toISOString(),
+    fechaLegible: new Date().toLocaleString('es-CO')
+  });
+  
+  DB.set('sesiones_'+pid, ses);
+  
+  // Remover el box de corrección
+  const box = document.getElementById('ses-correccion-box');
+  if(box) box.remove();
+  
+  toast('✓ Corrección guardada y registrada');
+  renderListaSesiones(pid);
 }
 
 function limpiarFormSesion(){
