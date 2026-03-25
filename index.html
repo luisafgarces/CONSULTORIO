@@ -2298,6 +2298,8 @@ function goPage(name){
   if(name==='documentos') renderDocumentos();
   if(name==='informes') ilInit();
   if(name==='informe-global') igInit();
+  if(name==='anamnesis') setTimeout(function(){ agregarBotonesSiguiente(); }, 300);
+}
 }
 
 // ===================== TABS =====================
