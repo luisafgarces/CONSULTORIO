@@ -2367,8 +2367,8 @@ function loadAnamnesis(){
   // Load distortions
   window._dcSeleccionadas = data['distorsiones'] || {};
   renderDCGrid();
-// Agregar botones Siguiente
-  agregarBotonesSiguiente();
+
+setTimeout(function(){ agregarBotonesSiguiente(); }, 100);
 }
 
 function guardarAnamnesis(){
