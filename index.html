@@ -2298,33 +2298,10 @@ function goPage(name){
   if(name==='documentos') renderDocumentos();
   if(name==='informes') ilInit();
   if(name==='informe-global') igInit();
-  if(name==='anamnesis') setTimeout(function(){ agregarBotonesSiguiente(); }, 300);
 }
 
 // ===================== TABS =====================
-// ── BOTONES SIGUIENTE EN ANAMNESIS ──
-function agregarBotonesSiguiente(){
-  const tabs = ['datos','motivo','historia','cogcond','sustancias','alimentaria','sueno','trauma','social'];
-  const siguiente = ['motivo','historia','cogcond','sustancias','alimentaria','sueno','trauma','social','metas'];
-  const labels = ['II. Motivo de Consulta','III. Historia Clínica','IV. Evaluación','V. Sustancias','VI. Alimentaria','VII. Sueño','VIII. Trauma','IX. Red Social','X. Metas'];
-  tabs.forEach(function(tab, i){
-    const el = document.getElementById('an-'+tab);
-    if(!el) return;
-    if(el.querySelector('.an-siguiente-btn')) return;
-    const btn = document.createElement('button');
-    btn.className = 'an-siguiente-btn btn primary';
-    btn.style.cssText = 'margin:24px auto 8px;display:block;min-width:200px;font-size:.95rem;';
-    btn.innerHTML = 'Siguiente: '+labels[i]+' →';
-    btn.onclick = function(){ switchTab('an', siguiente[i]); window.scrollTo({top:0,behavior:'smooth'}); };
-    el.appendChild(btn);
-  });
-}
-```
-
-Luego busca con Ctrl+F:
-```
-guardarAnamnesis
-  function switchTab(prefix, name){
+function switchTab(prefix, name){
   const page = document.getElementById('page-'+prefix) || document.querySelector('.page.active');
   page.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
   page.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
@@ -2368,8 +2345,6 @@ function loadAnamnesis(){
   // Load distortions
   window._dcSeleccionadas = data['distorsiones'] || {};
   renderDCGrid();
-
-setTimeout(function(){ agregarBotonesSiguiente(); }, 100);
 }
 
 function guardarAnamnesis(){
