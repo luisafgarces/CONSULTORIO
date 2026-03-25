@@ -729,6 +729,9 @@ input[type=range] { accent-color: var(--border); flex: 1; }
         </div>
       </div>
     </div>
+    <div class="btn-row" style="justify-content:flex-end;margin-top:10px">
+      <button class="btn primary" onclick="switchTab('an','motivo');window.scrollTo({top:0,behavior:'smooth'})">Siguiente: Motivo de Consulta →</button>
+    </div>
   </div>
 
   <!-- II. MOTIVO -->
@@ -745,6 +748,10 @@ input[type=range] { accent-color: var(--border); flex: 1; }
         </div>
       </div>
     </div>
+    <div class="btn-row" style="justify-content:space-between;margin-top:10px">
+      <button class="btn" onclick="switchTab('an','datos');window.scrollTo({top:0,behavior:'smooth'})">← Datos Personales</button>
+      <button class="btn primary" onclick="switchTab('an','historia');window.scrollTo({top:0,behavior:'smooth'})">Siguiente: Historia Clínica →</button>
+    </div>
   </div>
 
   <!-- III. HISTORIA -->
@@ -758,6 +765,10 @@ input[type=range] { accent-color: var(--border); flex: 1; }
       <div class="fg" style="margin-bottom:14px"><label class="lbl">Historia del desarrollo</label><textarea id="an-desarrollo"></textarea></div>
       <div class="fg" style="margin-bottom:14px"><label class="lbl">Antecedentes familiares de salud mental</label><textarea id="an-famMental"></textarea></div>
       <div class="fg"><label class="lbl">Relación familiar actual</label><textarea id="an-relFam"></textarea></div>
+    </div>
+    <div class="btn-row" style="justify-content:space-between;margin-top:10px">
+      <button class="btn" onclick="switchTab('an','motivo');window.scrollTo({top:0,behavior:'smooth'})">← Motivo de Consulta</button>
+      <button class="btn primary" onclick="switchTab('an','cogcond');window.scrollTo({top:0,behavior:'smooth'})">Siguiente: Evaluación →</button>
     </div>
   </div>
 
@@ -786,6 +797,10 @@ input[type=range] { accent-color: var(--border); flex: 1; }
       </div>
       <div class="fg" style="margin-top:12px"><label class="lbl">Observaciones sobre distorsiones</label><textarea id="an-dc-obs" placeholder="Notas adicionales sobre las distorsiones identificadas..."></textarea></div>
     </div>
+    <div class="btn-row" style="justify-content:space-between;margin-top:10px">
+      <button class="btn" onclick="switchTab('an','historia');window.scrollTo({top:0,behavior:'smooth'})">← Historia Clínica</button>
+      <button class="btn primary" onclick="switchTab('an','sustancias');window.scrollTo({top:0,behavior:'smooth'})">Siguiente: Sustancias →</button>
+    </div>
   </div>
 
   <!-- V. SUSTANCIAS -->
@@ -798,6 +813,10 @@ input[type=range] { accent-color: var(--border); flex: 1; }
       <div class="fg" style="margin-top:14px"><label class="lbl">Otras sustancias</label><textarea id="an-sotras"></textarea></div>
       <div class="fg" style="margin-top:14px"><label class="lbl">Observaciones generales</label><textarea id="an-sobs"></textarea></div>
     </div>
+    <div class="btn-row" style="justify-content:space-between;margin-top:10px">
+      <button class="btn" onclick="switchTab('an','cogcond');window.scrollTo({top:0,behavior:'smooth'})">← Evaluación</button>
+      <button class="btn primary" onclick="switchTab('an','alimentaria');window.scrollTo({top:0,behavior:'smooth'})">Siguiente: Alimentaria →</button>
+    </div>
   </div>
 
   <!-- VI. ALIMENTARIA -->
@@ -807,6 +826,10 @@ input[type=range] { accent-color: var(--border); flex: 1; }
       <div class="fg" style="margin-bottom:14px"><label class="lbl">Conductas de riesgo alimentario</label><textarea id="an-alCond"></textarea></div>
       <div class="fg" style="margin-bottom:14px"><label class="lbl">Imagen corporal percibida</label><textarea id="an-alImag"></textarea></div>
       <div class="row col2"><div class="fg"><label class="lbl">Peso / Talla</label><input type="text" id="an-alPeso"></div><div class="fg"><label class="lbl">Relación emocional con la comida</label><input type="text" id="an-alEmoc"></div></div>
+    </div>
+    <div class="btn-row" style="justify-content:space-between;margin-top:10px">
+      <button class="btn" onclick="switchTab('an','sustancias');window.scrollTo({top:0,behavior:'smooth'})">← Sustancias</button>
+      <button class="btn primary" onclick="switchTab('an','sueno');window.scrollTo({top:0,behavior:'smooth'})">Siguiente: Sueño →</button>
     </div>
   </div>
 
@@ -819,6 +842,10 @@ input[type=range] { accent-color: var(--border); flex: 1; }
       <div class="fg" style="margin-top:14px"><label class="lbl">Alteraciones del sueño</label><textarea id="an-suAlter" placeholder="Insomnio, pesadillas, apnea..."></textarea></div>
       <div class="fg" style="margin-top:14px"><label class="lbl">Observaciones</label><textarea id="an-suObs"></textarea></div>
     </div>
+    <div class="btn-row" style="justify-content:space-between;margin-top:10px">
+      <button class="btn" onclick="switchTab('an','alimentaria');window.scrollTo({top:0,behavior:'smooth'})">← Alimentaria</button>
+      <button class="btn primary" onclick="switchTab('an','trauma');window.scrollTo({top:0,behavior:'smooth'})">Siguiente: Trauma →</button>
+    </div>
   </div>
 
   <!-- VIII. TRAUMA -->
@@ -828,6 +855,10 @@ input[type=range] { accent-color: var(--border); flex: 1; }
       <div class="fg" style="margin-bottom:14px"><label class="lbl">Eventos referidos</label><textarea id="an-trEv"></textarea></div>
       <div class="fg" style="margin-bottom:14px"><label class="lbl">Descripción del impacto</label><textarea id="an-trImp"></textarea></div>
       <div class="fg"><label class="lbl">Atención previa por trauma</label><textarea id="an-trAten"></textarea></div>
+    </div>
+    <div class="btn-row" style="justify-content:space-between;margin-top:10px">
+      <button class="btn" onclick="switchTab('an','sueno');window.scrollTo({top:0,behavior:'smooth'})">← Sueño</button>
+      <button class="btn primary" onclick="switchTab('an','social');window.scrollTo({top:0,behavior:'smooth'})">Siguiente: Red Social →</button>
     </div>
   </div>
 
@@ -839,6 +870,10 @@ input[type=range] { accent-color: var(--border); flex: 1; }
       <div class="fg" style="margin-bottom:14px"><label class="lbl">Personas de confianza</label><textarea id="an-raPers"></textarea></div>
       <div class="fg" style="margin-bottom:14px"><label class="lbl">Calidad de relaciones interpersonales</label><textarea id="an-raRel"></textarea></div>
       <div class="fg"><label class="lbl">Apoyo disponible en crisis</label><textarea id="an-raCrisis"></textarea></div>
+    </div>
+    <div class="btn-row" style="justify-content:space-between;margin-top:10px">
+      <button class="btn" onclick="switchTab('an','trauma');window.scrollTo({top:0,behavior:'smooth'})">← Trauma</button>
+      <button class="btn primary" onclick="switchTab('an','metas');window.scrollTo({top:0,behavior:'smooth'})">Siguiente: Metas →</button>
     </div>
   </div>
 
@@ -857,6 +892,7 @@ input[type=range] { accent-color: var(--border); flex: 1; }
       <div class="fg"><label class="lbl">Notas adicionales</label><textarea id="an-oNotas"></textarea></div>
     </div>
     <div class="btn-row">
+      <button class="btn" onclick="switchTab('an','social');window.scrollTo({top:0,behavior:'smooth'})">← Red Social</button>
       <button class="btn primary" onclick="guardarAnamnesis()">💾 Guardar Anamnesis</button>
       <button class="btn" onclick="exportarAnamnesis()">📄 Exportar PDF</button>
     </div>
