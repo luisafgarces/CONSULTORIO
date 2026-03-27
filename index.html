@@ -1198,6 +1198,15 @@ input[type=range] { accent-color: var(--border); flex: 1; }
 
         <div class="fg"><label class="lbl">Notas confidenciales (solo tuyas, no van al resumen)</label><textarea id="ses-notas-priv"></textarea></div>
       </div>
+      <div class="card" id="ses-ia-card">
+        <div class="sec-title">🧠 Análisis Clínico con IA</div>
+        <p style="font-size:0.82rem; color:var(--strong); margin-bottom:14px">La IA redactará un resumen clínico y análisis basado en esta sesión y el historial del paciente. Revisa siempre antes de usar.</p>
+        <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
+          <button class="btn primary" onclick="generarAnalisisIA()" id="ses-ia-btn">✨ Generar análisis clínico</button>
+          <button onclick="cambiarApiKeyGemini()" style="background:none;border:none;color:#cd8e9d;font-size:.78rem;cursor:pointer;text-decoration:underline;">🔑 Cambiar API Key</button>
+        </div>
+        <div id="ses-ia-resultado" style="display:none"></div>
+      </div>
       <div class="card">
         <div class="sec-title">📤 Resumen para el Paciente</div>
         <p style="font-size:0.82rem; color:var(--strong); margin-bottom:14px">Vista previa del documento que recibirá el paciente. No incluye tus notas confidenciales.</p>
@@ -2739,6 +2748,10 @@ function nuevaSesion(){
   const pid = document.getElementById('ses-sel-pac').value;
   if(!pid){ toast('Selecciona un paciente'); return; }
   currentSesionId = null;
+  const iaCardN = document.getElementById('ses-ia-card');
+  if(iaCardN) iaCardN.style.display = 'block';
+  const iaRes = document.getElementById('ses-ia-resultado');
+  if(iaRes) iaRes.style.display = 'none';
   const ses = DB.get('sesiones_'+pid)||[];
   // Auto-numero: next session number (counting only non-cancelled)
   const numSesiones = ses.filter(s=>s.tipo!=='cancelacion').length;
@@ -2838,6 +2851,13 @@ function abrirSesion(pid, sid){
   if(lockBadge) lockBadge.remove();
   const corrBox2 = document.getElementById('ses-correcciones-historial');
   if(corrBox2) corrBox2.remove();
+  // Mostrar/ocultar card IA según estado de sesión
+  const iaCard = document.getElementById('ses-ia-card');
+  if(s.guardada_definitivo){
+    if(iaCard) iaCard.style.display = 'none';
+  } else {
+    if(iaCard) iaCard.style.display = 'block';
+  }
   if(s.guardada_definitivo){
     const badge = document.createElement('div');
     badge.id = 'ses-lock-badge';
@@ -3057,6 +3077,195 @@ function setSesDCNivel(id, nivel){
 function sesDcNoAplica(){
   window._sesDcSeleccionadas = {__no_aplica: true};
   renderSesDCGrid();
+}
+
+function abrirModalGemini(){
+  var modal = document.getElementById('gemini-modal');
+  if(modal){
+    modal.style.display = 'flex';
+    var input = document.getElementById('gemini-key-input');
+    if(input){
+      var actual = localStorage.getItem('gemini_api_key') || '';
+      input.value = '';
+      input.placeholder = actual ? 'API Key guardada (ingresa nueva para cambiar)' : 'AIzaSy...';
+      setTimeout(function(){ input.focus(); }, 100);
+    }
+  }
+}
+
+function cerrarModalGemini(){
+  var modal = document.getElementById('gemini-modal');
+  if(modal) modal.style.display = 'none';
+  // Si había un callback pendiente (primer uso), cancelar
+  if(window._geminiCallback){
+    window._geminiCallback(null);
+    window._geminiCallback = null;
+  }
+}
+
+function guardarApiKeyGemini(){
+  var input = document.getElementById('gemini-key-input');
+  var key = input ? input.value.trim() : '';
+  if(!key){
+    input.style.borderColor = '#e74c3c';
+    setTimeout(function(){ input.style.borderColor = '#cd8e9d'; }, 1500);
+    return;
+  }
+  localStorage.setItem('gemini_api_key', key);
+  var modal = document.getElementById('gemini-modal');
+  if(modal) modal.style.display = 'none';
+  toast('API Key guardada correctamente');
+  // Si había callback pendiente (primer uso desde generarAnalisisIA)
+  if(window._geminiCallback){
+    window._geminiCallback(key);
+    window._geminiCallback = null;
+  }
+}
+
+function cambiarApiKeyGemini(){
+  abrirModalGemini();
+}
+
+function generarAnalisisIA(){
+  var pid = document.getElementById('ses-sel-pac').value;
+  if(!pid){ toast('Selecciona un paciente primero'); return; }
+
+  var num = document.getElementById('ses-num').value || '';
+  var fecha = document.getElementById('ses-fecha').value || '';
+  var temas = document.getElementById('ses-temas').value || '';
+  var inter = document.getElementById('ses-inter').value || '';
+  var avances = document.getElementById('ses-avances').value || '';
+  var tarea = document.getElementById('ses-tarea').value || '';
+  var acuerdos = document.getElementById('ses-acuerdos').value || '';
+  var eventos = document.getElementById('ses-eventos').value || '';
+  var pensamiento = document.getElementById('ses-pensamiento').value || '';
+  var ajustes = document.getElementById('ses-ajustes').value || '';
+  var difTarea = document.getElementById('ses-dif-tarea').value || '';
+  var tareaRevEl = document.querySelector('input[name="ses-tarea-rev"]:checked');
+  var tareaRevVal = tareaRevEl ? tareaRevEl.value : 'No registrado';
+  var humores = Array.from(document.querySelectorAll('#ses-humores input:checked')).map(function(c){return c.value;}).join(', ') || 'No registrado';
+  var tecnicas = Array.from(document.querySelectorAll('#ses-tecnicas input:checked')).map(function(c){return c.value;}).join(', ') || 'No registrado';
+  var riesgos = Array.from(document.querySelectorAll('input[name=riesgo]:checked')).map(function(c){return c.value;}).join(', ') || 'Ninguno';
+  var recursos = Array.from(document.querySelectorAll('input[name=recurso]:checked')).map(function(c){return c.value;}).join(', ') || 'No registrado';
+
+  var todasSes = (DB.get('sesiones_'+pid)||[])
+    .filter(function(s){ return s.tipo!=='cancelacion' && s.guardada_definitivo; })
+    .sort(function(a,b){ return (b.num||0)-(a.num||0); })
+    .slice(0,3);
+
+  var historial = '';
+  if(todasSes.length > 0){
+    historial = 'HISTORIAL RECIENTE (ultimas sesiones guardadas):\n' + todasSes.map(function(s){
+      return 'Sesion #'+(s.num||'?')+' ('+( s.fecha||'')+'):\n'
+        + '  - Temas: '+(s.temas||'No registrado')+'\n'
+        + '  - Avances: '+(s.avances||'No registrado')+'\n'
+        + '  - Tarea: '+(s.tarea||'No registrado');
+    }).join('\n\n');
+  } else {
+    historial = '(Primera sesion o sin historial previo guardado)';
+  }
+
+  var pacientes = DB.get('pacientes')||[];
+  var pac = pacientes.find(function(p){ return p.id===pid; });
+  var nombrePac = pac ? pac.nombre : 'paciente';
+
+
+  var resultado = document.getElementById('ses-ia-resultado');
+  var btn = document.getElementById('ses-ia-btn');
+  resultado.style.display = 'block';
+  resultado.innerHTML = '<div style="padding:20px;text-align:center;color:#cd8e9d;font-size:.9rem;">Generando analisis clinico... un momento...</div>';
+  btn.disabled = true;
+  btn.textContent = 'Generando...';
+
+  var GEMINI_KEY = localStorage.getItem('gemini_api_key') || '';
+  if(!GEMINI_KEY){
+    // Primera vez: abrir modal y esperar
+    resultado.style.display = 'block';
+    resultado.innerHTML = '<div style="padding:16px;font-size:.85rem;color:#cd8e9d;">Primero configura tu API Key de Google Gemini...</div>';
+    window._geminiCallback = function(key){
+      if(!key){ btn.disabled=false; btn.textContent='Generar analisis clinico'; resultado.style.display='none'; return; }
+      ejecutarLlamadaGemini(pid, num, fecha, temas, inter, avances, tarea, acuerdos, eventos, pensamiento, ajustes, difTarea, tareaRevVal, humores, tecnicas, riesgos, recursos, historial, nombrePac, resultado, btn, key);
+    };
+    abrirModalGemini();
+    return;
+  }
+  ejecutarLlamadaGemini(pid, num, fecha, temas, inter, avances, tarea, acuerdos, eventos, pensamiento, ajustes, difTarea, tareaRevVal, humores, tecnicas, riesgos, recursos, historial, nombrePac, resultado, btn, GEMINI_KEY);
+}
+
+function ejecutarLlamadaGemini(pid, num, fecha, temas, inter, avances, tarea, acuerdos, eventos, pensamiento, ajustes, difTarea, tareaRevVal, humores, tecnicas, riesgos, recursos, historial, nombrePac, resultado, btn, GEMINI_KEY){
+  var prompt = 'Eres una psicologa clinica experta en psicologia cognitivo-conductual. Redacta una nota clinica profesional en espanol, con lenguaje tecnico pero humanizado, en tercera persona.\n\n'
+    + 'DATOS DE LA SESION ACTUAL (#'+num+' - '+fecha+'):\n'
+    + '- Paciente: '+nombrePac+'\n'
+    + '- Estado emocional/humor: '+humores+'\n'
+    + '- Eventos desde ultima sesion: '+(eventos||'No reportados')+'\n'
+    + '- Revision de tarea: '+tareaRevVal+(difTarea ? ' - Dificultades: '+difTarea : '')+'\n'
+    + '- Temas trabajados: '+(temas||'No registrado')+'\n'
+    + '- Tecnicas utilizadas: '+tecnicas+'\n'
+    + '- Intervenciones: '+(inter||'No registrado')+'\n'
+    + '- Pensamiento automatico clave: '+(pensamiento||'No identificado')+'\n'
+    + '- Avances y observaciones: '+(avances||'No registrado')+'\n'
+    + '- Indicadores de riesgo: '+riesgos+'\n'
+    + '- Recursos del paciente: '+recursos+'\n'
+    + '- Tarea asignada: '+(tarea||'No asignada')+'\n'
+    + '- Acuerdos proxima sesion: '+(acuerdos||'No registrado')+'\n'
+    + '- Ajustes terapeuticos: '+(ajustes||'Ninguno')+'\n\n'
+    + historial+'\n\n'
+    + 'Genera DOS secciones:\n\n'
+    + '**1. RESUMEN DE SESION**\n'
+    + 'Redacta en 3-5 parrafos fluidos: como llego el paciente, que se trabajo, tecnicas usadas, respuesta, avances y pendientes. Lenguaje clinico accesible.\n\n'
+    + '**2. ANALISIS CLINICO**\n'
+    + 'Redacta en 2-3 parrafos: patrones cognitivos y conductuales, hipotesis de trabajo, continuidad con sesiones anteriores, adherencia y recomendaciones. Lenguaje tecnico especializado.\n\n'
+    + 'Tercera persona, sin tutear, sin nombre de terapeuta. Usa acentos correctos en espanol.';
+
+  fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='+GEMINI_KEY, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }],
+      generationConfig: { maxOutputTokens: 1500, temperature: 0.7 }
+    })
+  })
+  .then(function(r){ return r.json(); })
+  .then(function(data){
+    btn.disabled = false;
+    btn.textContent = 'Generar analisis clinico';
+    if(data.error){ resultado.innerHTML = '<div style="color:#e74c3c;padding:12px;font-size:.85rem;">Error API: '+data.error.message+'</div>'; return; }
+    if(data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts[0]){
+      var texto = data.candidates[0].content.parts[0].text;
+      var html = texto
+        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+        .replace(/\n\n/g, '</p><p>')
+        .replace(/\n/g, '<br>');
+      resultado.innerHTML = '<div style="background:#fdf0f3;border:1.5px solid #cd8e9d;border-radius:10px;padding:18px;margin-top:8px;">'
+        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">'
+        + '<span style="font-size:.8rem;color:#cd8e9d;font-weight:600;">Generado por IA - Revisa antes de usar</span>'
+        + '<div style="display:flex;gap:8px;">'
+        + '<button onclick="copiarAnalisisIA()" style="background:white;border:1px solid #cd8e9d;color:#643000;border-radius:6px;padding:4px 12px;font-size:.78rem;cursor:pointer;">Copiar</button>'
+        + '<button onclick="document.getElementById(\'ses-ia-resultado\').style.display=\'none\'" style="background:white;border:1px solid #ddd;color:#999;border-radius:6px;padding:4px 10px;font-size:.78rem;cursor:pointer;">X</button>'
+        + '</div></div>'
+        + '<div id="ses-ia-texto" style="font-size:.88rem;color:#643000;line-height:1.7;"><p>'+html+'</p></div>'
+        + '</div>';
+    } else {
+      resultado.innerHTML = '<div style="color:#e74c3c;padding:12px;font-size:.85rem;">Error al generar el analisis. Intenta de nuevo.</div>';
+    }
+  })
+  .catch(function(){
+    btn.disabled = false;
+    btn.textContent = 'Generar analisis clinico';
+    resultado.innerHTML = '<div style="color:#e74c3c;padding:12px;font-size:.85rem;">Error de conexion. Verifica tu internet e intenta de nuevo.</div>';
+  });
+}
+
+
+function copiarAnalisisIA(){
+  const el = document.getElementById('ses-ia-texto');
+  if(!el) return;
+  const texto = el.innerText;
+  navigator.clipboard.writeText(texto).then(()=>{
+    toast('✅ Análisis copiado al portapapeles');
+  }).catch(()=>{
+    toast('No se pudo copiar automáticamente');
+  });
 }
 
 function generarResumen(){
