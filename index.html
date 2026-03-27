@@ -3221,7 +3221,7 @@ function ejecutarLlamadaGemini(pid, num, fecha, temas, inter, avances, tarea, ac
     + 'Redacta en 2-3 parrafos: patrones cognitivos y conductuales, hipotesis de trabajo, continuidad con sesiones anteriores, adherencia y recomendaciones. Lenguaje tecnico especializado.\n\n'
     + 'Tercera persona, sin tutear, sin nombre de terapeuta. Usa acentos correctos en espanol.';
 
-  fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key='+GEMINI_KEY, {
+  fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-04-17:generateContent?key='+GEMINI_KEY, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
