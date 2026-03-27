@@ -215,6 +215,10 @@ textarea { resize: vertical; min-height: 80px; }
 .checks { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }
 .chk { display: flex; align-items: center; gap: 6px; font-size: 0.87rem; cursor: pointer; }
 .chk input[type=checkbox] { accent-color: var(--border); width: 15px; height: 15px; }
+.tip { display: inline-flex; align-items: center; justify-content: center; width: 13px; height: 13px; border-radius: 50%; background: #f0d8de; color: #cd8e9d; font-size: .65rem; font-weight: 700; cursor: default; position: relative; flex-shrink: 0; font-style: normal; }
+.tip:hover::after { content: attr(data-tip); position: absolute; bottom: 130%; left: 50%; transform: translateX(-50%); background: #643000; color: #fff; font-size: .72rem; padding: 5px 9px; border-radius: 6px; white-space: nowrap; max-width: 220px; white-space: normal; z-index: 999; line-height: 1.4; pointer-events: none; }
+.tip:hover::before { content: ''; position: absolute; bottom: 110%; left: 50%; transform: translateX(-50%); border: 5px solid transparent; border-top-color: #643000; z-index: 999; pointer-events: none; }
+.dc-item .tip { background: #f0d8de; margin-left: 4px; }
 .range-row { display: flex; align-items: center; gap: 12px; }
 input[type=range] { accent-color: var(--border); flex: 1; }
 .rval { background: var(--border); color: #fff; border-radius: 50%; width: 30px; height: 30px; display: flex; align-items: center; justify-content: center; font-weight: 700; font-size: 0.88rem; flex-shrink: 0; }
@@ -1063,71 +1067,71 @@ input[type=range] { accent-color: var(--border); flex: 1; }
           <div style="margin-top:6px">
             <div style="font-size:.7rem;font-weight:700;color:var(--border);text-transform:uppercase;letter-spacing:1px;margin:8px 0 4px;padding-bottom:3px;border-bottom:1px solid var(--bg)">🧠 Técnicas Cognitivas</div>
             <div class="checks" id="ses-tecnicas" style="flex-wrap:wrap;gap:6px">
-              <label class="chk"><input type="checkbox" name="tecnica" value="Registro de pensamientos automáticos"> Registro PA</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Reestructuración cognitiva"> Reestructuración cognitiva</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Debate socrático"> Debate socrático</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Flecha descendente"> Flecha descendente</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Búsqueda de evidencia"> Búsqueda de evidencia</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Reatribución"> Reatribución</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Descatastrofización"> Descatastrofización</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Continuum cognitivo"> Continuum cognitivo</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Ventajas y desventajas"> Ventajas y desventajas</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Reformulación alternativa"> Reformulación alternativa</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Identificación distorsiones"> Identificación distorsiones</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Cuestionamiento guiado"> Cuestionamiento guiado</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Técnica del abogado defensor"> Abogado defensor</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Doble estándar"> Doble estándar</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Ensayo cognitivo"> Ensayo cognitivo</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Descentramiento"> Descentramiento</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Silla vacía (cognitiva)"> Silla vacía</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Trabajo creencias nucleares"> Creencias nucleares</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Modificación supuestos intermedios"> Supuestos intermedios</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Tarjetas recordatorias"> Tarjetas recordatorias</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Psicoeducación"> Psicoeducación</label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Registro de pensamientos automáticos"> Registro PA <i class="tip" data-tip="Identificar y registrar pensamientos automáticos negativos ante situaciones específicas">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Reestructuración cognitiva"> Reestructuración cognitiva <i class="tip" data-tip="Evaluar y modificar pensamientos distorsionados reemplazándolos por interpretaciones más realistas">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Debate socrático"> Debate socrático <i class="tip" data-tip="Cuestionar la validez de los pensamientos mediante preguntas guiadas">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Flecha descendente"> Flecha descendente <i class="tip" data-tip="Explorar el significado profundo de un pensamiento preguntando "¿y si fuera cierto, qué significaría?"">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Búsqueda de evidencia"> Búsqueda de evidencia <i class="tip" data-tip="Revisar evidencias a favor y en contra de un pensamiento automático">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Reatribución"> Reatribución <i class="tip" data-tip="Distribuir la responsabilidad de los eventos de forma más objetiva y realista">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Descatastrofización"> Descatastrofización <i class="tip" data-tip="Evaluar la probabilidad real y el impacto de los resultados temidos">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Continuum cognitivo"> Continuum cognitivo <i class="tip" data-tip="Reemplazar pensamiento todo-o-nada usando una escala de 0 a 100">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Ventajas y desventajas"> Ventajas y desventajas <i class="tip" data-tip="Analizar pros y contras de un pensamiento o conducta para tomar decisiones más equilibradas">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Reformulación alternativa"> Reformulación alternativa <i class="tip" data-tip="Generar interpretaciones alternativas y más adaptativas a la situación">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Identificación distorsiones"> Identificación distorsiones <i class="tip" data-tip="Reconocer y nombrar los errores del pensamiento presentes en la cognición del paciente">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Cuestionamiento guiado"> Cuestionamiento guiado <i class="tip" data-tip="Serie de preguntas que llevan al paciente a descubrir por sí mismo fallas en su razonamiento">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Técnica del abogado defensor"> Abogado defensor <i class="tip" data-tip="Defender el pensamiento propio frente a un tribunal imaginario para evaluar su solidez">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Doble estándar"> Doble estándar <i class="tip" data-tip="Comparar el trato que se da a uno mismo con el que se daría a otra persona en igual situación">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Ensayo cognitivo"> Ensayo cognitivo <i class="tip" data-tip="Practicar mentalmente situaciones difíciles con el pensamiento nuevo y más adaptativo">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Descentramiento"> Descentramiento <i class="tip" data-tip="Reducir el egocentrismo cognitivo evaluando si otros realmente se centran en el paciente">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Silla vacía (cognitiva)"> Silla vacía <i class="tip" data-tip="Dialogar con una silla vacía que representa a otra persona o a una parte de sí mismo">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Trabajo creencias nucleares"> Creencias nucleares <i class="tip" data-tip="Identificar y modificar creencias profundas sobre uno mismo, el mundo y el futuro">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Modificación supuestos intermedios"> Supuestos intermedios <i class="tip" data-tip="Trabajar las reglas, actitudes y suposiciones condicionales que median el comportamiento">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Tarjetas recordatorias"> Tarjetas recordatorias <i class="tip" data-tip="Fichas con pensamientos alternativos o estrategias de afrontamiento para usar en el día a día">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Psicoeducación"> Psicoeducación <i class="tip" data-tip="Informar al paciente sobre su diagnóstico, el modelo cognitivo y el fundamento del tratamiento">i</i></label>
               <div style="font-size:.7rem;font-weight:700;color:var(--border);text-transform:uppercase;letter-spacing:1px;margin:10px 0 4px;padding-bottom:3px;border-bottom:1px solid var(--bg);width:100%">📋 Técnicas Conductuales</div>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Activación conductual"> Activación conductual</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Programación de actividades"> Programación actividades</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Exposición en vivo"> Exposición en vivo</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Exposición imaginada"> Exposición imaginada</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Exposición interoceptiva"> Exposición interoceptiva</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Prevención de respuesta"> Prevención de respuesta</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Experimentos conductuales"> Experimentos conductuales</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Modelado"> Modelado</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Ensayo conductual"> Ensayo conductual</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Role playing"> Role playing</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Entrenamiento habilidades sociales"> HH. sociales</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Entrenamiento asertividad"> Asertividad</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Contrato conductual"> Contrato conductual</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Reforzamiento positivo"> Reforzamiento positivo</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Extinción"> Extinción</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Autoregistro conductual"> Autoregistro conductual</label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Activación conductual"> Activación conductual <i class="tip" data-tip="Incrementar actividades placenteras o de logro para romper el ciclo de evitación y depresión">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Programación de actividades"> Programación actividades <i class="tip" data-tip="Planificar actividades estructuradas para mejorar el estado de ánimo y la funcionalidad">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Exposición en vivo"> Exposición en vivo <i class="tip" data-tip="Enfrentamiento directo y gradual a situaciones temidas en el ambiente real">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Exposición imaginada"> Exposición imaginada <i class="tip" data-tip="Enfrentamiento gradual a situaciones temidas mediante visualización mental">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Exposición interoceptiva"> Exposición interoceptiva <i class="tip" data-tip="Provocar intencionalmente sensaciones físicas temidas para reducir su impacto">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Prevención de respuesta"> Prevención de respuesta <i class="tip" data-tip="Exponerse al estímulo ansioso sin realizar la conducta compulsiva o de evitación">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Experimentos conductuales"> Experimentos conductuales <i class="tip" data-tip="Probar en la realidad las predicciones negativas del paciente para evaluarlas empíricamente">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Modelado"> Modelado <i class="tip" data-tip="Aprender una conducta observando a otro realizarla correctamente">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Ensayo conductual"> Ensayo conductual <i class="tip" data-tip="Practicar en sesión conductas nuevas antes de ejecutarlas en la vida real">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Role playing"> Role playing <i class="tip" data-tip="Dramatizar situaciones para practicar habilidades o explorar perspectivas diferentes">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Entrenamiento habilidades sociales"> HH. sociales <i class="tip" data-tip="Enseñar habilidades de comunicación y relación interpersonal efectiva">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Entrenamiento asertividad"> Asertividad <i class="tip" data-tip="Entrenar la expresión directa de necesidades, opiniones y límites con respeto">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Contrato conductual"> Contrato conductual <i class="tip" data-tip="Acuerdo formal sobre conductas a cambiar con compromisos y consecuencias definidas">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Reforzamiento positivo"> Reforzamiento positivo <i class="tip" data-tip="Aumentar una conducta deseada mediante consecuencias positivas inmediatas">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Extinción"> Extinción <i class="tip" data-tip="Eliminar una conducta retirando el reforzamiento que la mantiene">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Autoregistro conductual"> Autoregistro conductual <i class="tip" data-tip="Registrar frecuencia, duración o intensidad de conductas para identificar patrones">i</i></label>
               <div style="font-size:.7rem;font-weight:700;color:var(--border);text-transform:uppercase;letter-spacing:1px;margin:10px 0 4px;padding-bottom:3px;border-bottom:1px solid var(--bg);width:100%">🫁 Técnicas Fisiológicas</div>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Respiración diafragmática"> Respiración diafragmática</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Relajación muscular progresiva"> Relajación progresiva</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Entrenamiento autógeno"> Entrenamiento autógeno</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Visualización guiada"> Visualización guiada</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Biofeedback"> Biofeedback</label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Respiración diafragmática"> Respiración diafragmática <i class="tip" data-tip="Técnica de respiración abdominal lenta para reducir la activación fisiológica">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Relajación muscular progresiva"> Relajación progresiva <i class="tip" data-tip="Tensar y liberar grupos musculares progresivamente para inducir relajación profunda">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Entrenamiento autógeno"> Entrenamiento autógeno <i class="tip" data-tip="Inducir estados de relajación mediante autosugestión de sensaciones corporales">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Visualización guiada"> Visualización guiada <i class="tip" data-tip="Usar imágenes mentales para generar estados emocionales tranquilos o positivos">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Biofeedback"> Biofeedback <i class="tip" data-tip="Usar información fisiológica en tiempo real para aprender a controlar respuestas corporales">i</i></label>
               <div style="font-size:.7rem;font-weight:700;color:var(--border);text-transform:uppercase;letter-spacing:1px;margin:10px 0 4px;padding-bottom:3px;border-bottom:1px solid var(--bg);width:100%">💚 Técnicas Emocionales</div>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Exposición emocional"> Exposición emocional</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Etiquetado emocional"> Etiquetado emocional</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Regulación emocional"> Regulación emocional</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Tolerancia al malestar"> Tolerancia al malestar</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Inoculación de estrés"> Inoculación de estrés</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Validación emocional"> Validación emocional</label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Exposición emocional"> Exposición emocional <i class="tip" data-tip="Contactar y tolerar emociones difíciles sin suprimirlas ni evitarlas">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Etiquetado emocional"> Etiquetado emocional <i class="tip" data-tip="Identificar y nombrar con precisión las emociones para reducir su intensidad">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Regulación emocional"> Regulación emocional <i class="tip" data-tip="Estrategias para modificar la intensidad o duración de respuestas emocionales">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Tolerancia al malestar"> Tolerancia al malestar <i class="tip" data-tip="Habilidades para soportar situaciones angustiantes sin empeorarlas con conductas impulsivas">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Inoculación de estrés"> Inoculación de estrés <i class="tip" data-tip="Preparar al paciente para situaciones estresantes mediante ensayo y técnicas de afrontamiento">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Validación emocional"> Validación emocional <i class="tip" data-tip="Reconocer y legitimar las emociones del paciente como comprensibles y válidas">i</i></label>
               <div style="font-size:.7rem;font-weight:700;color:var(--border);text-transform:uppercase;letter-spacing:1px;margin:10px 0 4px;padding-bottom:3px;border-bottom:1px solid var(--bg);width:100%">🏠 Herramientas y Tareas para Casa</div>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Autorregistro diario"> Autorregistro diario</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Registro ABC"> Registro ABC</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Registro pensamientos disfuncionales"> Registro RPD</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Registro de emociones"> Registro emociones</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Diario de actividades"> Diario actividades</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Programación semanal"> Programación semanal</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Tareas de exposición"> Tareas exposición</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Práctica de habilidades"> Práctica habilidades</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Tarjetas de afrontamiento"> Tarjetas afrontamiento</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Lecturas psicoeducativas"> Lecturas psicoed.</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Autoevaluaciones estructuradas"> Autoevaluaciones</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Psicoeducación"> Psicoeducación</label>
-              <label class="chk"><input type="checkbox" name="tecnica" value="Mindfulness"> Mindfulness</label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Autorregistro diario"> Autorregistro diario <i class="tip" data-tip="Registro diario de situaciones, pensamientos y emociones para automonitoreo">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Registro ABC"> Registro ABC <i class="tip" data-tip="Registrar Acontecimiento, Creencia (pensamiento) y Consecuencia emocional/conductual">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Registro pensamientos disfuncionales"> Registro RPD <i class="tip" data-tip="Registro de Pensamientos Disfuncionales para identificar y cuestionar cogniciones negativas">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Registro de emociones"> Registro emociones <i class="tip" data-tip="Llevar un diario de emociones con situación, emoción e intensidad">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Diario de actividades"> Diario actividades <i class="tip" data-tip="Registrar actividades diarias para evaluar placer, logro y su relación con el estado de ánimo">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Programación semanal"> Programación semanal <i class="tip" data-tip="Planificar la semana con actividades de placer y logro para mejorar rutinas">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Tareas de exposición"> Tareas exposición <i class="tip" data-tip="Práctica progresiva en casa de situaciones temidas acordadas en sesión">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Práctica de habilidades"> Práctica habilidades <i class="tip" data-tip="Aplicar fuera de sesión las habilidades trabajadas en terapia">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Tarjetas de afrontamiento"> Tarjetas afrontamiento <i class="tip" data-tip="Fichas de apoyo con frases o pasos para manejar situaciones difíciles">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Lecturas psicoeducativas"> Lecturas psicoed. <i class="tip" data-tip="Lectura de materiales educativos sobre el trastorno o las técnicas terapéuticas">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Autoevaluaciones estructuradas"> Autoevaluaciones <i class="tip" data-tip="Cuestionarios de seguimiento para monitorear síntomas entre sesiones">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Psicoeducación"> Psicoeducación <i class="tip" data-tip="Informar al paciente sobre su diagnóstico, el modelo cognitivo y el fundamento del tratamiento">i</i></label>
+              <label class="chk"><input type="checkbox" name="tecnica" value="Mindfulness"> Mindfulness <i class="tip" data-tip="Práctica de atención plena al momento presente sin juicio, para reducir rumiación y ansiedad">i</i></label>
             </div>
           </div>
         </div>
@@ -3052,7 +3056,7 @@ function renderSesDCGrid(){
     var info = window._sesDcSeleccionadas[d.id]||null;
     var nivel = info ? info.nivel : '';
     return '<div class="dc-item '+(info?'selected':'')+'" id="ses-dc-'+d.id+'" onclick="toggleSesDC(\''+d.id+'\')" style="font-size:.75rem;padding:8px 10px">'
-      +'<div class="dc-name" style="font-size:.78rem">'+d.name+'</div>'
+      +'<div class="dc-name" style="font-size:.78rem">'+d.name+(d.desc?' <i class="tip" data-tip="'+d.desc+'">i</i>':'')+'</div>'
       +'<div class="dc-nivel" onclick="event.stopPropagation()">'
       +['Leve','Moderada','Severa'].map(n=>'<button class="dc-nivel-btn '+(nivel===n?'sel':'')+'" onclick="setSesDCNivel(\''+d.id+'\',\''+n+'\')">'+n+'</button>').join('')
       +'</div></div>';
