@@ -8444,5 +8444,21 @@ function descargarHerImg(){
 }
 </script>
 
+
+<!-- Modal API Key Gemini -->
+<div id="gemini-modal" style="display:none;position:fixed;inset:0;background:rgba(100,48,0,0.18);z-index:9999;align-items:center;justify-content:center;">
+  <div style="background:white;border-radius:16px;padding:32px;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(100,48,0,0.15);font-family:'Lato',sans-serif;">
+    <div style="font-family:'Playfair Display',serif;font-size:1.1rem;color:#643000;font-weight:700;margin-bottom:8px;">🔑 Configurar API Key de Gemini</div>
+    <p style="font-size:.85rem;color:#7a5a40;margin-bottom:16px;line-height:1.5;">Solo la ingresas una vez y queda guardada en tu dispositivo.</p>
+    <p style="font-size:.8rem;color:#cd8e9d;margin-bottom:16px;">Obtenla gratis en <a href="https://aistudio.google.com" target="_blank" style="color:#cd8e9d;font-weight:600;">aistudio.google.com</a> → Get API Key</p>
+    <input id="gemini-key-input" type="password" placeholder="AIzaSy..."
+      style="width:100%;box-sizing:border-box;padding:10px 14px;border:1.5px solid #cd8e9d;border-radius:8px;font-size:.9rem;color:#643000;margin-bottom:16px;font-family:inherit;"
+      onkeydown="if(event.key==='Enter') guardarApiKeyGemini()">
+    <div style="display:flex;gap:10px;justify-content:flex-end;">
+      <button onclick="cerrarModalGemini()" style="background:none;border:1.5px solid #ddd;border-radius:8px;padding:8px 18px;color:#999;cursor:pointer;font-size:.88rem;">Cancelar</button>
+      <button onclick="guardarApiKeyGemini()" style="background:#cd8e9d;border:none;border-radius:8px;padding:8px 20px;color:white;cursor:pointer;font-size:.88rem;font-weight:600;">Guardar</button>
+    </div>
+  </div>
+</div>
 </body>
 </html>
