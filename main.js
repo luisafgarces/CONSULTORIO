@@ -2084,11 +2084,9 @@ function goPageDirect(name){
   if(name==='pacientes') renderPacientes();
 }
 
-// Abre directamente la ficha (Anamnesis) de un paciente desde el dashboard
+// Abre directamente la ficha (modal de perfil) de un paciente desde el dashboard
 function abrirFichaPaciente(id){
-  selectPaciente(id);
-  goPage('anamnesis');
-  loadAnamnesis();
+  abrirPacModal(id);
 }
 
 // ===================== TOAST =====================
