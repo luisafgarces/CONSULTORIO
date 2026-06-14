@@ -904,11 +904,10 @@ const DB = {
   <div class="card" id="ag-form-card" style="margin-top:24px">
     <div class="sec-title">➕ Agregar evento</div>
     <div class="row col3">
+      <div class="fg"><label class="lbl">Paciente (opcional)</label>
+        <select id="ag-nuevo-pac" onchange="agAutocompletarTitulo()"></select>
+      </div>
       <div class="fg"><label class="lbl">Título</label><input type="text" id="ag-nuevo-titulo" placeholder="Ej: Sesión con María"></div>
-      <div class="fg"><label class="lbl">Fecha y hora inicio</label><input type="datetime-local" id="ag-nuevo-inicio"></div>
-      <div class="fg"><label class="lbl">Hora fin</label><input type="datetime-local" id="ag-nuevo-fin"></div>
-    </div>
-    <div class="row col2">
       <div class="fg"><label class="lbl">Tipo</label>
         <select id="ag-nuevo-tipo">
           <option value="virtual">Virtual</option>
@@ -916,10 +915,28 @@ const DB = {
           <option value="admin">Administrativo</option>
         </select>
       </div>
+    </div>
+    <div class="row col3">
+      <div class="fg"><label class="lbl">Fecha y hora inicio</label><input type="datetime-local" id="ag-nuevo-inicio"></div>
+      <div class="fg"><label class="lbl">Hora fin</label><input type="datetime-local" id="ag-nuevo-fin"></div>
       <div class="fg"><label class="lbl">Descripción</label><input type="text" id="ag-nuevo-desc" placeholder="Nota opcional"></div>
+    </div>
+    <div class="row col3">
+      <div class="fg"><label class="lbl">Repetir</label>
+        <select id="ag-nuevo-repetir" onchange="agToggleRepetir()">
+          <option value="">No repetir</option>
+          <option value="semanal">Semanal</option>
+          <option value="quincenal">Quincenal (cada 2 semanas)</option>
+          <option value="mensual">Mensual</option>
+          <option value="personalizado">Personalizado (cada X días)</option>
+        </select>
+      </div>
+      <div class="fg" id="ag-rep-dias-wrap" style="display:none"><label class="lbl">Repetir cada (días)</label><input type="number" id="ag-nuevo-rep-dias" min="1" placeholder="Ej: 10"></div>
+      <div class="fg" id="ag-rep-hasta-wrap" style="display:none"><label class="lbl">Repetir hasta</label><input type="date" id="ag-nuevo-rep-hasta"></div>
     </div>
     <div class="btn-row"><button class="btn primary" onclick="agAgregarEvento()">+ Guardar evento</button></div>
   </div>
+
 
   <!-- PANEL CUMPLEAÑOS (pestaña dentro de agenda) -->
   <div id="ag-panel-cumple" style="display:none">

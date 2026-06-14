@@ -227,7 +227,15 @@ function fillSelects(){
     const optsR = '<option value="">\u2014 Seleccionar paciente registrada \u2014</option>' + pacs.map(p=>`<option value="${p.nombre}">${p.nombre}</option>`).join('');
     rSel.innerHTML = optsR;
   }
+  // Poblar selector de pacientes en formulario de Agenda
+  const agSel = document.getElementById('ag-nuevo-pac');
+  if(agSel){
+    const v = agSel.value;
+    agSel.innerHTML = '<option value="">\u2014 Sin paciente \u2014</option>' + opts.replace('<option value="">\u2014 Seleccionar paciente \u2014</option>','');
+    agSel.value = v;
+  }
 }
+
 
 function rellenarPacienteDesdeSelector(){
   var sel = document.getElementById('r_pac_selector');
@@ -1980,7 +1988,7 @@ function renderDashboard(){
 
   const recent = pacs.slice(-6).reverse();
   document.getElementById('dash-recent-patients').innerHTML = recent.length ?
-    `<div class="patient-grid">${recent.map(p=>`<div class="patient-card" onclick="abrirFichaPaciente('${p.id}')"><h3>${p.nombre}</h3><div class="meta">${p.ocup||'\u2014'}</div><div class="badge">${getSesionesCount(p.id)} sesi\u00f3n(es)</div></div>`).join('')}</div>` :
+    `<div class="patient-grid">${recent.map(p=>`<div class="patient-card" onclick="goPageDirect('pacientes')"><h3>${p.nombre}</h3><div class="meta">${p.ocup||'\u2014'}</div><div class="badge">${getSesionesCount(p.id)} sesi\u00f3n(es)</div></div>`).join('')}</div>` :
     '<p style="font-size:.85rem;color:var(--border)">A\u00fan no tienes pacientes. <a href="#" onclick="goPageDirect(\'pacientes\')" style="color:var(--border)">Crea el primero \u2192</a></p>';
 
   // \u00faltimas sesiones
@@ -2082,11 +2090,6 @@ function goPageDirect(name){
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
   if(name==='pacientes') renderPacientes();
-}
-
-// Abre directamente la ficha (modal de perfil) de un paciente desde el dashboard
-function abrirFichaPaciente(id){
-  abrirPacModal(id);
 }
 
 // ===================== TOAST =====================
@@ -2374,30 +2377,97 @@ function agCambiarDia(dir){
   if(agTabActual==='mes'){ agMesOffset+=dir; renderAgenda(); return; }
   agDiaOffset+=dir; renderAgenda();
 }
+// Autocompleta el título del evento al elegir un paciente
+function agAutocompletarTitulo(){
+  var pid = document.getElementById('ag-nuevo-pac').value;
+  if(!pid) return;
+  var pacs = getPacientes();
+  var pac = pacs.find(p=>p.id===pid);
+  if(!pac) return;
+  var numSesion = getSesionesCount(pid) + 1;
+  document.getElementById('ag-nuevo-titulo').value = 'Sesi\u00f3n #'+numSesion+' - '+pac.nombre;
+}
+
+// Muestra/oculta los campos de repetición según la frecuencia elegida
+function agToggleRepetir(){
+  var val = document.getElementById('ag-nuevo-repetir').value;
+  var diasWrap = document.getElementById('ag-rep-dias-wrap');
+  var hastaWrap = document.getElementById('ag-rep-hasta-wrap');
+  diasWrap.style.display = (val==='personalizado') ? '' : 'none';
+  hastaWrap.style.display = val ? '' : 'none';
+}
+
 function agAgregarEvento(){
+  var pacId=document.getElementById('ag-nuevo-pac').value;
   var titulo=document.getElementById('ag-nuevo-titulo').value.trim();
   var inicio=document.getElementById('ag-nuevo-inicio').value;
   var fin=document.getElementById('ag-nuevo-fin').value;
   var tipo=document.getElementById('ag-nuevo-tipo').value;
   var desc=document.getElementById('ag-nuevo-desc').value.trim();
+  var repetir=document.getElementById('ag-nuevo-repetir').value;
+  var repDias=parseInt(document.getElementById('ag-nuevo-rep-dias').value,10);
+  var repHasta=document.getElementById('ag-nuevo-rep-hasta').value;
   if(!titulo||!inicio){ toast('Ingresa t\u00edtulo y fecha de inicio'); return; }
-  var nuevoEv = {id:'ev'+Date.now(),titulo,inicio,fin:fin||inicio,tipo,descripcion:desc};
-  agEventos.push(nuevoEv);
+
+  // Determinar el intervalo en días según la opción de repetición
+  var intervaloDias = 0;
+  if(repetir==='semanal') intervaloDias = 7;
+  else if(repetir==='quincenal') intervaloDias = 14;
+  else if(repetir==='mensual') intervaloDias = 30;
+  else if(repetir==='personalizado') intervaloDias = repDias;
+
+  if(repetir && (!intervaloDias || intervaloDias<1)){ toast('Indica cada cu\u00e1ntos d\u00edas se repite'); return; }
+  if(repetir && !repHasta){ toast('Indica hasta qu\u00e9 fecha se repite'); return; }
+
+  var fechaInicio = new Date(inicio);
+  var fechaFin = fin ? new Date(fin) : new Date(inicio);
+  var duracionMs = fechaFin.getTime() - fechaInicio.getTime();
+  var limite = repetir ? new Date(repHasta+'T23:59:59') : null;
+
+  var nuevosEventos = [];
+  var contadorSesion = pacId ? (getSesionesCount(pacId) + 1) : null;
+  var iter = 0;
+  do{
+    var offsetMs = iter * intervaloDias * 24*60*60*1000;
+    var ini = new Date(fechaInicio.getTime() + offsetMs);
+    var finEv = new Date(ini.getTime() + duracionMs);
+    var tituloEv = titulo;
+    // Si el título sigue el patrón "Sesión #N - Nombre", incrementar N en cada repetición
+    if(pacId && iter>0){
+      tituloEv = titulo.replace(/Sesi\u00f3n #\d+/, 'Sesi\u00f3n #'+(contadorSesion+iter));
+    }
+    nuevosEventos.push({
+      id:'ev'+Date.now()+'_'+iter,
+      titulo: tituloEv,
+      inicio: ini.toISOString().slice(0,16),
+      fin: finEv.toISOString().slice(0,16),
+      tipo, descripcion: desc,
+      pacienteId: pacId || null
+    });
+    iter++;
+  } while(repetir && new Date(fechaInicio.getTime() + iter*intervaloDias*24*60*60*1000) <= limite);
+
+  agEventos = agEventos.concat(nuevosEventos);
   agGuardar();
   // Si la cita es para mañana, resetear la marca y mostrar alerta
   var manana = new Date(); manana.setDate(manana.getDate()+1);
-  var dEv = new Date(nuevoEv.inicio);
+  var dEv = new Date(nuevosEventos[0].inicio);
   if(dEv.getFullYear()===manana.getFullYear()&&dEv.getMonth()===manana.getMonth()&&dEv.getDate()===manana.getDate()){
     localStorage.removeItem('citas_alerta_vista');
     var existing = document.getElementById('cita-alert-badge-main'); if(existing) existing.remove();
     setTimeout(verificarCitasManana, 300);
   }
+  document.getElementById('ag-nuevo-pac').value='';
   document.getElementById('ag-nuevo-titulo').value='';
   document.getElementById('ag-nuevo-inicio').value='';
   document.getElementById('ag-nuevo-fin').value='';
   document.getElementById('ag-nuevo-desc').value='';
+  document.getElementById('ag-nuevo-repetir').value='';
+  document.getElementById('ag-nuevo-rep-dias').value='';
+  document.getElementById('ag-nuevo-rep-hasta').value='';
+  agToggleRepetir();
   renderAgenda();
-  toast('Evento guardado \u2713');
+  toast(nuevosEventos.length>1 ? (nuevosEventos.length+' eventos guardados \u2713') : 'Evento guardado \u2713');
 }
 function agEliminar(id){
   if(!confirm('\u00bfEliminar este evento?')) return;
