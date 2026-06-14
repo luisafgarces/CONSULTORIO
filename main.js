@@ -1270,7 +1270,7 @@ function exportarResumenPDF(){
   abrirDocumentoSeguro(html, 'Sesion_'+num+'_'+(pac.nombre||'Paciente').replace(/\s+/g,'_')+'.html');
 }
 
-function exportarHistoriaClinica(){
+function exportarHistoriaSesionActual(){
   const pid = document.getElementById('ses-sel-pac').value;
   if(!pid){ toast('Selecciona un paciente'); return; }
   const pacs = getPacientes();
