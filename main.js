@@ -1980,7 +1980,7 @@ function renderDashboard(){
 
   const recent = pacs.slice(-6).reverse();
   document.getElementById('dash-recent-patients').innerHTML = recent.length ?
-    `<div class="patient-grid">${recent.map(p=>`<div class="patient-card" onclick="goPageDirect('pacientes')"><h3>${p.nombre}</h3><div class="meta">${p.ocup||'\u2014'}</div><div class="badge">${getSesionesCount(p.id)} sesi\u00f3n(es)</div></div>`).join('')}</div>` :
+    `<div class="patient-grid">${recent.map(p=>`<div class="patient-card" onclick="abrirFichaPaciente('${p.id}')"><h3>${p.nombre}</h3><div class="meta">${p.ocup||'\u2014'}</div><div class="badge">${getSesionesCount(p.id)} sesi\u00f3n(es)</div></div>`).join('')}</div>` :
     '<p style="font-size:.85rem;color:var(--border)">A\u00fan no tienes pacientes. <a href="#" onclick="goPageDirect(\'pacientes\')" style="color:var(--border)">Crea el primero \u2192</a></p>';
 
   // \u00faltimas sesiones
@@ -2082,6 +2082,13 @@ function goPageDirect(name){
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
   if(name==='pacientes') renderPacientes();
+}
+
+// Abre directamente la ficha (Anamnesis) de un paciente desde el dashboard
+function abrirFichaPaciente(id){
+  selectPaciente(id);
+  goPage('anamnesis');
+  loadAnamnesis();
 }
 
 // ===================== TOAST =====================
