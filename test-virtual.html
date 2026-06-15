@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cuestionario — Psic. Luisa Fernanda Garcés</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+
+<!-- Firebase (mismas versiones y config que usa Suite Clínica) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<style>
+  :root{
+    --bg: #fadae1;
+    --soft: #fdf2f5;
+    --text: #643000;
+    --strong: #a0536a;
+    --border: #cd8e9d;
+    --accent-grad: linear-gradient(135deg,#a0536a,#cd8e9d);
+  }
+
+  *{ box-sizing:border-box; }
+
+  body{
+    margin:0;
+    font-family:'Lato',sans-serif;
+    background:var(--soft);
+    color:var(--text);
+    min-height:100vh;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding:24px 16px 60px;
+  }
+
+  .header{
+    text-align:center;
+    margin-bottom:20px;
+  }
+
+  .header .marca{
+    font-family:'Playfair Display',serif;
+    font-size:1.4rem;
+    font-weight:700;
+    color:var(--text);
+    margin-bottom:2px;
+  }
+
+  .header .subtitulo{
+    font-size:0.8rem;
+    color:var(--strong);
+  }
+
+  .card{
+    background:#fff;
+    border:1.5px solid var(--bg);
+    border-radius:16px;
+    padding:24px 22px;
+    max-width:520px;
+    width:100%;
+    box-shadow:0 4px 20px rgba(160,83,106,0.10);
+    margin-bottom:18px;
+  }
+
+  .card h1{
+    font-family:'Playfair Display',serif;
+    font-size:1.2rem;
+    color:var(--text);
+    margin:0 0 6px;
+  }
+
+  .card p.desc{
+    font-size:0.85rem;
+    color:var(--strong);
+    margin:0 0 18px;
+    line-height:1.5;
+  }
+
+  .pregunta{
+    margin-bottom:20px;
+    padding-bottom:18px;
+    border-bottom:1px solid var(--soft);
+  }
+
+  .pregunta:last-of-type{
+    border-bottom:none;
+    margin-bottom:8px;
+  }
+
+  .pregunta .num{
+    display:inline-block;
+    font-size:0.7rem;
+    font-weight:700;
+    color:var(--border);
+    background:var(--soft);
+    border-radius:10px;
+    padding:2px 9px;
+    margin-bottom:6px;
+  }
+
+  .pregunta .texto{
+    font-size:0.95rem;
+    color:var(--text);
+    margin-bottom:10px;
+    line-height:1.4;
+  }
+
+  .opciones{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+  }
+
+  .opcion{
+    display:flex;
+    align-items:center;
+    gap:10px;
+    border:1.5px solid var(--bg);
+    border-radius:10px;
+    padding:10px 14px;
+    cursor:pointer;
+    font-size:0.88rem;
+    transition:background 0.15s, border-color 0.15s;
+  }
+
+  .opcion:hover{
+    background:var(--soft);
+  }
+
+  .opcion.selected{
+    background:linear-gradient(135deg,#fff8f9,#fadae1);
+    border-color:var(--border);
+    font-weight:700;
+    color:var(--strong);
+  }
+
+  .opcion input{
+    accent-color:var(--strong);
+    width:16px;
+    height:16px;
+  }
+
+  .btn-enviar{
+    width:100%;
+    padding:14px;
+    border:none;
+    border-radius:24px;
+    background:var(--accent-grad);
+    color:#fff;
+    font-size:1rem;
+    font-weight:700;
+    font-family:'Lato',sans-serif;
+    cursor:pointer;
+    margin-top:8px;
+    transition:opacity 0.2s;
+  }
+
+  .btn-enviar:hover{ opacity:0.92; }
+
+  .btn-enviar:disabled{
+    opacity:0.5;
+    cursor:not-allowed;
+  }
+
+  .aviso{
+    font-size:0.75rem;
+    color:var(--border);
+    text-align:center;
+    margin-top:6px;
+  }
+
+  /* Pantalla de confirmación */
+  .pantalla-final{
+    text-align:center;
+  }
+
+  .pantalla-final .icono{
+    font-size:2.6rem;
+    margin-bottom:10px;
+  }
+
+  .pantalla-final h2{
+    font-family:'Playfair Display',serif;
+    color:var(--text);
+    font-size:1.25rem;
+    margin:0 0 8px;
+  }
+
+  .pantalla-final p{
+    font-size:0.9rem;
+    color:var(--strong);
+    line-height:1.5;
+  }
+
+  .footer-firma{
+    font-size:0.72rem;
+    color:var(--border);
+    text-align:center;
+    margin-top:8px;
+  }
+
+  /* Estado de error / carga */
+  .estado-msg{
+    text-align:center;
+    font-size:0.9rem;
+    color:var(--strong);
+    padding:30px 0;
+  }
+
+  [hidden]{ display:none !important; }
+</style>
+</head>
+<body>
+
+  <div class="header">
+    <div class="marca">Psic. Luisa Fernanda Garcés García</div>
+    <div class="subtitulo">Cuestionario clínico — Suite Clínica</div>
+  </div>
+
+  <!-- Estado: cargando -->
+  <div class="card" id="estado-cargando">
+    <div class="estado-msg">Cargando cuestionario…</div>
+  </div>
+
+  <!-- Estado: error / link inválido -->
+  <div class="card" id="estado-error" hidden>
+    <div class="estado-msg">
+      Este enlace no es válido o ya fue utilizado.<br><br>
+      Si crees que esto es un error, por favor contacta a tu psicóloga.
+    </div>
+  </div>
+
+  <!-- Formulario del test -->
+  <form class="card" id="form-test" hidden>
+    <h1 id="test-titulo"></h1>
+    <p class="desc" id="test-descripcion"></p>
+    <div id="contenedor-preguntas"></div>
+    <button type="submit" class="btn-enviar" id="btn-enviar" disabled>Enviar respuestas</button>
+    <p class="aviso">Sus respuestas son confidenciales y se enviarán directamente a su psicóloga.</p>
+  </form>
+
+  <!-- Pantalla final -->
+  <div class="card pantalla-final" id="pantalla-final" hidden>
+    <div class="icono">✅</div>
+    <h2>¡Listo, gracias!</h2>
+    <p>Tus respuestas fueron enviadas correctamente.<br>Tu psicóloga las revisará pronto.</p>
+  </div>
+
+  <div class="footer-firma">Suite Clínica · Confidencial</div>
+
+
+<script>
+/* ============================================================
+   test-virtual.html — Suite Clínica
+   ============================================================
+   Lee el código de la URL (?codigo=xxxx), busca la asignación
+   en Firestore (colección "asignaciones_test"), trae la escala
+   correspondiente (colección "escalas_virtuales"), renderiza
+   el cuestionario, califica al enviar y guarda el resultado.
+   ============================================================ */
+
+// --- Config Firebase (misma que usa Suite Clínica) ---
+// Config Firebase del proyecto SEPARADO "consultorio-tests"
+// (no es el mismo proyecto que usa Suite Clínica para historias clínicas)
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBKJbaH47eQdUunHzFApw_bupa7Mlh6K98",
+  authDomain: "consultorio-tests.firebaseapp.com",
+  projectId: "consultorio-tests",
+  storageBucket: "consultorio-tests.firebasestorage.app",
+  messagingSenderId: "834442182774",
+  appId: "1:834442182774:web:a50504b59d185db99a1f57"
+};
+
+firebase.initializeApp(FIREBASE_CONFIG);
+const db = firebase.firestore();
+
+
+// --- Lógica genérica de renderizado y calificación ---
+
+const respuestas = {};
+
+function renderEscala(escala){
+  document.getElementById("test-titulo").textContent = escala.nombre;
+  document.getElementById("test-descripcion").textContent = escala.descripcion;
+
+  const cont = document.getElementById("contenedor-preguntas");
+  cont.innerHTML = "";
+
+  escala.preguntas.forEach((pregunta, idx) => {
+    const div = document.createElement("div");
+    div.className = "pregunta";
+
+    const num = document.createElement("div");
+    num.className = "num";
+    num.textContent = `Pregunta ${idx + 1} de ${escala.preguntas.length}`;
+    div.appendChild(num);
+
+    const texto = document.createElement("div");
+    texto.className = "texto";
+    texto.textContent = pregunta.texto;
+    div.appendChild(texto);
+
+    const opcionesDiv = document.createElement("div");
+    opcionesDiv.className = "opciones";
+
+    escala.opciones_respuesta.forEach((opcion) => {
+      const label = document.createElement("label");
+      label.className = "opcion";
+      label.dataset.preguntaId = pregunta.id;
+
+      const input = document.createElement("input");
+      input.type = "radio";
+      input.name = pregunta.id;
+      input.value = opcion.valor;
+      input.required = true;
+
+      input.addEventListener("change", () => {
+        respuestas[pregunta.id] = opcion.valor;
+        opcionesDiv.querySelectorAll(".opcion").forEach(o => o.classList.remove("selected"));
+        label.classList.add("selected");
+        actualizarBotonEnviar(escala);
+      });
+
+      const span = document.createElement("span");
+      span.textContent = opcion.texto;
+
+      label.appendChild(input);
+      label.appendChild(span);
+      opcionesDiv.appendChild(label);
+    });
+
+    div.appendChild(opcionesDiv);
+    cont.appendChild(div);
+  });
+}
+
+function actualizarBotonEnviar(escala){
+  const todasRespondidas = escala.preguntas.every(p => respuestas[p.id] !== undefined);
+  document.getElementById("btn-enviar").disabled = !todasRespondidas;
+}
+
+function calificar(escala, respuestas){
+  const cal = escala.calificacion;
+  let resultado = { puntaje_total: null, interpretacion: null, alertas_activadas: [] };
+
+  if (cal.tipo === "suma_simple"){
+    let suma = 0;
+    escala.preguntas.forEach(p => { suma += respuestas[p.id] || 0; });
+    resultado.puntaje_total = suma;
+
+    const rango = cal.rangos.find(r => suma >= r.min && suma <= r.max);
+    resultado.interpretacion = rango ? rango.etiqueta : null;
+  }
+
+  if (cal.alertas){
+    cal.alertas.forEach(alerta => {
+      const valor = respuestas[alerta.pregunta_id];
+      const cumple = new Function("valor", `return ${alerta.condicion}`)(valor);
+      if (cumple){
+        resultado.alertas_activadas.push(alerta.mensaje);
+      }
+    });
+  }
+
+  return resultado;
+}
+
+function mostrarError(){
+  document.getElementById("estado-cargando").hidden = true;
+  document.getElementById("estado-error").hidden = false;
+}
+
+
+// --- Inicialización ---
+
+async function init(){
+  const codigo = new URLSearchParams(window.location.search).get("codigo");
+
+  if (!codigo){
+    mostrarError();
+    return;
+  }
+
+  let asigDoc;
+  try{
+    asigDoc = await db.collection("asignaciones_test").doc(codigo).get();
+  }catch(e){
+    console.warn("Error consultando asignación:", e);
+    mostrarError();
+    return;
+  }
+
+  if (!asigDoc.exists){
+    mostrarError();
+    return;
+  }
+
+  const asignacion = asigDoc.data();
+
+  if (asignacion.estado !== "pendiente"){
+    mostrarError();
+    return;
+  }
+
+  let escalaDoc;
+  try{
+    escalaDoc = await db.collection("escalas_virtuales").doc(asignacion.escala_id).get();
+  }catch(e){
+    console.warn("Error consultando escala:", e);
+    mostrarError();
+    return;
+  }
+
+  if (!escalaDoc.exists){
+    mostrarError();
+    return;
+  }
+
+  const escala = escalaDoc.data();
+
+  renderEscala(escala);
+
+  document.getElementById("estado-cargando").hidden = true;
+  document.getElementById("form-test").hidden = false;
+
+  document.getElementById("form-test").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const btn = document.getElementById("btn-enviar");
+    btn.disabled = true;
+    btn.textContent = "Enviando…";
+
+    const resultado = calificar(escala, respuestas);
+
+    try{
+      await db.collection("asignaciones_test").doc(codigo).update({
+        respuestas: respuestas,
+        puntaje_total: resultado.puntaje_total,
+        interpretacion: resultado.interpretacion,
+        alertas_activadas: resultado.alertas_activadas,
+        estado: "completado",
+        fecha_completado: new Date().toISOString()
+      });
+
+      document.getElementById("form-test").hidden = true;
+      document.getElementById("pantalla-final").hidden = false;
+    }catch(e){
+      console.warn("Error guardando resultado:", e);
+      btn.disabled = false;
+      btn.textContent = "Enviar respuestas";
+      alert("Hubo un problema al enviar tus respuestas. Por favor intenta nuevamente.");
+    }
+  });
+}
+
+init();
+</script>
+
+</body>
+</html>
