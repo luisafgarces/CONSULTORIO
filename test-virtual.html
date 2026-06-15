@@ -84,6 +84,20 @@
     border-bottom:1px solid var(--soft);
   }
 
+  .seccion-encabezado{
+    font-size:0.85rem;
+    color:var(--strong);
+    font-weight:700;
+    line-height:1.4;
+    margin:18px 0 14px;
+    padding-bottom:8px;
+    border-bottom:1.5px solid var(--bg);
+  }
+
+  .seccion-encabezado:first-child{
+    margin-top:0;
+  }
+
   .pregunta:last-of-type{
     border-bottom:none;
     margin-bottom:8px;
@@ -281,6 +295,15 @@ const db = firebase.firestore();
 
 const respuestas = {};
 
+// Títulos de encabezado para escalas que dividen sus preguntas en secciones
+// (por ahora solo el ITQ las usa; el campo "seccion" es opcional en cada pregunta)
+const TITULOS_SECCION = {
+  sintomas_tept: "Durante el último mes, ¿cuánto le ha molestado cada uno de los siguientes problemas relacionados con la experiencia que indicó?",
+  impacto_tept: "En el último mes, si ha tenido alguno de los problemas anteriores, indique cómo le han afectado:",
+  sintomas_aao: "A continuación, indique cuán cierto es para usted cada una de las siguientes afirmaciones, pensando en cómo se siente y se relaciona habitualmente:",
+  impacto_aao: "En el último mes, si ha tenido alguno de los problemas anteriores respecto a sus emociones, su autoconcepto o sus relaciones, indique cómo le han afectado:"
+};
+
 function renderEscala(escala){
   document.getElementById("test-titulo").textContent = escala.nombre;
   document.getElementById("test-descripcion").textContent = escala.descripcion;
@@ -288,7 +311,18 @@ function renderEscala(escala){
   const cont = document.getElementById("contenedor-preguntas");
   cont.innerHTML = "";
 
+  let seccionActual = null;
+
   escala.preguntas.forEach((pregunta, idx) => {
+    // Si la pregunta pertenece a una sección distinta a la anterior, mostrar encabezado
+    if (pregunta.seccion && pregunta.seccion !== seccionActual){
+      seccionActual = pregunta.seccion;
+      const encabezado = document.createElement("div");
+      encabezado.className = "seccion-encabezado";
+      encabezado.textContent = TITULOS_SECCION[seccionActual] || "";
+      cont.appendChild(encabezado);
+    }
+
     const div = document.createElement("div");
     div.className = "pregunta";
 
@@ -343,7 +377,7 @@ function actualizarBotonEnviar(escala){
 
 function calificar(escala, respuestas){
   const cal = escala.calificacion;
-  let resultado = { puntaje_total: null, interpretacion: null, alertas_activadas: [] };
+  let resultado = { puntaje_total: null, interpretacion: null, alertas_activadas: [], detalle: null };
 
   if (cal.tipo === "suma_simple"){
     let suma = 0;
@@ -352,6 +386,126 @@ function calificar(escala, respuestas){
 
     const rango = cal.rangos.find(r => suma >= r.min && suma <= r.max);
     resultado.interpretacion = rango ? rango.etiqueta : null;
+  }
+
+  if (cal.tipo === "perfil_subescalas"){
+    // Suma por cada esquema/subescala y nivel según baremos (bajo/medio/alto/muy_alto)
+    const perfil = cal.esquemas.map(esq => {
+      let suma = 0;
+      escala.preguntas.forEach(p => {
+        if (p.esquema === esq.codigo) suma += (respuestas[p.id] || 0);
+      });
+
+      let nivel = null;
+      for (const key of cal.niveles_orden){
+        const rango = esq.baremos[key];
+        if (suma >= rango[0] && suma <= rango[1]){
+          nivel = key;
+          break;
+        }
+      }
+
+      return {
+        codigo: esq.codigo,
+        nombre: esq.nombre,
+        puntaje: suma,
+        maximo: esq.maximo,
+        nivel: nivel,
+        nivel_etiqueta: cal.niveles_etiquetas[nivel] || null
+      };
+    });
+
+    resultado.detalle = { perfil: perfil };
+
+    // Resumen para vista rápida en el panel: cuántos esquemas en nivel alto/muy alto
+    const altos = perfil.filter(p => p.nivel === "alto" || p.nivel === "muy_alto");
+    resultado.puntaje_total = altos.length;
+    resultado.interpretacion = altos.length
+      ? `${altos.length} esquema(s) en nivel alto o muy alto: ${altos.map(a => a.nombre).join(", ")}`
+      : "Ningún esquema en nivel alto o muy alto";
+  }
+
+  if (cal.tipo === "cribado_casillas"){
+    // Cada ítem cuenta como "sombreado" si respuesta >= sombreado_desde
+    const itemsInfo = escala.preguntas.map(p => {
+      const valor = respuestas[p.id];
+      const sombreado = valor >= p.sombreado_desde;
+      return { id: p.id, parte: p.parte, valor: valor, sombreado: sombreado };
+    });
+
+    const parteA = itemsInfo.filter(i => cal.parte_a_ids.includes(i.id));
+    const parteB = itemsInfo.filter(i => cal.parte_b_ids.includes(i.id));
+
+    const sombreadosA = parteA.filter(i => i.sombreado).length;
+    const sombreadosB = parteB.filter(i => i.sombreado);
+
+    const positivo = sombreadosA >= cal.umbral_positivo_parte_a;
+
+    resultado.detalle = {
+      parte_a_sombreados: sombreadosA,
+      parte_a_total: parteA.length,
+      parte_a_positivo: positivo,
+      parte_b_sombreados: sombreadosB.map(i => i.id),
+      nota: cal.nota || null
+    };
+
+    resultado.puntaje_total = sombreadosA;
+    resultado.interpretacion = positivo
+      ? `Parte A: ${sombreadosA}/${parteA.length} en casillas sombreadas — cribado positivo (≥ ${cal.umbral_positivo_parte_a}), se sugiere evaluación adicional`
+      : `Parte A: ${sombreadosA}/${parteA.length} en casillas sombreadas — cribado negativo`;
+  }
+
+  if (cal.tipo === "algoritmo_itq"){
+    const umbral = cal.umbral_presente;
+
+    // Puntaje y "presente" (>= umbral en al menos uno de sus ítems) por subescala
+    const subescalas = cal.subescalas.map(sub => {
+      let suma = 0;
+      let presente = false;
+      sub.items.forEach(id => {
+        const v = respuestas[id] || 0;
+        suma += v;
+        if (v >= umbral) presente = true;
+      });
+      return { codigo: sub.codigo, nombre: sub.nombre, cluster: sub.cluster, puntaje: suma, presente: presente };
+    });
+
+    // Deterioro funcional: presente si al menos uno de sus ítems >= umbral
+    const deterioros = cal.deterioro_funcional.map(det => {
+      const presente = det.items.some(id => (respuestas[id] || 0) >= umbral);
+      return { codigo: det.codigo, nombre: det.nombre, presente: presente };
+    });
+
+    const porCodigo = {};
+    subescalas.forEach(s => { porCodigo[s.codigo] = s; });
+    const detPorCodigo = {};
+    deterioros.forEach(d => { detPorCodigo[d.codigo] = d; });
+
+    const tept_dx = porCodigo.Re.presente && porCodigo.Ev.presente && porCodigo.Am.presente && detPorCodigo["TEPT-DF"].presente;
+    const aao_dx = porCodigo.Da.presente && porCodigo.An.presente && porCodigo.Ar.presente && detPorCodigo["DFAAO"].presente;
+
+    let resultadoCategorico;
+    if (tept_dx && aao_dx) resultadoCategorico = "TEPTC";
+    else if (tept_dx && !aao_dx) resultadoCategorico = "TEPT";
+    else if (!tept_dx && aao_dx) resultadoCategorico = "No determinado (criterios AAO sin criterios TEPT)";
+    else resultadoCategorico = "Sin criterios para TEPT ni TEPTC";
+
+    const puntajeTEPT = porCodigo.Re.puntaje + porCodigo.Ev.puntaje + porCodigo.Am.puntaje;
+    const puntajeAAO = porCodigo.Da.puntaje + porCodigo.An.puntaje + porCodigo.Ar.puntaje;
+
+    resultado.detalle = {
+      subescalas: subescalas,
+      deterioro_funcional: deterioros,
+      puntaje_tept: puntajeTEPT,
+      puntaje_aao: puntajeAAO,
+      tept_dx: tept_dx,
+      aao_dx: aao_dx,
+      resultado_categorico: resultadoCategorico,
+      nota: cal.nota || null
+    };
+
+    resultado.puntaje_total = puntajeTEPT + puntajeAAO;
+    resultado.interpretacion = `${resultadoCategorico} (TEPT: ${puntajeTEPT}/24, AAO: ${puntajeAAO}/24)`;
   }
 
   if (cal.alertas){
@@ -440,6 +594,7 @@ async function init(){
         puntaje_total: resultado.puntaje_total,
         interpretacion: resultado.interpretacion,
         alertas_activadas: resultado.alertas_activadas,
+        detalle: resultado.detalle,
         estado: "completado",
         fecha_completado: new Date().toISOString()
       });

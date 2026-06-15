@@ -1,0 +1,517 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Cargar escalas virtuales — Suite Clínica (uso único)</title>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<style>
+  body{ font-family: sans-serif; padding: 30px; max-width: 700px; margin: 0 auto; color:#643000; }
+  button{ background:#cd8e9d; color:#fff; border:none; border-radius:20px; padding:12px 28px; font-size:1rem; cursor:pointer; }
+  button:disabled{ opacity:0.5; cursor:not-allowed; }
+  pre{ background:#fdf2f5; border:1px solid #fadae1; border-radius:8px; padding:14px; font-size:0.85rem; overflow:auto; }
+  .ok{ color:#2e7d32; }
+  .warn{ color:#e57373; }
+</style>
+</head>
+<body>
+
+<h1>Cargar escalas virtuales (PHQ-9, GAD-7, YSQ-L3, ASRS-v1.1 e ITQ)</h1>
+<p>Esta página es de <strong>uso único</strong>: crea/actualiza los documentos
+<code>phq9</code>, <code>gad7</code>, <code>ysql3</code>, <code>asrs</code> e <code>itq</code> en la colección
+<code>escalas_virtuales</code> de tu Firestore, usando exactamente las mismas preguntas y rangos que ya usa
+Suite Clínica (PHQ-9/GAD-7) o los baremos/algoritmos oficiales del resto.</p>
+<p>Después de correrla una vez, puedes archivar este archivo (no se necesita
+de nuevo, salvo que quieras agregar otra escala con este método).</p>
+
+<button id="btn-cargar" onclick="cargarEscalas()">Cargar escalas en Firestore</button>
+
+<pre id="log">— esperando —</pre>
+
+<script>
+// Config Firebase del proyecto SEPARADO "consultorio-tests"
+// (no es el mismo proyecto que usa Suite Clínica para historias clínicas)
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBKJbaH47eQdUunHzFApw_bupa7Mlh6K98",
+  authDomain: "consultorio-tests.firebaseapp.com",
+  projectId: "consultorio-tests",
+  storageBucket: "consultorio-tests.firebasestorage.app",
+  messagingSenderId: "834442182774",
+  appId: "1:834442182774:web:a50504b59d185db99a1f57"
+};
+
+firebase.initializeApp(FIREBASE_CONFIG);
+const db = firebase.firestore();
+
+const OPCIONES_PHQ_GAD = [
+  { texto: "Ningún día", valor: 0 },
+  { texto: "Varios días", valor: 1 },
+  { texto: "Más de la mitad de los días", valor: 2 },
+  { texto: "Casi todos los días", valor: 3 }
+];
+
+const ESCALA_PHQ9 = {
+  id: "phq9",
+  nombre: "PHQ-9 · Cuestionario de Salud del Paciente",
+  descripcion: "Durante las últimas 2 semanas, ¿qué tan seguido le ha molestado cada uno de los siguientes problemas? Responda con sinceridad, no hay respuestas correctas o incorrectas.",
+  opciones_respuesta: OPCIONES_PHQ_GAD,
+  preguntas: [
+    { id: "p1", texto: "Poco interés o placer en hacer cosas" },
+    { id: "p2", texto: "Sentirse decaído/a, deprimido/a o sin esperanza" },
+    { id: "p3", texto: "Problemas para quedarse o mantenerse dormido/a, o dormir demasiado" },
+    { id: "p4", texto: "Sentirse cansado/a o tener poca energía" },
+    { id: "p5", texto: "Poco apetito o comer en exceso" },
+    { id: "p6", texto: "Sentirse mal consigo mismo/a, sentir que es un fracaso o que ha fallado a sí mismo/a o a su familia" },
+    { id: "p7", texto: "Dificultad para concentrarse en cosas como leer el periódico o ver la televisión" },
+    { id: "p8", texto: "Moverse o hablar tan lento que otras personas podrían notarlo, o estar tan inquieto/a que ha estado moviéndose mucho más de lo normal" },
+    { id: "p9", texto: "Pensamientos de que estaría mejor muerto/a o de hacerse daño de alguna manera" }
+  ],
+  calificacion: {
+    tipo: "suma_simple",
+    rangos: [
+      { min: 0,  max: 4,  etiqueta: "Mínima o sin depresión" },
+      { min: 5,  max: 9,  etiqueta: "Depresión leve" },
+      { min: 10, max: 14, etiqueta: "Depresión moderada" },
+      { min: 15, max: 19, etiqueta: "Depresión moderadamente grave" },
+      { min: 20, max: 27, etiqueta: "Depresión grave" }
+    ],
+    alertas: [
+      { pregunta_id: "p9", condicion: "valor > 0", mensaje: "Ítem 9 (ideación suicida) positivo - revisar de inmediato" }
+    ]
+  }
+};
+
+const ESCALA_GAD7 = {
+  id: "gad7",
+  nombre: "GAD-7 · Escala de Trastorno de Ansiedad Generalizada",
+  descripcion: "Durante las últimas 2 semanas, ¿qué tan seguido le ha molestado cada uno de los siguientes problemas? Responda con sinceridad, no hay respuestas correctas o incorrectas.",
+  opciones_respuesta: OPCIONES_PHQ_GAD,
+  preguntas: [
+    { id: "p1", texto: "Sentirse nervioso/a, ansioso/a o con los nervios de punta" },
+    { id: "p2", texto: "No poder dejar de preocuparse o no poder controlar la preocupación" },
+    { id: "p3", texto: "Preocuparse demasiado por diferentes cosas" },
+    { id: "p4", texto: "Dificultad para relajarse" },
+    { id: "p5", texto: "Estar tan inquieto/a que es difícil mantenerse quieto/a" },
+    { id: "p6", texto: "Irritarse o enojarse fácilmente" },
+    { id: "p7", texto: "Sentir miedo como si algo terrible pudiera pasar" }
+  ],
+  calificacion: {
+    tipo: "suma_simple",
+    rangos: [
+      { min: 0,  max: 4,  etiqueta: "Ansiedad mínima" },
+      { min: 5,  max: 9,  etiqueta: "Ansiedad leve" },
+      { min: 10, max: 14, etiqueta: "Ansiedad moderada" },
+      { min: 15, max: 21, etiqueta: "Ansiedad grave" }
+    ],
+    alertas: []
+  }
+};
+
+const OPCIONES_YSQ = [
+  { texto: "1 = Completamente falso", valor: 1 },
+  { texto: "2 = Generalmente falso", valor: 2 },
+  { texto: "3 = Ligeramente más verdadero que falso", valor: 3 },
+  { texto: "4 = Moderadamente verdadero", valor: 4 },
+  { texto: "5 = Generalmente verdadero", valor: 5 },
+  { texto: "6 = Me describe perfectamente", valor: 6 }
+];
+
+const ESCALA_YSQL3 = {
+  id: "ysql3",
+  nombre: "YSQ-L3 · Cuestionario de Esquemas de Young (forma larga)",
+  descripcion: "A continuación encontrarás una lista de enunciados que alguien podría usar para describirse. Lee cada enunciado y decide qué tan bien te describe, eligiendo el número de la escala que consideres como el que mejor te describe. Cuando no estés seguro(a), basa tu respuesta en lo que emocionalmente sientes, no en lo que crees que sería verdad.",
+  opciones_respuesta: OPCIONES_YSQ,
+  preguntas: [
+    { id: "p1", texto: "La gente no ha estado ahí para satisfacer mis necesidades emocionales.", esquema: "ed" },
+    { id: "p2", texto: "No he recibido suficiente amor o atención.", esquema: "ed" },
+    { id: "p3", texto: "Por lo general, no he tenido alguien de quien depender para obtener consejos o apoyo emocional.", esquema: "ed" },
+    { id: "p4", texto: "La mayor parte del tiempo, no he tenido alguien que me apoye, que comparta conmigo, o que se interese profundamente en todo lo que me suceda.", esquema: "ed" },
+    { id: "p5", texto: "En gran parte de mi vida, no he tenido a alguien que quiera acercarse a mí y pasar mucho tiempo conmigo.", esquema: "ed" },
+    { id: "p6", texto: "Por lo general, nadie ha estado ahí para darme calidez humana, apoyo y cariño.", esquema: "ed" },
+    { id: "p7", texto: "En gran parte de mi vida, no he sentido que soy especial para alguien.", esquema: "ed" },
+    { id: "p8", texto: "Por lo general, no he tenido alguien que realmente me escuche, me entienda, o que esté en sintonía con mis verdaderas necesidades y sentimientos.", esquema: "ed" },
+    { id: "p9", texto: "Raramente he tenido una persona fuerte para darme buenos consejos o para guiarme cuando no estoy seguro(a) de qué hacer.", esquema: "ed" },
+    { id: "p10", texto: "Me preocupa que la gente que quiero muera pronto, aun cuando hay pocas razones médicas para respaldar mi preocupación.", esquema: "ab" },
+    { id: "p11", texto: "He notado que me aferro a la gente que está cerca de mí porque me da miedo que me dejen.", esquema: "ab" },
+    { id: "p12", texto: "Me preocupa que la gente a quienes me siento cercano(a) me dejen o me abandonen.", esquema: "ab" },
+    { id: "p13", texto: "Siento que no tengo una base estable de apoyo emocional.", esquema: "ab" },
+    { id: "p14", texto: "Siento que las relaciones importantes no pueden durar; creo que éstas terminan tarde o temprano.", esquema: "ab" },
+    { id: "p15", texto: "Me siento atraído(a) a las parejas que no pueden estar conmigo en una forma comprometida.", esquema: "ab" },
+    { id: "p16", texto: "Al final terminaré solo(a).", esquema: "ab" },
+    { id: "p17", texto: "Cuando siento que alguien que quiero se está alejando de mí, me desespero.", esquema: "ab" },
+    { id: "p18", texto: "A veces me preocupa tanto que la gente me deje, que termino alejándolos.", esquema: "ab" },
+    { id: "p19", texto: "Me disgusto cuando alguien me deja solo(a), aunque sea por un periodo de tiempo pequeño.", esquema: "ab" },
+    { id: "p20", texto: "No puedo contar con que la gente que me apoya esté ahí de forma regular.", esquema: "ab" },
+    { id: "p21", texto: "No puedo permitirme tener relaciones profundas con otras personas porque no tengo la seguridad de que siempre estarán ahí.", esquema: "ab" },
+    { id: "p22", texto: "Parece que las personas que son importantes en mi vida, siempre van y vienen.", esquema: "ab" },
+    { id: "p23", texto: "Me preocupa mucho que la gente que amo me deje porque encuentre a alguien más a quien prefieran.", esquema: "ab" },
+    { id: "p24", texto: "Las personas muy cercanas a mí han sido muy impredecibles; en un momento son amables y están disponibles; y en el próximo están enojados, molestos, absortos en ellos mismos, peleando, etcétera.", esquema: "ab" },
+    { id: "p25", texto: "Necesito tanto a otras personas que me da miedo perderlas.", esquema: "ab" },
+    { id: "p26", texto: "No puedo ser yo mismo(a) o expresar lo que realmente siento pues la gente terminará dejándome.", esquema: "ab" },
+    { id: "p27", texto: "Siento que las personas se aprovecharán de mí.", esquema: "ma" },
+    { id: "p28", texto: "Frecuentemente siento que tengo que protegerme de los demás.", esquema: "ma" },
+    { id: "p29", texto: "Siento que no puedo bajar la guardia frente a otras personas o me harán daño intencionalmente.", esquema: "ma" },
+    { id: "p30", texto: "Si alguien se comporta amable conmigo, asumo que está buscando algo.", esquema: "ma" },
+    { id: "p31", texto: "Es sólo cuestión de tiempo antes de que alguien me traicione.", esquema: "ma" },
+    { id: "p32", texto: "La mayoría de las personas solo piensan en ellos mismos.", esquema: "ma" },
+    { id: "p33", texto: "Me cuesta muchísimo confiar en los demás.", esquema: "ma" },
+    { id: "p34", texto: "Siempre sospecho de las intenciones de otras personas.", esquema: "ma" },
+    { id: "p35", texto: "Las personas son raramente honestas; usualmente no son lo que parecen.", esquema: "ma" },
+    { id: "p36", texto: "Usualmente estoy a la búsqueda de las \"segundas intenciones\" de la gente.", esquema: "ma" },
+    { id: "p37", texto: "Si creo que alguien está tratando de herirme, intento herirlo(a) primero.", esquema: "ma" },
+    { id: "p38", texto: "Las personas tienen que demostrarme que son dignas de confianza antes de que yo pueda confiar en ellas.", esquema: "ma" },
+    { id: "p39", texto: "Les pongo \"pruebas\" a las personas para saber si me están diciendo la verdad y si sus intenciones son buenas.", esquema: "ma" },
+    { id: "p40", texto: "Me apego a la creencia \"controlar o ser controlado\".", esquema: "ma" },
+    { id: "p41", texto: "Me enojo al pensar en las formas en que he sido maltratado(a) por otra gente durante el curso de mi vida.", esquema: "ma" },
+    { id: "p42", texto: "Durante mi vida, quienes han sido cercanos a mí, se han aprovechado o me han usado para conseguir sus propósitos.", esquema: "ma" },
+    { id: "p43", texto: "He sido abusado(a) física, emocional o sexualmente por gente importante en mi vida.", esquema: "ma" },
+    { id: "p44", texto: "No me adapto.", esquema: "si" },
+    { id: "p45", texto: "Soy fundamentalmente diferente a otras personas.", esquema: "si" },
+    { id: "p46", texto: "No soy aceptado, soy solitario(a).", esquema: "si" },
+    { id: "p47", texto: "Me siento distanciado(a) de las demás personas.", esquema: "si" },
+    { id: "p48", texto: "Me siento solo(a) y aislado(a).", esquema: "si" },
+    { id: "p49", texto: "Siempre me siento fuera de los grupos.", esquema: "si" },
+    { id: "p50", texto: "Nadie me entiende realmente.", esquema: "si" },
+    { id: "p51", texto: "Mi familia siempre fue diferente a las otras familias alrededor de nosotros.", esquema: "si" },
+    { id: "p52", texto: "A veces me siento como si fuera un extraño.", esquema: "si" },
+    { id: "p53", texto: "Si desapareciera mañana, nadie lo notaría.", esquema: "si" },
+    { id: "p54", texto: "Ningún(a) hombre/mujer que yo desee podría amarme una vez que vea mis defectos.", esquema: "ds" },
+    { id: "p55", texto: "Nadie que yo desee querría estar cerca de mí si conociera mi yo real.", esquema: "ds" },
+    { id: "p56", texto: "Soy intrínsecamente imperfecto(a) y defectuoso(a).", esquema: "ds" },
+    { id: "p57", texto: "No importa cuánto lo intente, siento que no seré capaz de encontrar un(a) hombre/mujer importante para mí, que me respete o sienta que valgo la pena.", esquema: "ds" },
+    { id: "p58", texto: "No merezco el amor, la atención y el respeto de los demás.", esquema: "ds" },
+    { id: "p59", texto: "Siento que no soy una persona a la que se puede amar.", esquema: "ds" },
+    { id: "p60", texto: "Soy demasiado inaceptable en aspectos tan básicos de mi persona que no revelo mi yo real a los demás.", esquema: "ds" },
+    { id: "p61", texto: "No podría enfrentar a otras personas si supieran mis defectos.", esquema: "ds" },
+    { id: "p62", texto: "Cuando le agrado a la gente, siento que los engaño.", esquema: "ds" },
+    { id: "p63", texto: "Con frecuencia descubro que me siento atraído(a) a personas criticonas o que me rechazan.", esquema: "ds" },
+    { id: "p64", texto: "Tengo secretos que no quiero que las personas cercanas a mí los sepan.", esquema: "ds" },
+    { id: "p65", texto: "Es mi culpa que mis papás no pudieran quererme lo suficiente.", esquema: "ds" },
+    { id: "p66", texto: "No permito que las personas conozcan mi verdadero yo.", esquema: "ds" },
+    { id: "p67", texto: "Uno de mis más grandes miedos es que mis defectos queden al descubierto.", esquema: "ds" },
+    { id: "p68", texto: "No puedo entender cómo es que alguien podría amarme.", esquema: "ds" },
+    { id: "p69", texto: "Casi nada de lo que hago en el trabajo (o en la escuela) es tan bueno como lo que hacen los demás.", esquema: "fa" },
+    { id: "p70", texto: "Soy incompetente cuando se trata de logros.", esquema: "fa" },
+    { id: "p71", texto: "La mayoría de las personas son más capaces que yo en áreas de trabajo (o escuela) y en la obtención de logros.", esquema: "fa" },
+    { id: "p72", texto: "Soy un fracaso.", esquema: "fa" },
+    { id: "p73", texto: "No soy tan talentoso como la mayoría de las personas lo son en su trabajo (o en la escuela).", esquema: "fa" },
+    { id: "p74", texto: "No soy tan inteligente como la mayoría de las personas lo es en su trabajo (o la escuela).", esquema: "fa" },
+    { id: "p75", texto: "Soy humillado(a) por mis fracasos e incapacidades en la esfera laboral (o educativa).", esquema: "fa" },
+    { id: "p76", texto: "Frecuentemente me siento avergonzado(a) con otras personas que tienen logros que yo no tengo.", esquema: "fa" },
+    { id: "p77", texto: "Frecuentemente comparo mis logros con los de otros y siento que ellos son mucho más exitosos.", esquema: "fa" },
+    { id: "p78", texto: "No me siento capaz de valerme por mí mismo(a) en mi vida diaria.", esquema: "di" },
+    { id: "p79", texto: "Necesito que otros me ayuden a arreglar mis asuntos.", esquema: "di" },
+    { id: "p80", texto: "No siento que pueda hacer frente a mis cosas por mí mismo(a).", esquema: "di" },
+    { id: "p81", texto: "Creo que otra gente puede cuidar mejor de mí de lo que yo puedo hacerlo.", esquema: "di" },
+    { id: "p82", texto: "Tengo problemas enfrentando nuevas tareas fuera del trabajo, a menos que tenga alguien para guiarme.", esquema: "di" },
+    { id: "p83", texto: "Me percibo como una persona dependiente en el desempeño de mi vida diaria.", esquema: "di" },
+    { id: "p84", texto: "Echo a perder todo lo que intento, aún fuera del trabajo (o de la escuela).", esquema: "di" },
+    { id: "p85", texto: "Soy inepto(a) en la mayoría de las áreas de la vida.", esquema: "di" },
+    { id: "p86", texto: "Si confío en mi propio juicio en situaciones diarias, tomaré una decisión equivocada.", esquema: "di" },
+    { id: "p87", texto: "Me falta sentido común.", esquema: "di" },
+    { id: "p88", texto: "Mi juicio no es confiable en situaciones diarias.", esquema: "di" },
+    { id: "p89", texto: "No confío en la habilidad que tengo para resolver los problemas cotidianos que surgen.", esquema: "di" },
+    { id: "p90", texto: "Siento que necesito alguien en quien apoyarme para orientarme acerca de cosas prácticas.", esquema: "di" },
+    { id: "p91", texto: "Me siento más como niño(a) que como adulto(a) cuando se trata de manejar responsabilidades diarias.", esquema: "di" },
+    { id: "p92", texto: "Encuentro abrumadoras las responsabilidades de la vida diaria.", esquema: "di" },
+    { id: "p93", texto: "No puedo escapar del sentimiento de que algo malo está por suceder.", esquema: "vu" },
+    { id: "p94", texto: "Siento que un desastre (natural, financiero, criminal, o médico) podría sucederme en cualquier momento.", esquema: "vu" },
+    { id: "p95", texto: "Me preocupa convertirme en un(a) vagabundo(a) o persona de la calle.", esquema: "vu" },
+    { id: "p96", texto: "Me preocupa ser atacado.", esquema: "vu" },
+    { id: "p97", texto: "Tomo grandes precauciones para evitar enfermarme o herirme.", esquema: "vu" },
+    { id: "p98", texto: "Me preocupa poder estar desarrollando una enfermedad seria, aún cuando nada serio haya sido diagnosticado por un médico.", esquema: "vu" },
+    { id: "p99", texto: "Soy una persona miedosa.", esquema: "vu" },
+    { id: "p100", texto: "Me preocupan mucho las cosas malas que suceden en el mundo: crimen, contaminación, etc.", esquema: "vu" },
+    { id: "p101", texto: "Frecuentemente siento que me estoy volviendo loco(a).", esquema: "vu" },
+    { id: "p102", texto: "Frecuentemente siento que tendré un ataque de ansiedad.", esquema: "vu" },
+    { id: "p103", texto: "Frecuentemente me preocupa el poder tener un ataque al corazón o padecer cáncer, aún cuando hay muy pocas razones médicas para estar preocupado(a).", esquema: "vu" },
+    { id: "p104", texto: "Siento que el mundo es un lugar peligroso.", esquema: "vu" },
+    { id: "p105", texto: "No he sido capaz de separarme de mis padres de la forma que las demás personas de mi edad parecen haberlo hecho.", esquema: "eu" },
+    { id: "p106", texto: "Mis padres y yo tendemos a involucrarnos demasiado en la vida y problemas de cada uno.", esquema: "eu" },
+    { id: "p107", texto: "Es muy difícil para mis padres y para mí callar detalles íntimos sin sentirnos culpables o traicionados.", esquema: "eu" },
+    { id: "p108", texto: "Mis padres y yo tenemos que hablarnos casi todos los días, si no, alguno se siente culpable, herido, decepcionado o solo.", esquema: "eu" },
+    { id: "p109", texto: "Con frecuencia siento que no tengo una identidad separada de la de mis padres o mi pareja.", esquema: "eu" },
+    { id: "p110", texto: "Frecuentemente siento que mis padres están viviendo a través de mí o que no tengo una vida propia.", esquema: "eu" },
+    { id: "p111", texto: "Me es muy difícil mantener distancia de la gente con la que estoy íntimamente ligada; tengo problemas manteniendo un sentido independiente de mí mismo(a).", esquema: "eu" },
+    { id: "p112", texto: "Estoy tan involucrado(a) con mi pareja o mis padres que realmente no sé quién soy o lo que quiero.", esquema: "eu" },
+    { id: "p113", texto: "Tengo problemas separando mi punto de vista o mis opiniones de las de mis padres o mi pareja.", esquema: "eu" },
+    { id: "p114", texto: "Frecuentemente siento que no tengo privacidad cuando se trata de mis padres o mi pareja.", esquema: "eu" },
+    { id: "p115", texto: "Siento que mis padres se sentirían muy heridos si yo me fuera a vivir solo(a), lejos de ellos.", esquema: "eu" },
+    { id: "p116", texto: "Dejo a la gente hacer las cosas a su manera porque tengo miedo de las consecuencias.", esquema: "sb" },
+    { id: "p117", texto: "Siento que si hago lo que quiero sólo estaría buscando problemas.", esquema: "sb" },
+    { id: "p118", texto: "Siento que no tengo otra opción que ceder a los deseos de los demás, si no, ellos se desquitarán o me rechazarán de alguna manera.", esquema: "sb" },
+    { id: "p119", texto: "En las relaciones, dejo que la otra persona tenga el dominio y/o tome la delantera.", esquema: "sb" },
+    { id: "p120", texto: "Siempre he dejado que los demás decidan por mí así que realmente no sé lo que quiero para mí.", esquema: "sb" },
+    { id: "p121", texto: "Siento que las decisiones importantes en mi vida no han sido realmente mías.", esquema: "sb" },
+    { id: "p122", texto: "Me preocupa mucho complacer a la demás gente para que no me rechacen.", esquema: "sb" },
+    { id: "p123", texto: "Tengo muchos problemas exigiendo que mis derechos sean respetados y mis sentimientos tomados en cuenta.", esquema: "sb" },
+    { id: "p124", texto: "Me desquito con las personas de manera muy discreta o sutil en lugar de mostrar mi enojo directamente.", esquema: "sb" },
+    { id: "p125", texto: "Iría mucho más lejos de lo que muchas personas van con tal de evitar confrontaciones.", esquema: "sb" },
+    { id: "p126", texto: "Antepongo las necesidades de los demás ante las mías, si no, me siento culpable.", esquema: "ss" },
+    { id: "p127", texto: "Me siento culpable cuando defraudo o decepciono a la gente.", esquema: "ss" },
+    { id: "p128", texto: "Le doy a los demás más de lo que yo obtengo a cambio de ellos.", esquema: "ss" },
+    { id: "p129", texto: "Soy quien usualmente termina cuidando de la gente cercana a mí.", esquema: "ss" },
+    { id: "p130", texto: "Soy capaz de hacer casi cualquier cosa por una persona que yo amara.", esquema: "ss" },
+    { id: "p131", texto: "Soy una buena persona porque pienso en los demás más de lo que pienso en mí mismo(a).", esquema: "ss" },
+    { id: "p132", texto: "En el trabajo, usualmente soy yo quien se ofrece a hacer tareas adicionales o tiempo extra.", esquema: "ss" },
+    { id: "p133", texto: "No importa qué tan ocupado(a) esté, siempre puedo encontrar tiempo para otros.", esquema: "ss" },
+    { id: "p134", texto: "Me las puedo arreglar con poco porque mis necesidades son mínimas.", esquema: "ss" },
+    { id: "p135", texto: "Sólo soy feliz cuando los que están a mi alrededor son felices.", esquema: "ss" },
+    { id: "p136", texto: "Tengo poco tiempo para mí porque me encuentro muy ocupado(a) haciendo cosas por la gente que quiero.", esquema: "ss" },
+    { id: "p137", texto: "Siempre he sido quien escucha los problemas de los demás.", esquema: "ss" },
+    { id: "p138", texto: "Me siento más cómodo(a) dando regalos que recibiéndolos.", esquema: "ss" },
+    { id: "p139", texto: "Las personas perciben que hago demasiado por los demás y no lo suficiente por mí.", esquema: "ss" },
+    { id: "p140", texto: "No importa qué tanto dé, siento que nunca es suficiente.", esquema: "ss" },
+    { id: "p141", texto: "Si hago lo que quiero, me siento incómodo(a).", esquema: "ss" },
+    { id: "p142", texto: "Me es muy difícil pedirle a los demás que se ocupen de mis necesidades.", esquema: "ss" },
+    { id: "p143", texto: "Me preocupa perder el control de mis acciones.", esquema: "ei" },
+    { id: "p144", texto: "Me preocupa poder herir física o emocionalmente a alguien en forma seria si mi enojo se sale de control.", esquema: "ei" },
+    { id: "p145", texto: "Siento que debo controlar mis impulsos y mis emociones o algo malo podía pasar.", esquema: "ei" },
+    { id: "p146", texto: "Hay mucho enojo y resentimientos dentro de mí que no expreso.", esquema: "ei" },
+    { id: "p147", texto: "Soy demasiado consciente como para expresar a otros sentimientos positivos (por ejemplo: afecto, cuidado).", esquema: "ei" },
+    { id: "p148", texto: "Me avergüenza expresarle mis sentimientos a los demás.", esquema: "ei" },
+    { id: "p149", texto: "Me cuesta trabajo ser cálido(a) y espontáneo(a).", esquema: "ei" },
+    { id: "p150", texto: "Me controlo tanto que la gente piensa que soy insensible.", esquema: "ei" },
+    { id: "p151", texto: "La gente me percibe como una persona cerrada emocionalmente.", esquema: "ei" },
+    { id: "p152", texto: "Debo ser el/la mejor en todo lo que hago; no puedo aceptar segundos lugares.", esquema: "us" },
+    { id: "p153", texto: "Me esfuerzo para mantener todo en perfecto orden.", esquema: "us" },
+    { id: "p154", texto: "Debo lucir de lo mejor la mayoría de las veces.", esquema: "us" },
+    { id: "p155", texto: "Intento hacer mi máximo esfuerzo; no puedo conformarme con lo \"suficientemente bueno\".", esquema: "us" },
+    { id: "p156", texto: "Tengo tanto que lograr que realmente casi no hay tiempo para relajarse.", esquema: "us" },
+    { id: "p157", texto: "Casi nada de lo que hago es lo suficientemente bueno; siempre puedo hacerlo mejor.", esquema: "us" },
+    { id: "p158", texto: "Debo cumplir con todas mis responsabilidades.", esquema: "us" },
+    { id: "p159", texto: "Siento que hay una presión constante para que logre mis metas y realice mis cosas.", esquema: "us" },
+    { id: "p160", texto: "Mis relaciones se afectan porque yo me presiono demasiado.", esquema: "us" },
+    { id: "p161", texto: "Mi salud se está deteriorando porque me pongo bajo demasiada presión para hacer bien las cosas.", esquema: "us" },
+    { id: "p162", texto: "Frecuentemente sacrifico placer y felicidad para alcanzar mis propios estándares.", esquema: "us" },
+    { id: "p163", texto: "Cuando cometo un error, merezco que me critiquen fuertemente.", esquema: "us" },
+    { id: "p164", texto: "No puedo permitirme el hecho de justificar o formular excusas para escapar fácilmente de mis errores.", esquema: "us" },
+    { id: "p165", texto: "Soy una persona muy competitiva.", esquema: "us" },
+    { id: "p166", texto: "Le doy mucho énfasis al dinero y al estatus.", esquema: "us" },
+    { id: "p167", texto: "En términos de mi desempeño, siempre tengo que ser el/la número uno.", esquema: "us" },
+    { id: "p168", texto: "Tengo problemas para aceptar un \"no\" por respuesta cuando quiero algo de otras personas.", esquema: "et" },
+    { id: "p169", texto: "Con frecuencia me enojo o me irrito si no obtengo lo que quiero.", esquema: "et" },
+    { id: "p170", texto: "Soy especial y no tendría por qué aceptar las restricciones que tienen otras personas.", esquema: "et" },
+    { id: "p171", texto: "Odio ser limitado y que eviten que haga lo que quiera.", esquema: "et" },
+    { id: "p172", texto: "Siento que no tengo por qué seguir las reglas y convencionalismos normales que la demás gente sigue.", esquema: "et" },
+    { id: "p173", texto: "Siento que lo que yo tengo que ofrecer es de más valor que lo que tienen que ofrecer los demás.", esquema: "et" },
+    { id: "p174", texto: "Usualmente antepongo mis necesidades a las de los otros.", esquema: "et" },
+    { id: "p175", texto: "Frecuentemente me doy cuenta de que estoy tan envuelto(a) en mis prioridades que no tengo tiempo para atender a mis amigos o a mi familia.", esquema: "et" },
+    { id: "p176", texto: "La gente me dice con frecuencia que soy muy dominante y controlo la manera en cómo se hacen las cosas.", esquema: "et" },
+    { id: "p177", texto: "Me irrito mucho cuando la gente no hace lo que le pido.", esquema: "et" },
+    { id: "p178", texto: "No puedo tolerar que otras personas me digan qué hacer.", esquema: "et" },
+    { id: "p179", texto: "Tengo gran dificultad para dejar de beber, fumar, comer en exceso u otros comportamientos que son problemáticos.", esquema: "is" },
+    { id: "p180", texto: "No parezco poder disciplinarme para cumplir con tareas aburridas o rutinarias.", esquema: "is" },
+    { id: "p181", texto: "Frecuentemente me dejo llevar por impulsos y expreso emociones que me meten en problemas o hieren a otras personas.", esquema: "is" },
+    { id: "p182", texto: "Si no puedo alcanzar una meta, me frustro fácilmente y me doy por vencido(a).", esquema: "is" },
+    { id: "p183", texto: "Me es muy difícil sacrificar satisfacciones inmediatas para alcanzar una meta a largo plazo.", esquema: "is" },
+    { id: "p184", texto: "Frecuentemente sucede que, una vez que empiezo a sentirme enojado(a), ya no puedo controlarme.", esquema: "is" },
+    { id: "p185", texto: "Tiendo a exagerar las cosas aunque sé que es malo para mí.", esquema: "is" },
+    { id: "p186", texto: "Me aburro muy fácilmente.", esquema: "is" },
+    { id: "p187", texto: "Cuando las tareas se vuelven difíciles, es usual que no pueda perseverar hasta completarlas.", esquema: "is" },
+    { id: "p188", texto: "No me puedo concentrar en algo por mucho tiempo.", esquema: "is" },
+    { id: "p189", texto: "No puedo forzarme a hacer cosas que no disfruto, aun cuando sé que son por mi propio bien.", esquema: "is" },
+    { id: "p190", texto: "Pierdo la cordura ante la más mínima ofensa.", esquema: "is" },
+    { id: "p191", texto: "Raramente soy capaz de mantener mis decisiones.", esquema: "is" },
+    { id: "p192", texto: "Casi nunca puedo evitar mostrarle a la gente cómo me siento en realidad, no me importa el costo que esto pudiera tener.", esquema: "is" },
+    { id: "p193", texto: "Frecuentemente hago cosas impulsivamente y luego me arrepiento.", esquema: "is" },
+    { id: "p194", texto: "Es importante para mí caerle bien a casi todas las personas que conozco.", esquema: "as" },
+    { id: "p195", texto: "Cambio mi conducta en función de la persona con la que esté con el fin de caerle aún mejor.", esquema: "as" },
+    { id: "p196", texto: "Me esfuerzo mucho para adaptarme y estar a la altura de las situaciones.", esquema: "as" },
+    { id: "p197", texto: "Mi autoestima está basada mayormente en la manera en que otra gente me percibe.", esquema: "as" },
+    { id: "p198", texto: "Tener dinero y conocer gente importante me hace sentir que valgo la pena.", esquema: "as" },
+    { id: "p199", texto: "Invierto mucho tiempo en mi apariencia física para que la gente me valore.", esquema: "as" },
+    { id: "p200", texto: "Los logros son más valiosos para mí cuando otra gente los nota.", esquema: "as" },
+    { id: "p201", texto: "Estoy tan enfocado(a) en quedar bien con los demás que algunas veces no sé quién soy.", esquema: "as" },
+    { id: "p202", texto: "Encuentro difícil establecer mis propias metas sin tomar en cuenta cómo responderán los demás a mis decisiones.", esquema: "as" },
+    { id: "p203", texto: "Cuando miro hacia mis decisiones de vida, encuentro que tomé la mayoría de ellas teniendo en mente la aprobación de otras personas.", esquema: "as" },
+    { id: "p204", texto: "Aun cuando alguien no me cae bien, quiero parecerle agradable.", esquema: "as" },
+    { id: "p205", texto: "Me siento menos importante a menos de que obtenga mucha atención de parte de los demás.", esquema: "as" },
+    { id: "p206", texto: "Si hago comentarios en una junta o me presento en una reunión, busco el reconocimiento y la admiración.", esquema: "as" },
+    { id: "p207", texto: "Recibir muchos elogios y cumplidos me hacen sentir como una persona que vale la pena.", esquema: "as" },
+    { id: "p208", texto: "Aún cuando las cosas parecen ir bien, siento que es sólo temporalmente.", esquema: "np" },
+    { id: "p209", texto: "Si algo bueno pasa, me preocupa que algo malo suceda después.", esquema: "np" },
+    { id: "p210", texto: "No puedes ser demasiado cuidadoso(a); algo, casi siempre, va a salir mal.", esquema: "np" },
+    { id: "p211", texto: "No importa qué tan duro trabaje, me preocupa perder el control de mis finanzas.", esquema: "np" },
+    { id: "p212", texto: "Me preocupa que una mala decisión pueda llevarme a un desastre.", esquema: "np" },
+    { id: "p213", texto: "Frecuentemente me obsesiono con decisiones menores porque las consecuencias de cometer un error, parecen muy serias.", esquema: "np" },
+    { id: "p214", texto: "Me siento mejor asumiendo que las cosas no resultarán para mí; de esta manera, no me siento decepcionado(a) si las cosas salen mal.", esquema: "np" },
+    { id: "p215", texto: "Me enfoco más en los aspectos y eventos negativos de la vida que en los positivos.", esquema: "np" },
+    { id: "p216", texto: "Tiendo a ser pesimista.", esquema: "np" },
+    { id: "p217", texto: "La gente cercana a mí me considera un(a) preocupón(a).", esquema: "np" },
+    { id: "p218", texto: "Si la gente se entusiasma demasiado con algo, me siento incómodo y quiero advertirles lo que podría salir mal.", esquema: "np" },
+    { id: "p219", texto: "Si cometo un error, merezco que me castiguen.", esquema: "pu" },
+    { id: "p220", texto: "Si no hago mi mayor esfuerzo, debo salir perdiendo.", esquema: "pu" },
+    { id: "p221", texto: "No hay excusas si cometo un error.", esquema: "pu" },
+    { id: "p222", texto: "La gente que no da su mayor esfuerzo debe ser castigada de alguna manera.", esquema: "pu" },
+    { id: "p223", texto: "Por lo general, no acepto las excusas de los demás, simplemente porque ellos no están dispuestos a aceptar responsabilidades y pagar las consecuencias.", esquema: "pu" },
+    { id: "p224", texto: "Si no hago el trabajo, debo sufrir las consecuencias.", esquema: "pu" },
+    { id: "p225", texto: "Frecuentemente pienso acerca de los errores que he cometido y me siento enojado(a) conmigo mismo(a).", esquema: "pu" },
+    { id: "p226", texto: "Cuando la gente hace algo malo tengo problemas aplicando la frase \"perdona y olvida\".", esquema: "pu" },
+    { id: "p227", texto: "Mantengo rencores aun después de que alguien se ha disculpado.", esquema: "pu" },
+    { id: "p228", texto: "Me molesto cuando pienso que alguien se ha quitado de problemas demasiado fácil.", esquema: "pu" },
+    { id: "p229", texto: "Me enojo cuando las personas se disculpan a sí mismas o cuando culpan a otras personas de sus problemas.", esquema: "pu" },
+    { id: "p230", texto: "No importa el por qué cometo un error, ya que cuando hago algo mal debo sufrir las consecuencias.", esquema: "pu" },
+    { id: "p231", texto: "Me castigo mucho cuando echo a perder las cosas.", esquema: "pu" },
+    { id: "p232", texto: "Soy una mala persona que merece ser castigada.", esquema: "pu" }
+  ],
+  calificacion: {
+    tipo: "perfil_subescalas",
+    esquemas: [
+    { codigo: "ed", nombre: "Privación emocional", maximo: 54, baremos: { bajo: [0, 8], medio: [9, 18], alto: [19, 30], muy_alto: [31, 54] } },
+    { codigo: "ab", nombre: "Abandonamiento", maximo: 102, baremos: { bajo: [0, 12], medio: [13, 25], alto: [26, 39], muy_alto: [40, 102] } },
+    { codigo: "ma", nombre: "Desconfianza/Abuso", maximo: 102, baremos: { bajo: [0, 12], medio: [13, 25], alto: [26, 39], muy_alto: [40, 102] } },
+    { codigo: "si", nombre: "Aislamiento social", maximo: 60, baremos: { bajo: [0, 8], medio: [9, 18], alto: [19, 30], muy_alto: [31, 60] } },
+    { codigo: "ds", nombre: "Deficiencias", maximo: 90, baremos: { bajo: [0, 12], medio: [13, 25], alto: [26, 39], muy_alto: [40, 90] } },
+    { codigo: "fa", nombre: "Fracaso", maximo: 54, baremos: { bajo: [0, 8], medio: [9, 18], alto: [19, 30], muy_alto: [31, 54] } },
+    { codigo: "di", nombre: "Dependencia", maximo: 90, baremos: { bajo: [0, 12], medio: [13, 25], alto: [26, 39], muy_alto: [40, 90] } },
+    { codigo: "vu", nombre: "Vulnerabilidad", maximo: 72, baremos: { bajo: [0, 8], medio: [9, 18], alto: [19, 30], muy_alto: [31, 72] } },
+    { codigo: "eu", nombre: "Enredos", maximo: 66, baremos: { bajo: [0, 8], medio: [9, 18], alto: [19, 30], muy_alto: [31, 66] } },
+    { codigo: "sb", nombre: "Subyugación", maximo: 60, baremos: { bajo: [0, 8], medio: [9, 18], alto: [19, 30], muy_alto: [31, 60] } },
+    { codigo: "ss", nombre: "Auto sacrificio", maximo: 102, baremos: { bajo: [0, 12], medio: [13, 25], alto: [26, 39], muy_alto: [40, 102] } },
+    { codigo: "ei", nombre: "Inhibición emocional", maximo: 54, baremos: { bajo: [0, 8], medio: [9, 18], alto: [19, 30], muy_alto: [31, 54] } },
+    { codigo: "us", nombre: "Estándares inflexibles", maximo: 96, baremos: { bajo: [0, 12], medio: [13, 25], alto: [26, 39], muy_alto: [40, 96] } },
+    { codigo: "et", nombre: "Títulos/Derecho", maximo: 66, baremos: { bajo: [0, 8], medio: [9, 18], alto: [19, 30], muy_alto: [31, 66] } },
+    { codigo: "is", nombre: "Auto control insuficiente", maximo: 90, baremos: { bajo: [0, 12], medio: [13, 25], alto: [26, 39], muy_alto: [40, 90] } },
+    { codigo: "as", nombre: "Búsqueda de aprobación/reconocimiento", maximo: 84, baremos: { bajo: [0, 12], medio: [13, 25], alto: [26, 39], muy_alto: [40, 84] } },
+    { codigo: "np", nombre: "Negatividad/Pesimismo", maximo: 66, baremos: { bajo: [0, 8], medio: [9, 18], alto: [19, 30], muy_alto: [31, 66] } },
+    { codigo: "pu", nombre: "Castigo", maximo: 84, baremos: { bajo: [0, 12], medio: [13, 25], alto: [26, 39], muy_alto: [40, 84] } }
+    ],
+    niveles_orden: ["bajo", "medio", "alto", "muy_alto"],
+    niveles_etiquetas: {
+      bajo: "Bajo",
+      medio: "Medio",
+      alto: "Alto",
+      muy_alto: "Muy alto"
+    }
+  }
+};
+
+const OPCIONES_ASRS = [
+  { texto: "Nunca", valor: 1 },
+  { texto: "Raramente", valor: 2 },
+  { texto: "Algunas veces", valor: 3 },
+  { texto: "A menudo", valor: 4 },
+  { texto: "Muy a menudo", valor: 5 }
+];
+
+const ESCALA_ASRS = {
+  id: "asrs",
+  nombre: "ASRS-v1.1 · Escala de Autoinforme para TDAH en Adultos",
+  descripcion: "Por favor, responda las siguientes preguntas evaluándose a sí mismo según cada uno de los criterios que se muestran. A medida que conteste cada pregunta, marque la opción que mejor describa cómo se ha sentido y cómo se ha comportado durante los últimos 6 meses.",
+  opciones_respuesta: OPCIONES_ASRS,
+  preguntas: [
+    { id: "p1", texto: "¿Con qué frecuencia tiene dificultades para terminar los detalles finales de un proyecto, una vez que ya ha completado las partes más difíciles?", parte: "parteA", sombreado_desde: 3 },
+    { id: "p2", texto: "¿Con qué frecuencia tiene dificultad para poner las cosas en orden cuando debe realizar una tarea que requiere organización?", parte: "parteA", sombreado_desde: 3 },
+    { id: "p3", texto: "¿Con qué frecuencia tiene problemas para recordar citas u obligaciones?", parte: "parteA", sombreado_desde: 3 },
+    { id: "p4", texto: "Cuando tiene una tarea que requiere mucho esfuerzo mental, ¿con qué frecuencia la evita o retrasa comenzarla?", parte: "parteA", sombreado_desde: 4 },
+    { id: "p5", texto: "¿Con qué frecuencia se mueve o se inquieta con las manos o los pies cuando tiene que permanecer sentado durante mucho tiempo?", parte: "parteA", sombreado_desde: 3 },
+    { id: "p6", texto: "¿Con qué frecuencia se siente excesivamente activo y con la necesidad de hacer cosas, como si estuviera \"impulsado por un motor\"?", parte: "parteA", sombreado_desde: 3 },
+    { id: "p7", texto: "¿Con qué frecuencia comete errores por descuido cuando tiene que trabajar en un proyecto aburrido o difícil?", parte: "parteB", sombreado_desde: 3 },
+    { id: "p8", texto: "¿Con qué frecuencia tiene dificultad para mantener la atención cuando realiza un trabajo aburrido o repetitivo?", parte: "parteB", sombreado_desde: 3 },
+    { id: "p9", texto: "¿Con qué frecuencia tiene dificultad para concentrarse en lo que las personas le dicen, incluso cuando le están hablando directamente?", parte: "parteB", sombreado_desde: 3 },
+    { id: "p10", texto: "¿Con qué frecuencia pierde cosas o tiene dificultad para encontrarlas en casa o en el trabajo?", parte: "parteB", sombreado_desde: 4 },
+    { id: "p11", texto: "¿Con qué frecuencia se distrae por la actividad o el ruido que hay a su alrededor?", parte: "parteB", sombreado_desde: 4 },
+    { id: "p12", texto: "¿Con qué frecuencia se levanta de su asiento en reuniones u otras situaciones en las que se espera que permanezca sentado?", parte: "parteB", sombreado_desde: 3 },
+    { id: "p13", texto: "¿Con qué frecuencia se siente inquieto o nervioso?", parte: "parteB", sombreado_desde: 4 },
+    { id: "p14", texto: "¿Con qué frecuencia tiene dificultad para relajarse y descansar cuando dispone de tiempo para sí mismo?", parte: "parteB", sombreado_desde: 3 },
+    { id: "p15", texto: "¿Con qué frecuencia se encuentra hablando demasiado cuando está en situaciones sociales?", parte: "parteB", sombreado_desde: 4 },
+    { id: "p16", texto: "Cuando está en una conversación, ¿con qué frecuencia se sorprende terminando las frases de las personas con las que habla antes de que ellas mismas las terminen?", parte: "parteB", sombreado_desde: 3 },
+    { id: "p17", texto: "¿Con qué frecuencia tiene dificultad para esperar su turno en situaciones en las que se requiere hacerlo?", parte: "parteB", sombreado_desde: 4 },
+    { id: "p18", texto: "¿Con qué frecuencia interrumpe a otras personas cuando están ocupadas?", parte: "parteB", sombreado_desde: 3 }
+  ],
+  calificacion: {
+    tipo: "cribado_casillas",
+    parte_a_ids: ["p1","p2","p3","p4","p5","p6"],
+    parte_b_ids: ["p7","p8","p9","p10","p11","p12","p13","p14","p15","p16","p17","p18"],
+    umbral_positivo_parte_a: 4,
+    nota: "El ASRS-v1.1 es un instrumento de cribado, no diagnóstico. Un resultado positivo en la Parte A sugiere que se justifica una evaluación clínica más profunda; no constituye por sí mismo un diagnóstico de TDAH."
+  }
+};
+
+const OPCIONES_ITQ = [
+  { texto: "Nada", valor: 0 },
+  { texto: "Poco", valor: 1 },
+  { texto: "Moderadamente", valor: 2 },
+  { texto: "Mucho", valor: 3 },
+  { texto: "Extremadamente", valor: 4 }
+];
+
+const ESCALA_ITQ = {
+  id: "itq",
+  nombre: "ITQ · Cuestionario Internacional de Trauma",
+  descripcion: "A continuación se presenta una serie de problemas que las personas a veces informan en respuesta a eventos traumáticos o estresantes de la vida. Por favor, lea atentamente cada pregunta e indique cuánto le ha molestado ese problema durante el último mes, o cuán cierto es para usted, según corresponda.",
+  opciones_respuesta: OPCIONES_ITQ,
+  preguntas: [
+    { id: "p1", texto: "Tener sueños perturbadores que reproducen parte de la experiencia o están claramente relacionados con la experiencia.", grupo: "Re", seccion: "sintomas_tept" },
+    { id: "p2", texto: "Tener imágenes o recuerdos intensos que a veces vienen a su mente, en los cuales siente que la experiencia está ocurriendo de nuevo aquí y ahora.", grupo: "Re", seccion: "sintomas_tept" },
+    { id: "p3", texto: "Evitar pensamientos, sentimientos, sensaciones físicas u otros estímulos internos que le recuerden la experiencia.", grupo: "Ev", seccion: "sintomas_tept" },
+    { id: "p4", texto: "Evitar personas, lugares, conversaciones, objetos, actividades, situaciones u otros estímulos externos que le recuerden la experiencia.", grupo: "Ev", seccion: "sintomas_tept" },
+    { id: "p5", texto: "Estar \"súper alerta\", vigilante o en guardia.", grupo: "Am", seccion: "sintomas_tept" },
+    { id: "p6", texto: "Sentirse sobresaltado/a o asustarse fácilmente.", grupo: "Am", seccion: "sintomas_tept" },
+    { id: "p7", texto: "¿Han afectado sus relaciones interpersonales o su vida social?", grupo: "TEPT-DF", seccion: "impacto_tept" },
+    { id: "p8", texto: "¿Han afectado su trabajo o su capacidad para trabajar?", grupo: "TEPT-DF", seccion: "impacto_tept" },
+    { id: "p9", texto: "¿Han afectado otras áreas importantes de su vida, como la crianza de sus hijos o hijas, su desempeño en la escuela o en la universidad, u otras actividades importantes?", grupo: "TEPT-DF", seccion: "impacto_tept" },
+    { id: "c1", texto: "Cuando estoy molesto/a, tardo bastante tiempo en calmarme.", grupo: "Da", seccion: "sintomas_aao" },
+    { id: "c2", texto: "Me siento desconectado/a emocionalmente o emocionalmente apagado/a.", grupo: "Da", seccion: "sintomas_aao" },
+    { id: "c3", texto: "Me siento como un/a fracasado/a.", grupo: "An", seccion: "sintomas_aao" },
+    { id: "c4", texto: "Siento que no valgo nada.", grupo: "An", seccion: "sintomas_aao" },
+    { id: "c5", texto: "Me siento distante o alejado/a de las personas.", grupo: "Ar", seccion: "sintomas_aao" },
+    { id: "c6", texto: "Me resulta difícil estar emocionalmente cercano/a a la gente.", grupo: "Ar", seccion: "sintomas_aao" },
+    { id: "c7", texto: "¿Han generado preocupación o malestar sobre sus relaciones o su vida social?", grupo: "DFAAO", seccion: "impacto_aao" },
+    { id: "c8", texto: "¿Han afectado su trabajo o su capacidad para trabajar?", grupo: "DFAAO", seccion: "impacto_aao" },
+    { id: "c9", texto: "¿Han afectado otras áreas importantes de su vida, como la crianza de sus hijos o hijas, su desempeño en la escuela o en la universidad, u otras actividades importantes?", grupo: "DFAAO", seccion: "impacto_aao" }
+  ],
+  calificacion: {
+    tipo: "algoritmo_itq",
+    umbral_presente: 2,
+    subescalas: [
+      { codigo: "Re", nombre: "Re-experimentación en el aquí y el ahora", items: ["p1","p2"], cluster: "TEPT" },
+      { codigo: "Ev", nombre: "Evitación", items: ["p3","p4"], cluster: "TEPT" },
+      { codigo: "Am", nombre: "Sensación actual de amenaza", items: ["p5","p6"], cluster: "TEPT" },
+      { codigo: "Da", nombre: "Desregulación afectiva", items: ["c1","c2"], cluster: "AAO" },
+      { codigo: "An", nombre: "Autoconcepto negativo", items: ["c3","c4"], cluster: "AAO" },
+      { codigo: "Ar", nombre: "Alteraciones en las relaciones", items: ["c5","c6"], cluster: "AAO" }
+    ],
+    deterioro_funcional: [
+      { codigo: "TEPT-DF", nombre: "Deterioro funcional asociado a TEPT", items: ["p7","p8","p9"] },
+      { codigo: "DFAAO", nombre: "Deterioro funcional asociado a Alteraciones en la Auto-Organización", items: ["c7","c8","c9"] }
+    ],
+    nota: "El ITQ es un instrumento de cribado basado en criterios CIE-11. El resultado categórico (TEPT / TEPTC) orienta la evaluación clínica, pero el diagnóstico definitivo requiere valoración profesional integral."
+  }
+};
+
+async function cargarEscalas(){
+  const btn = document.getElementById("btn-cargar");
+  const log = document.getElementById("log");
+  btn.disabled = true;
+  log.textContent = "Cargando...\n";
+
+  try{
+    await db.collection("escalas_virtuales").doc("phq9").set(ESCALA_PHQ9);
+    log.textContent += "✔ PHQ-9 guardado correctamente.\n";
+
+    await db.collection("escalas_virtuales").doc("gad7").set(ESCALA_GAD7);
+    log.textContent += "✔ GAD-7 guardado correctamente.\n";
+
+    await db.collection("escalas_virtuales").doc("ysql3").set(ESCALA_YSQL3);
+    log.textContent += "✔ YSQ-L3 guardado correctamente (232 ítems, 18 esquemas).\n";
+
+    await db.collection("escalas_virtuales").doc("asrs").set(ESCALA_ASRS);
+    log.textContent += "✔ ASRS-v1.1 guardado correctamente (18 ítems, cribado por casillas).\n";
+
+    await db.collection("escalas_virtuales").doc("itq").set(ESCALA_ITQ);
+    log.textContent += "✔ ITQ guardado correctamente (18 ítems, algoritmo TEPT/TEPTC).\n";
+
+    log.textContent += "\nListo. Ya puedes generar links de test virtual para PHQ-9, GAD-7, YSQ-L3, ASRS-v1.1 e ITQ.";
+  }catch(e){
+    log.textContent += "\n✖ Error: " + e.message;
+    console.error(e);
+  }finally{
+    btn.disabled = false;
+  }
+}
+</script>
+
+</body>
+</html>

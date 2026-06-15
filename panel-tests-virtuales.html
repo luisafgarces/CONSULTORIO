@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tests virtuales — Suite Clínica</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
+<style>
+  :root{
+    --bg: #fadae1;
+    --soft: #fdf2f5;
+    --text: #643000;
+    --strong: #a0536a;
+    --border: #cd8e9d;
+    --accent-grad: linear-gradient(135deg,#a0536a,#cd8e9d);
+  }
+  *{ box-sizing:border-box; }
+  body{
+    margin:0; font-family:'Lato',sans-serif; background:var(--soft); color:var(--text);
+    padding:24px 16px 60px; display:flex; flex-direction:column; align-items:center;
+  }
+  .titulo{
+    font-family:'Playfair Display',serif; font-size:1.3rem; color:var(--text);
+    margin-bottom:18px; text-align:center;
+  }
+  .card{
+    background:#fff; border:1.5px solid var(--bg); border-radius:16px;
+    padding:22px; max-width:560px; width:100%;
+    box-shadow:0 4px 20px rgba(160,83,106,0.10); margin-bottom:18px;
+  }
+  .card h2{
+    font-family:'Playfair Display',serif; font-size:1.05rem; margin:0 0 14px; color:var(--text);
+  }
+  label{ font-size:0.82rem; color:var(--strong); display:block; margin-bottom:5px; font-weight:600; }
+  input, select{
+    width:100%; padding:10px 12px; border:1.5px solid var(--bg); border-radius:10px;
+    font-size:0.92rem; font-family:'Lato',sans-serif; margin-bottom:14px; color:var(--text);
+  }
+  button{
+    width:100%; padding:13px; border:none; border-radius:24px; background:var(--accent-grad);
+    color:#fff; font-size:0.95rem; font-weight:700; font-family:'Lato',sans-serif; cursor:pointer;
+  }
+  button:disabled{ opacity:0.5; cursor:not-allowed; }
+  .resultado-link{
+    margin-top:16px; padding:14px; background:var(--soft); border-radius:10px;
+    font-size:0.85rem; word-break:break-all; display:none;
+  }
+  .resultado-link a{ color:var(--strong); font-weight:700; }
+  .copiar-btn{
+    margin-top:8px; background:transparent; color:var(--strong);
+    border:1.5px solid var(--border); border-radius:20px; padding:8px 16px; font-size:0.82rem;
+  }
+  table{ width:100%; border-collapse:collapse; font-size:0.82rem; }
+  th, td{ text-align:left; padding:8px 6px; border-bottom:1px solid var(--soft); }
+  th{ color:var(--strong); font-weight:700; }
+  .badge{
+    display:inline-block; padding:2px 9px; border-radius:10px; font-size:0.72rem; font-weight:700;
+  }
+  .badge.pendiente{ background:#fadae1; color:var(--strong); }
+  .badge.completado{ background:#dff0d8; color:#2e7d32; }
+  .vacio{ font-size:0.85rem; color:var(--border); text-align:center; padding:14px 0; }
+  .alerta-item{ color:#c0392b; font-weight:700; }
+
+  details{ margin-top:6px; }
+  details summary{
+    cursor:pointer; color:var(--strong); font-weight:700; font-size:0.78rem;
+    padding:4px 0;
+  }
+  .detalle-tabla{ width:100%; margin-top:6px; font-size:0.76rem; }
+  .detalle-tabla th, .detalle-tabla td{ padding:4px 5px; border-bottom:1px solid var(--soft); }
+  .detalle-texto{ font-size:0.78rem; margin-top:6px; }
+  .detalle-nota{ font-size:0.72rem; color:var(--border); margin-top:6px; line-height:1.4; }
+</style>
+</head>
+<body>
+
+<div class="titulo">Tests virtuales — Suite Clínica</div>
+
+<!-- Generar nuevo test -->
+<div class="card">
+  <h2>Enviar un test nuevo</h2>
+  <label for="sel-escala">Escala</label>
+  <select id="sel-escala">
+    <option value="phq9">PHQ-9 (Depresión)</option>
+    <option value="gad7">GAD-7 (Ansiedad)</option>
+    <option value="ysql3">YSQ-L3 (Esquemas de Young)</option>
+    <option value="asrs">ASRS-v1.1 (Cribado TDAH adultos)</option>
+    <option value="itq">ITQ (Trauma — TEPT / TEPTC)</option>
+  </select>
+
+  <label for="input-paciente">Nombre del paciente</label>
+  <input type="text" id="input-paciente" placeholder="Ej: Juan Pérez">
+
+  <button id="btn-generar" onclick="generarLink()">Generar link</button>
+
+  <div class="resultado-link" id="resultado-link">
+    <div>Link generado:</div>
+    <a id="link-generado" target="_blank" rel="noopener"></a>
+    <br>
+    <button class="copiar-btn" onclick="copiarLink()">📋 Copiar link</button>
+  </div>
+</div>
+
+<!-- Lista de asignaciones -->
+<div class="card">
+  <h2>Tests enviados</h2>
+  <div id="lista-tests">
+    <div class="vacio">Cargando...</div>
+  </div>
+</div>
+
+
+<script>
+// Config Firebase del proyecto SEPARADO "consultorio-tests"
+// (no es el mismo proyecto que usa Suite Clínica para historias clínicas)
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyBKJbaH47eQdUunHzFApw_bupa7Mlh6K98",
+  authDomain: "consultorio-tests.firebaseapp.com",
+  projectId: "consultorio-tests",
+  storageBucket: "consultorio-tests.firebasestorage.app",
+  messagingSenderId: "834442182774",
+  appId: "1:834442182774:web:a50504b59d185db99a1f57"
+};
+
+firebase.initializeApp(FIREBASE_CONFIG);
+const db = firebase.firestore();
+
+// URL base donde está alojado test-virtual.html.
+// Ajusta esta ruta si tu archivo queda en otra carpeta dentro del repo.
+const BASE_URL = "https://luisafgarces.github.io/CONSULTORIO/test-virtual.html";
+
+
+async function generarLink(){
+  const escalaId = document.getElementById("sel-escala").value;
+  const pacienteNombre = document.getElementById("input-paciente").value.trim();
+  const btn = document.getElementById("btn-generar");
+
+  if (!pacienteNombre){
+    alert("Escribe el nombre del paciente.");
+    return;
+  }
+
+  btn.disabled = true;
+  btn.textContent = "Generando...";
+
+  try{
+    const codigo = crypto.randomUUID();
+
+    await db.collection("asignaciones_test").doc(codigo).set({
+      escala_id: escalaId,
+      paciente_nombre: pacienteNombre,
+      fecha_creacion: new Date().toISOString(),
+      estado: "pendiente",
+      respuestas: null,
+      puntaje_total: null,
+      interpretacion: null,
+      alertas_activadas: [],
+      fecha_completado: null
+    });
+
+    const link = `${BASE_URL}?codigo=${codigo}`;
+
+    const linkEl = document.getElementById("link-generado");
+    linkEl.href = link;
+    linkEl.textContent = link;
+    document.getElementById("resultado-link").style.display = "block";
+
+    document.getElementById("input-paciente").value = "";
+    cargarLista();
+  }catch(e){
+    console.error(e);
+    alert("Hubo un error generando el link. Revisa la consola.");
+  }finally{
+    btn.disabled = false;
+    btn.textContent = "Generar link";
+  }
+}
+
+function copiarLink(){
+  const link = document.getElementById("link-generado").textContent;
+  navigator.clipboard.writeText(link).then(() => {
+    alert("Link copiado ✔");
+  });
+}
+
+
+async function cargarLista(){
+  const cont = document.getElementById("lista-tests");
+  cont.innerHTML = '<div class="vacio">Cargando...</div>';
+
+  try{
+    const snapshot = await db.collection("asignaciones_test")
+      .orderBy("fecha_creacion", "desc")
+      .limit(30)
+      .get();
+
+    if (snapshot.empty){
+      cont.innerHTML = '<div class="vacio">Aún no has enviado ningún test.</div>';
+      return;
+    }
+
+    let html = '<table><tr><th>Paciente</th><th>Escala</th><th>Estado</th><th>Resultado</th></tr>';
+
+    snapshot.forEach(doc => {
+      const d = doc.data();
+      const fecha = d.fecha_creacion ? new Date(d.fecha_creacion).toLocaleDateString('es-CO') : '';
+      const escalaNombre = (d.escala_id || '').toUpperCase();
+
+      let resultado = '—';
+      if (d.estado === 'completado'){
+        const det = d.detalle || null;
+
+        if (det && det.perfil){
+          // YSQ-L3: tabla completa de esquemas en <details>
+          resultado = escapeHtml(d.interpretacion || '');
+          let filas = det.perfil.map(e => `
+            <tr>
+              <td>${escapeHtml(e.nombre)} (${escapeHtml(e.codigo)})</td>
+              <td>${e.puntaje} / ${e.maximo}</td>
+              <td>${escapeHtml(e.nivel_etiqueta || '—')}</td>
+            </tr>`).join('');
+          resultado += `
+            <details>
+              <summary>Ver perfil completo (18 esquemas)</summary>
+              <table class="detalle-tabla">
+                <tr><th>Esquema</th><th>Puntaje</th><th>Nivel</th></tr>
+                ${filas}
+              </table>
+            </details>`;
+
+        } else if (det && det.parte_a_total !== undefined){
+          // ASRS-v1.1: cribado por casillas
+          resultado = escapeHtml(d.interpretacion || '');
+          if (det.parte_b_sombreados && det.parte_b_sombreados.length){
+            resultado += `
+              <details>
+                <summary>Ver Parte B (informativa)</summary>
+                <div class="detalle-texto">Ítems en casilla sombreada: ${det.parte_b_sombreados.map(escapeHtml).join(', ')}</div>
+              </details>`;
+          }
+          if (det.nota){
+            resultado += `<div class="detalle-nota">${escapeHtml(det.nota)}</div>`;
+          }
+
+        } else if (det && det.resultado_categorico){
+          // ITQ: algoritmo TEPT/TEPTC
+          resultado = escapeHtml(d.interpretacion || '');
+          let filasSub = det.subescalas.map(s => `
+            <tr>
+              <td>${escapeHtml(s.nombre)} (${escapeHtml(s.codigo)})</td>
+              <td>${s.puntaje} / 8</td>
+              <td>${s.presente ? 'Presente' : 'No presente'}</td>
+            </tr>`).join('');
+          let filasDet = det.deterioro_funcional.map(dd => `
+            <tr>
+              <td>${escapeHtml(dd.nombre)}</td>
+              <td colspan="2">${dd.presente ? 'Presente' : 'No presente'}</td>
+            </tr>`).join('');
+          resultado += `
+            <details>
+              <summary>Ver detalle (subescalas y deterioro funcional)</summary>
+              <table class="detalle-tabla">
+                <tr><th>Subescala</th><th>Puntaje</th><th>Estado</th></tr>
+                ${filasSub}
+                ${filasDet}
+              </table>
+            </details>`;
+          if (det.nota){
+            resultado += `<div class="detalle-nota">${escapeHtml(det.nota)}</div>`;
+          }
+
+        } else {
+          // suma_simple (PHQ-9, GAD-7)
+          resultado = `${d.puntaje_total} · ${escapeHtml(d.interpretacion || '')}`;
+        }
+
+        if (d.alertas_activadas && d.alertas_activadas.length){
+          resultado += `<br><span class="alerta-item">⚠ ${d.alertas_activadas.map(escapeHtml).join(' / ')}</span>`;
+        }
+      }
+
+      html += `<tr>
+        <td>${escapeHtml(d.paciente_nombre || '')}<br><small style="color:var(--border)">${fecha}</small></td>
+        <td>${escapeHtml(escalaNombre)}</td>
+        <td><span class="badge ${d.estado}">${d.estado === 'completado' ? 'Completado' : 'Pendiente'}</span></td>
+        <td>${resultado}</td>
+      </tr>`;
+    });
+
+    html += '</table>';
+    cont.innerHTML = html;
+  }catch(e){
+    console.error(e);
+    cont.innerHTML = '<div class="vacio">Error cargando la lista. Revisa la consola.</div>';
+  }
+}
+
+function escapeHtml(s){
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+cargarLista();
+</script>
+
+</body>
+</html>
