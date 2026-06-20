@@ -150,6 +150,7 @@ const DB = {
     <button class="nav-btn" onclick="goPage('documentos');cerrarSidebarMobile()"><span class="icon">📄</span><span class="nav-label"> Documentos</span></button>
 
     <button class="nav-btn" onclick="goPage('herramientas');cerrarSidebarMobile()"><span class="icon">🔧</span><span class="nav-label"> Herramientas TCC</span></button>
+    <button class="nav-btn" onclick="goPage('psicoeducacion');cerrarSidebarMobile()"><span class="icon">📚</span><span class="nav-label"> Psicoeducación</span></button>
     <button class="nav-btn" onclick="goPage('cumpleanos');cerrarSidebarMobile()"><span class="icon">🎂</span><span class="nav-label"> Cumpleaños</span></button>
     <div class="nav-section">Reportes</div>
     <button class="nav-btn" onclick="goPage('informe-global');cerrarSidebarMobile()"><span class="icon">📊</span><span class="nav-label"> Informe Global</span></button>
@@ -1599,7 +1600,73 @@ const DB = {
 </div>
 
 
-<!-- ========== CUMPLEAÑOS ========== -->
+<!-- ========== PSICOEDUCACIÓN ========== -->
+<div class="page" id="page-psicoeducacion">
+  <div class="page-header">
+    <h1>Psicoeducación 📚</h1>
+    <p>Construye tu propia biblioteca de material psicoeducativo y envíalo personalizado a tus pacientes</p>
+  </div>
+
+  <!-- VISTA: BIBLIOTECA -->
+  <div id="psi-vista-biblioteca">
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:18px">
+      <button class="btn primary" onclick="psiAbrirEditor()">+ Nueva pieza de psicoeducación</button>
+      <select id="psi-filtro-categoria" onchange="psiRenderBiblioteca()" style="max-width:240px">
+        <option value="">Todas las categorías</option>
+      </select>
+    </div>
+    <div id="psi-biblioteca-lista"></div>
+  </div>
+
+  <!-- VISTA: EDITOR -->
+  <div id="psi-vista-editor" style="display:none">
+    <div class="card">
+      <div class="sec-title" id="psi-editor-titulo">Nueva pieza de psicoeducación</div>
+      <div class="row col2">
+        <div class="fg">
+          <label class="lbl">Título</label>
+          <input type="text" id="psi-titulo" placeholder="Ej: ¿Qué es la ansiedad?">
+        </div>
+        <div class="fg">
+          <label class="lbl">Categoría</label>
+          <input type="text" id="psi-categoria" list="psi-categorias-existentes" placeholder="Ej: Ansiedad, Duelo, Sueño...">
+          <datalist id="psi-categorias-existentes"></datalist>
+        </div>
+      </div>
+      <div class="fg" style="margin-top:6px">
+        <label class="lbl">Contenido</label>
+        <textarea id="psi-contenido" style="min-height:320px" placeholder="Escribe aquí el contenido psicoeducativo. Puedes usar líneas en blanco para separar párrafos."></textarea>
+      </div>
+      <div class="btn-row" style="margin-top:14px">
+        <button class="btn" onclick="psiCancelarEditor()">Cancelar</button>
+        <button class="btn primary" onclick="psiGuardarPieza()">💾 Guardar en la biblioteca</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- VISTA: ENVIAR A PACIENTE -->
+  <div id="psi-vista-enviar" style="display:none">
+    <div class="card">
+      <div class="sec-title">📤 Enviar: <span id="psi-enviar-titulo-pieza"></span></div>
+      <div class="row col2">
+        <div class="fg">
+          <label class="lbl">Paciente (opcional)</label>
+          <select id="psi-enviar-pac"><option value="">— Genérico, sin nombre —</option></select>
+        </div>
+        <div class="fg">
+          <label class="lbl">Fecha a mostrar</label>
+          <input type="date" id="psi-enviar-fecha">
+        </div>
+      </div>
+      <div class="btn-row" style="margin-top:14px">
+        <button class="btn" onclick="psiCancelarEnviar()">Cancelar</button>
+        <button class="btn primary" onclick="psiGenerarDocumento()">📄 Generar documento</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+
 <div class="page" id="page-cumpleanos">
   <div class="page-header">
     <h1>Cumpleaños 🎂</h1>
@@ -1754,7 +1821,7 @@ window.ROL_ACTUAL = null;
 // por sí solo más allá de lo que cada rol ya puede ver en su propia página).
 var PERMISOS_POR_ROL = {
   duena: null, // null = acceso a todo, sin restricción
-  psicologo: ['dashboard','pacientes','anamnesis','plan','sesiones','tests','seguimiento','agenda','documentos','herramientas','cumpleanos','informe-global'],
+  psicologo: ['dashboard','pacientes','anamnesis','plan','sesiones','tests','seguimiento','agenda','documentos','herramientas','psicoeducacion','cumpleanos','informe-global'],
   contador: ['dashboard','finanzas'],
   // Administrador entra a 'finanzas' SOLO para registrar pagos/gastos (ver
   // aplicarPermisosFinanzas, que oculta el resto de pestañas de esa página

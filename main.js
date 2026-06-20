@@ -278,6 +278,7 @@ function goPage(name){
     if(typeof aplicarPermisosFinanzas === 'function') aplicarPermisosFinanzas();
   }
   if(name==='documentos') renderDocumentos();
+  if(name==='psicoeducacion') psiInit();
   if(name==='usuarios') usrRenderLista();
   if(name==='informes') ilInit();
   if(name==='informe-global') igInit();
@@ -5812,4 +5813,226 @@ function usrReactivar(email){
   _firebaseDB.collection('usuarios_app').doc(email).update({ activo: true })
     .then(function(){ toast('Usuario reactivado ✅'); usrRenderLista(); })
     .catch(function(err){ console.error(err); toast('⚠️ No se pudo reactivar el usuario'); });
+}
+
+// ===================== PSICOEDUCACIÓN =====================
+// Biblioteca de material psicoeducativo construida por la psicóloga,
+// organizada por categorías. Cada pieza se guarda en
+// psicoeducacion_biblioteca y puede generarse como documento de marca
+// (logo, colores, firma) personalizado con nombre de paciente y fecha.
+
+var _psiEditandoId = null;
+var _psiPiezaParaEnviar = null;
+
+function psiGetBiblioteca(){ return DB.get('psicoeducacion_biblioteca') || []; }
+function psiGuardarBiblioteca(lista){ DB.set('psicoeducacion_biblioteca', lista); }
+
+function psiInit(){
+  document.getElementById('psi-vista-biblioteca').style.display = 'block';
+  document.getElementById('psi-vista-editor').style.display = 'none';
+  document.getElementById('psi-vista-enviar').style.display = 'none';
+  psiRenderBiblioteca();
+}
+
+// ---- Vista biblioteca: lista de categorías y piezas ---------------------
+function psiRenderBiblioteca(){
+  var lista = psiGetBiblioteca();
+  var cont = document.getElementById('psi-biblioteca-lista');
+  var filtroSel = document.getElementById('psi-filtro-categoria');
+
+  // Poblar el filtro de categorías sin perder la selección actual
+  var categorias = Array.from(new Set(lista.map(function(p){ return p.categoria || 'Sin categoría'; }))).sort();
+  var valorActual = filtroSel.value;
+  filtroSel.innerHTML = '<option value="">Todas las categorías</option>' +
+    categorias.map(function(c){ return '<option value="'+c.replace(/"/g,'&quot;')+'">'+c+'</option>'; }).join('');
+  filtroSel.value = categorias.indexOf(valorActual)!==-1 ? valorActual : '';
+
+  if(!lista.length){
+    cont.innerHTML = '<div class="card"><p style="font-size:.85rem;color:var(--border)">Aún no tienes piezas de psicoeducación. Crea la primera con el botón de arriba.</p></div>';
+    return;
+  }
+
+  var filtro = filtroSel.value;
+  var filtrada = filtro ? lista.filter(function(p){ return (p.categoria||'Sin categoría')===filtro; }) : lista;
+
+  // Agrupar por categoría para mostrarlas ordenadas
+  var grupos = {};
+  filtrada.forEach(function(p){
+    var cat = p.categoria || 'Sin categoría';
+    if(!grupos[cat]) grupos[cat] = [];
+    grupos[cat].push(p);
+  });
+
+  var html = '';
+  Object.keys(grupos).sort().forEach(function(cat){
+    html += '<div class="card" style="margin-bottom:14px">';
+    html += '<div class="sec-title" style="font-size:.95rem">📂 '+pscEsc(cat)+'</div>';
+    html += '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;margin-top:8px">';
+    grupos[cat].forEach(function(p){
+      var preview = (p.contenido||'').slice(0,90).replace(/\n/g,' ');
+      html += '<div style="background:var(--soft);border-left:4px solid var(--border);border-radius:0 12px 12px 0;padding:12px 16px">'
+        + '<div style="font-weight:700;font-size:.88rem;color:var(--text);margin-bottom:4px">'+pscEsc(p.titulo)+'</div>'
+        + '<div style="font-size:.78rem;color:var(--strong);line-height:1.5">'+pscEsc(preview)+(preview.length>=90?'…':'')+'</div>'
+        + '<div style="display:flex;gap:6px;justify-content:flex-end;margin-top:10px;flex-wrap:wrap">'
+        + '<button onclick="psiAbrirEditor(\''+p.id+'\')" style="background:#fdf5f7;color:#cd8e9d;border:1.5px solid #e8d0d6;border-radius:14px;padding:4px 12px;font-size:.72rem;cursor:pointer">✏️ Editar</button>'
+        + '<button onclick="psiAbrirEnviar(\''+p.id+'\')" style="background:#cd8e9d;color:#fff;border:none;border-radius:14px;padding:4px 12px;font-size:.72rem;cursor:pointer">📤 Enviar</button>'
+        + '<button onclick="psiEliminarPieza(\''+p.id+'\')" style="background:#ffeaea;color:#c0392b;border:1.5px solid #e8a0a0;border-radius:14px;padding:4px 12px;font-size:.72rem;cursor:pointer">🗑️</button>'
+        + '</div></div>';
+    });
+    html += '</div></div>';
+  });
+  cont.innerHTML = html;
+}
+
+function pscEsc(s){ if(!s) return ''; return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ---- Editor: crear o editar una pieza ------------------------------------
+function psiAbrirEditor(id){
+  _psiEditandoId = id || null;
+  document.getElementById('psi-vista-biblioteca').style.display = 'none';
+  document.getElementById('psi-vista-enviar').style.display = 'none';
+  document.getElementById('psi-vista-editor').style.display = 'block';
+
+  // Poblar el datalist de categorías existentes para autocompletar
+  var categorias = Array.from(new Set(psiGetBiblioteca().map(function(p){ return p.categoria; }).filter(Boolean)));
+  document.getElementById('psi-categorias-existentes').innerHTML =
+    categorias.map(function(c){ return '<option value="'+c.replace(/"/g,'&quot;')+'">'; }).join('');
+
+  if(id){
+    var pieza = psiGetBiblioteca().find(function(p){ return p.id===id; });
+    if(!pieza){ toast('Pieza no encontrada'); psiCancelarEditor(); return; }
+    document.getElementById('psi-editor-titulo').textContent = 'Editar pieza de psicoeducación';
+    document.getElementById('psi-titulo').value = pieza.titulo||'';
+    document.getElementById('psi-categoria').value = pieza.categoria||'';
+    document.getElementById('psi-contenido').value = pieza.contenido||'';
+  } else {
+    document.getElementById('psi-editor-titulo').textContent = 'Nueva pieza de psicoeducación';
+    document.getElementById('psi-titulo').value = '';
+    document.getElementById('psi-categoria').value = '';
+    document.getElementById('psi-contenido').value = '';
+  }
+}
+
+function psiCancelarEditor(){
+  _psiEditandoId = null;
+  document.getElementById('psi-vista-editor').style.display = 'none';
+  document.getElementById('psi-vista-biblioteca').style.display = 'block';
+  psiRenderBiblioteca();
+}
+
+function psiGuardarPieza(){
+  var titulo = document.getElementById('psi-titulo').value.trim();
+  var categoria = document.getElementById('psi-categoria').value.trim();
+  var contenido = document.getElementById('psi-contenido').value.trim();
+  if(!titulo){ toast('Ingresa un título'); return; }
+  if(!contenido){ toast('Ingresa el contenido'); return; }
+
+  var lista = psiGetBiblioteca();
+  if(_psiEditandoId){
+    var idx = lista.findIndex(function(p){ return p.id===_psiEditandoId; });
+    if(idx>=0){
+      lista[idx].titulo = titulo;
+      lista[idx].categoria = categoria;
+      lista[idx].contenido = contenido;
+      lista[idx].actualizado = new Date().toISOString();
+    }
+  } else {
+    lista.push({
+      id: genId(),
+      titulo: titulo,
+      categoria: categoria,
+      contenido: contenido,
+      creado: new Date().toISOString()
+    });
+  }
+  psiGuardarBiblioteca(lista);
+  toast('💾 Guardado en la biblioteca');
+  psiCancelarEditor();
+}
+
+function psiEliminarPieza(id){
+  if(!confirm('¿Eliminar esta pieza de psicoeducación? Esta acción no se puede deshacer.')) return;
+  var lista = psiGetBiblioteca().filter(function(p){ return p.id!==id; });
+  psiGuardarBiblioteca(lista);
+  toast('Eliminado');
+  psiRenderBiblioteca();
+}
+
+// ---- Vista enviar: generar el documento con marca ------------------------
+function psiAbrirEnviar(id){
+  var pieza = psiGetBiblioteca().find(function(p){ return p.id===id; });
+  if(!pieza){ toast('Pieza no encontrada'); return; }
+  _psiPiezaParaEnviar = pieza;
+
+  document.getElementById('psi-vista-biblioteca').style.display = 'none';
+  document.getElementById('psi-vista-editor').style.display = 'none';
+  document.getElementById('psi-vista-enviar').style.display = 'block';
+  document.getElementById('psi-enviar-titulo-pieza').textContent = pieza.titulo;
+  document.getElementById('psi-enviar-fecha').valueAsDate = new Date();
+
+  var pacs = getPacientes();
+  var sel = document.getElementById('psi-enviar-pac');
+  sel.innerHTML = '<option value="">— Genérico, sin nombre —</option>' +
+    pacs.map(function(p){ return '<option value="'+p.id+'">'+pscEsc(p.nombre)+'</option>'; }).join('');
+}
+
+function psiCancelarEnviar(){
+  _psiPiezaParaEnviar = null;
+  document.getElementById('psi-vista-enviar').style.display = 'none';
+  document.getElementById('psi-vista-biblioteca').style.display = 'block';
+  psiRenderBiblioteca();
+}
+
+function psiGenerarDocumento(){
+  if(!_psiPiezaParaEnviar) return;
+  var pacId = document.getElementById('psi-enviar-pac').value;
+  var fechaInput = document.getElementById('psi-enviar-fecha').value;
+  var pacs = getPacientes();
+  var pac = pacId ? pacs.find(function(p){ return p.id===pacId; }) : null;
+
+  var fechaDoc = fechaInput
+    ? new Date(fechaInput+'T12:00:00').toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'})
+    : new Date().toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'});
+
+  var logoSrc = document.getElementById('logo-img') ? document.getElementById('logo-img').src : '';
+  var pieza = _psiPiezaParaEnviar;
+
+  // Convertir párrafos (separados por líneas en blanco) a <p>, preservando
+  // saltos de línea simples dentro de un mismo párrafo.
+  var parrafosHtml = pscEsc(pieza.contenido)
+    .split(/\n\s*\n/)
+    .map(function(par){ return '<p>'+par.replace(/\n/g,'<br>')+'</p>'; })
+    .join('');
+
+  var html = '<!DOCTYPE html><html><head><meta charset="UTF-8">'
+    +'<style>*{box-sizing:border-box;margin:0;padding:0;}body{font-family:Arial,sans-serif;color:#643000;background:white;padding:32px 38px;font-size:14px;max-width:820px;margin:0 auto;}'
+    +'.header{display:flex;align-items:center;gap:18px;background:linear-gradient(135deg,#fff8f9,#fadae1);padding:16px 20px;border-radius:12px;border-bottom:3px solid #cd8e9d;margin-bottom:24px;}'
+    +'.header img{height:70px;object-fit:contain;}.header-info h1{font-size:1.15rem;color:#643000;margin-bottom:2px;font-family:Georgia,serif;font-style:italic;}.header-info p{font-size:0.7rem;color:#cd8e9d;letter-spacing:1.5px;text-transform:uppercase;margin-top:2px;}'
+    +'.categoria-badge{display:inline-block;background:#fadae1;color:#a0536a;font-size:.72rem;font-weight:700;text-transform:uppercase;letter-spacing:.5px;padding:4px 14px;border-radius:14px;margin-bottom:10px}'
+    +'.doc-title{font-family:Georgia,serif;font-size:1.6rem;color:#643000;margin:0 0 6px;}'
+    +'.para-nombre{font-size:.85rem;color:#a0536a;margin-bottom:20px}'
+    +'.contenido p{font-size:.95rem;line-height:1.8;margin-bottom:14px;text-align:justify}'
+    +'.firmas{margin-top:40px;border-top:2px solid #fadae1;padding-top:24px;text-align:center}'
+    +'.firma-img{height:65px;display:block;margin:0 auto 4px;mix-blend-mode:multiply;}'
+    +'.firma-linea{font-size:.9rem;font-weight:700;color:#643000}'
+    +'.firma-sub{font-size:.78rem;color:#a0536a}'
+    +'.fecha-doc{text-align:right;font-size:.72rem;color:#cd8e9d;margin-top:30px}'
+    +'@media print{@page{margin:1.8cm}body{padding:0}.no-print{display:none!important}}</style></head><body>'
+    +'<div class="header"><img src="'+logoSrc+'" alt="Logo"><div class="header-info"><h1>Luisa Fernanda Garcés García</h1><p>Psicóloga · TP 174366</p></div></div>'
+    +(pieza.categoria ? '<div class="categoria-badge">'+pscEsc(pieza.categoria)+'</div>' : '')
+    +'<div class="doc-title">'+pscEsc(pieza.titulo)+'</div>'
+    +(pac ? '<div class="para-nombre">Material preparado para: <strong>'+pscEsc(pac.nombre)+'</strong></div>' : '')
+    +'<div class="contenido">'+parrafosHtml+'</div>'
+    +'<div class="firmas">'
+    +'<img src="'+FIRMA_DATA+'" alt="Firma" class="firma-img">'
+    +'<div class="firma-linea">Luisa Fernanda Garcés García</div>'
+    +'<div class="firma-sub">Psicóloga Titulada · T.P. No. 174366</div>'
+    +'</div>'
+    +'<div class="fecha-doc">'+fechaDoc+'</div>'
+    +'</body></html>';
+
+  var ventana = window.open('','_blank','width=900,height=750');
+  ventana.document.write('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>'+pscEsc(pieza.titulo)+'</title></head><body>'+html+'<div class="no-print" style="position:fixed;bottom:20px;right:20px;display:flex;gap:10px;z-index:999"><button onclick="window.print()" style="background:#cd8e9d;color:#fff;border:none;border-radius:20px;padding:10px 24px;font-size:.9rem;cursor:pointer">Imprimir / Guardar PDF</button><button onclick="window.close()" style="background:#fff;color:#643000;border:1.5px solid #cd8e9d;border-radius:20px;padding:10px 20px;font-size:.9rem;cursor:pointer">Cerrar</button></div><style>@media print{.no-print{display:none!important}@page{margin:1.5cm}}</style></body></html>');
+  ventana.document.close();
+  toast('Documento listo para guardar como PDF');
 }
