@@ -780,15 +780,6 @@ const DB = {
 
         <div class="fg"><label class="lbl">Notas confidenciales (solo tuyas, no van al resumen)</label><textarea id="ses-notas-priv"></textarea></div>
       </div>
-      <div class="card" id="ses-ia-card">
-        <div class="sec-title">🧠 Análisis Clínico con IA</div>
-        <p style="font-size:0.82rem; color:var(--strong); margin-bottom:14px">La IA redactará un resumen clínico y análisis basado en esta sesión y el historial del paciente. Revisa siempre antes de usar.</p>
-        <div style="display:flex;gap:8px;align-items:center;margin-bottom:16px;flex-wrap:wrap;">
-          <button class="btn primary" onclick="generarAnalisisIA()" id="ses-ia-btn">✨ Generar análisis clínico</button>
-          <button onclick="cambiarApiKeyGemini()" style="background:none;border:none;color:#cd8e9d;font-size:.78rem;cursor:pointer;text-decoration:underline;">🔑 Cambiar API Key</button>
-        </div>
-        <div id="ses-ia-resultado" style="display:none"></div>
-      </div>
       <div class="card">
         <div class="sec-title">📤 Resumen para el Paciente</div>
         <p style="font-size:0.82rem; color:var(--strong); margin-bottom:14px">Vista previa del documento que recibirá el paciente. No incluye tus notas confidenciales.</p>
@@ -2777,7 +2768,7 @@ function fechaHoy(){
       <div style="font-family:'Playfair Display',serif;font-size:1.1rem;color:#643000" id="her-img-title">Generando...</div>
       <button onclick="cerrarHerImg()" style="background:none;border:none;font-size:1.3rem;cursor:pointer;color:#aaa">✕</button>
     </div>
-    <div id="her-img-status" style="text-align:center;padding:20px;color:#cd8e9d;font-size:.88rem">✨ Generando contenido con IA...</div>
+    <div id="her-img-status" style="text-align:center;padding:20px;color:#cd8e9d;font-size:.88rem">✨ Generando imagen...</div>
     <canvas id="her-img-canvas" style="display:none;width:100%;border-radius:12px;border:1.5px solid #f0dde5"></canvas>
     <div id="her-img-btns" style="display:none;margin-top:14px;display:none;gap:10px;justify-content:center">
       <button onclick="descargarHerImg()" style="background:#cd8e9d;color:#fff;border:none;border-radius:20px;padding:9px 20px;font-size:.85rem;cursor:pointer;font-family:Lato,sans-serif">⬇ Descargar imagen</button>
@@ -3104,21 +3095,6 @@ function descargarHerImg(){
 </script>
 
 
-<!-- Modal API Key Gemini -->
-<div id="gemini-modal" style="display:none;position:fixed;inset:0;background:rgba(100,48,0,0.18);z-index:9999;align-items:center;justify-content:center;">
-  <div style="background:white;border-radius:16px;padding:32px;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(100,48,0,0.15);font-family:'Lato',sans-serif;">
-    <div style="font-family:'Playfair Display',serif;font-size:1.1rem;color:#643000;font-weight:700;margin-bottom:8px;">🔑 Configurar API Key de Gemini</div>
-    <p style="font-size:.85rem;color:#7a5a40;margin-bottom:16px;line-height:1.5;">Solo la ingresas una vez y queda guardada en tu dispositivo.</p>
-    <p style="font-size:.8rem;color:#cd8e9d;margin-bottom:16px;">Obtenla gratis en <a href="https://aistudio.google.com" target="_blank" style="color:#cd8e9d;font-weight:600;">aistudio.google.com</a> → Get API Key</p>
-    <input id="gemini-key-input" type="password" placeholder="AIzaSy..."
-      style="width:100%;box-sizing:border-box;padding:10px 14px;border:1.5px solid #cd8e9d;border-radius:8px;font-size:.9rem;color:#643000;margin-bottom:16px;font-family:inherit;"
-      onkeydown="if(event.key==='Enter') guardarApiKeyGemini()">
-    <div style="display:flex;gap:10px;justify-content:flex-end;">
-      <button onclick="cerrarModalGemini()" style="background:none;border:1.5px solid #ddd;border-radius:8px;padding:8px 18px;color:#999;cursor:pointer;font-size:.88rem;">Cancelar</button>
-      <button onclick="guardarApiKeyGemini()" style="background:#cd8e9d;border:none;border-radius:8px;padding:8px 20px;color:white;cursor:pointer;font-size:.88rem;font-weight:600;">Guardar</button>
-    </div>
-  </div>
-</div>
 <script src="main.js"></script>
 </body>
 </html>

@@ -1,0 +1,315 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Firma de Consentimiento Informado</title>
+<link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
+<script>
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyB-N6-kZ3_E9CxzKPom79TPJ1pBA3-M11c",
+  authDomain: "consultorio-449a6.firebaseapp.com",
+  projectId: "consultorio-449a6",
+  storageBucket: "consultorio-449a6.firebasestorage.app",
+  messagingSenderId: "853876080178",
+  appId: "1:853876080178:web:a89b0d5b71ec077c66c62b"
+};
+</script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Lato',Arial,sans-serif;background:#fdf2f5;color:#3a1a00;line-height:1.6;padding:20px}
+  .page{max-width:620px;margin:0 auto}
+  .header{text-align:center;margin-bottom:24px;padding-top:10px}
+  .header h1{font-family:'Playfair Display',serif;font-size:1.3rem;color:#643000;margin-bottom:4px}
+  .header p{font-size:.82rem;color:#a0536a}
+  .card{background:#fff;border-radius:16px;padding:22px;margin-bottom:16px;box-shadow:0 2px 12px rgba(100,48,0,.08)}
+  .estado-box{display:flex;align-items:center;gap:10px;padding:14px 16px;border-radius:12px;margin-bottom:18px}
+  .estado-pendiente{background:#fff8f0;border:1.5px solid #e8d0d6}
+  .estado-error{background:#ffeaea;border:1.5px solid #e8a0a0}
+  .estado-ok{background:#edfaf0;border:1.5px solid #7ecba0}
+  .consent-block{border:1.5px solid var(--border,#e8d0d6);border-radius:10px;padding:14px 16px;margin-bottom:12px;background:#fdf5f7}
+  .consent-block.checked{border-color:#7ecba0;background:#edfaf0}
+  .consent-block label{display:flex;gap:10px;align-items:flex-start;cursor:pointer}
+  .consent-block input[type=checkbox]{margin-top:3px;width:18px;height:18px;flex-shrink:0;accent-color:#cd8e9d}
+  .consent-title{font-weight:700;font-size:.88rem;color:#3a1a00;font-family:'Playfair Display',serif;margin-bottom:4px}
+  .consent-text{font-size:.78rem;color:#666;line-height:1.65;max-height:140px;overflow-y:auto}
+  .firma-area{margin-top:16px}
+  .firma-label{font-size:.75rem;font-weight:700;color:#643000;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px}
+  canvas{width:100%;height:160px;border:2px solid #e8d0d6;border-radius:10px;background:#fff;touch-action:none;cursor:crosshair}
+  .firma-btns{display:flex;gap:8px;margin-top:10px}
+  .btn{flex:1;padding:11px 16px;border-radius:24px;border:none;font-size:.85rem;font-weight:600;cursor:pointer;font-family:'Lato',sans-serif}
+  .btn-primary{background:#cd8e9d;color:#fff}
+  .btn-secondary{background:#fdf5f7;color:#a0536a;border:1.5px solid #e8d0d6}
+  .btn:disabled{opacity:.5;cursor:not-allowed}
+  .footer-note{text-align:center;font-size:.72rem;color:#aaa;margin-top:18px;padding-bottom:20px}
+  .loading{text-align:center;padding:60px 20px;color:#a0536a}
+</style>
+</head>
+<body>
+<div class="page">
+  <div class="header">
+    <h1>Consentimiento Informado</h1>
+    <p>Luisa Fernanda Garcés García · Psicóloga T.P. 174366</p>
+  </div>
+
+  <div id="contenido">
+    <div class="loading">Cargando...</div>
+  </div>
+
+  <div class="footer-note">Documento seguro · Este enlace es de un solo uso</div>
+</div>
+
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
+firebase.initializeApp(FIREBASE_CONFIG);
+const db = firebase.firestore();
+
+// --- Mismos textos base que en la app principal (CI_TEXTOS_V2) -------
+const CI_TEXTOS_V2 = {
+  atencion: {
+    titulo: 'Consentimiento para atención psicológica',
+    texto: 'Declaro que he recibido información clara y comprensible sobre el proceso psicológico a seguir con la Psicóloga Luisa Fernanda Garcés García (T.P. 174366), y manifiesto mi consentimiento libre, voluntario e informado para recibirlo, bajo las siguientes condiciones: '
+      + '1. Confidencialidad: Toda la información compartida durante el proceso es estrictamente confidencial y está protegida por el secreto profesional, conforme a la Ley 1090 de 2006. Solo se divulgará con mi autorización expresa o cuando exista una obligación legal, riesgo inminente para mi integridad o la de terceros. '
+      + '2. Derechos del paciente: Tengo derecho a recibir información sobre mi proceso terapéutico, a participar en las decisiones sobre mi tratamiento, a retirar mi consentimiento en cualquier momento y a recibir un trato digno, respetuoso y sin discriminación. '
+      + '3. Grabaciones y registros: Cualquier grabación de audio o video de las sesiones requerirá mi autorización explícita y previa. Los registros escritos de las sesiones son propiedad de la profesional y constituyen el expediente clínico. '
+      + '4. Honorarios y cancelaciones: Conozco las tarifas acordadas para el proceso. En caso de cancelación, me comprometo a notificar con al menos 24 horas de anticipación. Las cancelaciones sin previo aviso podrán generar el cobro del valor de la sesión. '
+      + '5. Alcances y limitaciones: Entiendo que la psicología no es un servicio de emergencias. Ante una crisis o riesgo de vida, debo contactar a servicios de urgencias (Línea 106 o emergencias 123). El proceso psicológico no garantiza resultados específicos, pues depende de múltiples factores incluyendo mi participación activa. '
+      + '6. Menores de edad: Si el proceso involucra a un menor, el consentimiento es otorgado por su representante legal, quien además se compromete a apoyar el proceso.'
+  },
+  telepsicologia: {
+    titulo: 'Consentimiento para telepsicología (sesiones virtuales)',
+    texto: 'Acepto que, cuando la atención sea virtual (teleconsulta), las sesiones se realicen a través de los medios acordados con la psicóloga. Entiendo y acepto que: '
+      + '1. Queda prohibido grabar las sesiones sin autorización escrita previa de ambas partes. '
+      + '2. Me comprometo a realizar las sesiones desde un espacio privado que garantice mi confidencialidad. '
+      + '3. En caso de crisis durante una sesión virtual, autorizo a la psicóloga a contactar a la persona de emergencia registrada en mi historia clínica o a los servicios de urgencias correspondientes. '
+      + '4. Soy consciente de que la modalidad virtual puede presentar limitaciones técnicas (conectividad, calidad de audio/video) ajenas a la voluntad de la profesional.'
+  },
+  datos: {
+    titulo: 'Consentimiento para tratamiento de datos personales (Ley 1581 de 2012)',
+    texto: 'De conformidad con la Ley 1581 de 2012 y sus decretos reglamentarios, autorizo el tratamiento de mis datos personales y de salud (sensibles) por parte de la psicóloga Luisa Fernanda Garcés García, exclusivamente para: '
+      + '1. La prestación del servicio psicológico y la gestión de mi historia clínica. '
+      + '2. El cumplimiento de obligaciones legales y administrativas relacionadas con el ejercicio profesional. '
+      + 'Mis datos serán almacenados de forma segura, no serán compartidos con terceros sin mi consentimiento expreso (salvo obligación legal o riesgo para la vida), y podré solicitar en cualquier momento su consulta, corrección, actualización o eliminación, así como revocar esta autorización, sin que ello afecte la legalidad del tratamiento realizado con anterioridad a la revocatoria.'
+  }
+};
+const CI_ORDEN_V2 = ['atencion','telepsicologia','datos'];
+
+let _registro = null;
+let _token = null;
+let _canvas = null, _ctx = null, _drawing = false, _lastX = 0, _lastY = 0;
+let _hasSignature = false;
+
+function getToken(){
+  const params = new URLSearchParams(window.location.search);
+  return params.get('t');
+}
+
+function mostrarError(msg){
+  document.getElementById('contenido').innerHTML = `
+    <div class="card">
+      <div class="estado-box estado-error">
+        <div style="font-size:1.5rem">⚠️</div>
+        <div style="font-weight:700;font-size:.9rem;color:#c0392b">${msg}</div>
+      </div>
+    </div>`;
+}
+
+async function init(){
+  _token = getToken();
+  if(!_token){
+    mostrarError('Enlace inválido. Falta el código de acceso.');
+    return;
+  }
+
+  try{
+    const doc = await db.collection('firmas_pendientes').doc(_token).get();
+    if(!doc.exists){
+      mostrarError('Este enlace no existe o ya expiró.');
+      return;
+    }
+    const data = doc.data();
+    if(data.usado){
+      mostrarError('Este enlace ya fue utilizado. Si necesitas firmar de nuevo, solicita un nuevo enlace a tu psicóloga.');
+      return;
+    }
+    if(new Date(data.expira) < new Date()){
+      mostrarError('Este enlace ha expirado. Solicita uno nuevo a tu psicóloga.');
+      return;
+    }
+    _registro = data;
+    renderFormulario();
+  } catch(e){
+    console.error(e);
+    mostrarError('No se pudo cargar el formulario. Verifica tu conexión e intenta de nuevo.');
+  }
+}
+
+function checkboxBloque(key){
+  const def = CI_TEXTOS_V2[key];
+  return `
+    <div class="consent-block" id="bloque-${key}">
+      <label>
+        <input type="checkbox" id="chk-${key}" onchange="toggleBloque('${key}')">
+        <div>
+          <div class="consent-title">${def.titulo}</div>
+          <div class="consent-text">${def.texto}</div>
+        </div>
+      </label>
+    </div>`;
+}
+
+function toggleBloque(key){
+  const checked = document.getElementById('chk-'+key).checked;
+  document.getElementById('bloque-'+key).classList.toggle('checked', checked);
+}
+
+function renderFormulario(){
+  document.getElementById('contenido').innerHTML = `
+    <div class="card">
+      <div class="estado-box estado-pendiente">
+        <div style="font-size:1.5rem">✍️</div>
+        <div>
+          <div style="font-weight:700;font-size:.9rem;color:#a0536a">Hola, ${_registro.pacienteNombre}</div>
+          <div style="font-size:.75rem;color:#666">Por favor revisa y acepta los consentimientos que apliquen, luego firma abajo.</div>
+        </div>
+      </div>
+      ${CI_ORDEN_V2.map(checkboxBloque).join('')}
+      <div class="firma-area">
+        <div class="firma-label">Tu firma</div>
+        <canvas id="firma-canvas"></canvas>
+        <div class="firma-btns">
+          <button class="btn btn-secondary" onclick="limpiarFirma()">🧹 Borrar</button>
+          <button class="btn btn-primary" id="btn-enviar" onclick="enviarFirma()">✅ Firmar y enviar</button>
+        </div>
+      </div>
+    </div>`;
+
+  setTimeout(initCanvas, 50);
+}
+
+function initCanvas(){
+  _canvas = document.getElementById('firma-canvas');
+  _ctx = _canvas.getContext('2d');
+  const rect = _canvas.getBoundingClientRect();
+  const dpr = window.devicePixelRatio || 1;
+  _canvas.width = rect.width * dpr;
+  _canvas.height = rect.height * dpr;
+  _ctx.scale(dpr, dpr);
+  _ctx.strokeStyle = '#3a1a00';
+  _ctx.lineWidth = 2.2;
+  _ctx.lineCap = 'round';
+  _ctx.lineJoin = 'round';
+
+  function getPos(e){
+    const r = _canvas.getBoundingClientRect();
+    const t = e.touches ? e.touches[0] : e;
+    return { x: t.clientX - r.left, y: t.clientY - r.top };
+  }
+  function start(e){ e.preventDefault(); _drawing = true; const p = getPos(e); _lastX = p.x; _lastY = p.y; }
+  function move(e){
+    if(!_drawing) return;
+    e.preventDefault();
+    const p = getPos(e);
+    _ctx.beginPath();
+    _ctx.moveTo(_lastX, _lastY);
+    _ctx.lineTo(p.x, p.y);
+    _ctx.stroke();
+    _lastX = p.x; _lastY = p.y;
+    _hasSignature = true;
+  }
+  function end(){ _drawing = false; }
+
+  _canvas.addEventListener('mousedown', start);
+  _canvas.addEventListener('mousemove', move);
+  _canvas.addEventListener('mouseup', end);
+  _canvas.addEventListener('mouseleave', end);
+  _canvas.addEventListener('touchstart', start, {passive:false});
+  _canvas.addEventListener('touchmove', move, {passive:false});
+  _canvas.addEventListener('touchend', end);
+}
+
+function limpiarFirma(){
+  if(!_ctx) return;
+  _ctx.clearRect(0, 0, _canvas.width, _canvas.height);
+  _hasSignature = false;
+}
+
+async function enviarFirma(){
+  const algunoAceptado = CI_ORDEN_V2.some(k => document.getElementById('chk-'+k).checked);
+  if(!algunoAceptado){
+    alert('Por favor selecciona al menos un consentimiento.');
+    return;
+  }
+  if(!_hasSignature){
+    alert('Por favor dibuja tu firma antes de enviar.');
+    return;
+  }
+
+  const btn = document.getElementById('btn-enviar');
+  btn.disabled = true;
+  btn.textContent = 'Enviando...';
+
+  try{
+    const firmaPaciente = _canvas.toDataURL('image/png');
+    const ahora = new Date().toISOString();
+    const pid = _registro.pacienteId;
+
+    // Leer consentimiento existente (si lo hay) para no sobreescribir
+    // firmas previas o datos de la psicóloga.
+    const ciDoc = await db.collection('suitedata').doc('consentimiento_'+pid).get();
+    const ciExistente = (ciDoc.exists && ciDoc.data().value) ? ciDoc.data().value : {};
+
+    const consentimientos = ciExistente.consentimientos || {};
+    CI_ORDEN_V2.forEach(key => {
+      const aceptado = document.getElementById('chk-'+key).checked;
+      const item = consentimientos[key] || {};
+      if(aceptado){
+        if(!item.fechaAceptacion){
+          item.titulo = CI_TEXTOS_V2[key].titulo;
+          item.texto = CI_TEXTOS_V2[key].texto;
+          item.fechaAceptacion = ahora;
+        }
+        item.aceptado = true;
+      } else {
+        item.aceptado = false;
+        delete item.titulo;
+        delete item.texto;
+        delete item.fechaAceptacion;
+      }
+      consentimientos[key] = item;
+    });
+
+    const nuevoCi = {
+      ...ciExistente,
+      version: 2,
+      consentimientos: consentimientos,
+      firmaPaciente: firmaPaciente,
+      fechaFirma: ciExistente.fechaFirma || ahora
+    };
+
+    await db.collection('suitedata').doc('consentimiento_'+pid).set({ value: nuevoCi });
+    await db.collection('firmas_pendientes').doc(_token).update({ usado: true, fechaUso: ahora });
+
+    document.getElementById('contenido').innerHTML = `
+      <div class="card">
+        <div class="estado-box estado-ok">
+          <div style="font-size:1.5rem">✅</div>
+          <div>
+            <div style="font-weight:700;font-size:.95rem;color:#2d6a4f">¡Listo, ${_registro.pacienteNombre}!</div>
+            <div style="font-size:.8rem;color:#666;margin-top:4px">Tu firma fue registrada correctamente. Ya puedes cerrar esta ventana.</div>
+          </div>
+        </div>
+      </div>`;
+  } catch(e){
+    console.error(e);
+    btn.disabled = false;
+    btn.textContent = '✅ Firmar y enviar';
+    alert('Hubo un error al enviar tu firma. Por favor intenta de nuevo.');
+  }
+}
+
+init();
+</script>
+</body>
+</html>

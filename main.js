@@ -670,10 +670,6 @@ function nuevaSesion(){
   const pid = document.getElementById('ses-sel-pac').value;
   if(!pid){ toast('Selecciona un paciente'); return; }
   currentSesionId = null;
-  const iaCardN = document.getElementById('ses-ia-card');
-  if(iaCardN) iaCardN.style.display = 'block';
-  const iaRes = document.getElementById('ses-ia-resultado');
-  if(iaRes) iaRes.style.display = 'none';
   const ses = DB.get('sesiones_'+pid)||[];
   // Auto-numero: next session number (counting only non-cancelled)
   const numSesiones = ses.filter(s=>s.tipo!=='cancelacion').length;
@@ -773,13 +769,6 @@ function abrirSesion(pid, sid){
   if(lockBadge) lockBadge.remove();
   const corrBox2 = document.getElementById('ses-correcciones-historial');
   if(corrBox2) corrBox2.remove();
-  // Mostrar/ocultar card IA según estado de sesión
-  const iaCard = document.getElementById('ses-ia-card');
-  if(s.guardada_definitivo){
-    if(iaCard) iaCard.style.display = 'none';
-  } else {
-    if(iaCard) iaCard.style.display = 'block';
-  }
   if(s.guardada_definitivo){
     const badge = document.createElement('div');
     badge.id = 'ses-lock-badge';
@@ -1001,194 +990,6 @@ function sesDcNoAplica(){
   renderSesDCGrid();
 }
 
-function abrirModalGemini(){
-  var modal = document.getElementById('gemini-modal');
-  if(modal){
-    modal.style.display = 'flex';
-    var input = document.getElementById('gemini-key-input');
-    if(input){
-      var actual = localStorage.getItem('gemini_api_key') || '';
-      input.value = '';
-      input.placeholder = actual ? 'API Key guardada (ingresa nueva para cambiar)' : 'AIzaSy...';
-      setTimeout(function(){ input.focus(); }, 100);
-    }
-  }
-}
-
-function cerrarModalGemini(){
-  var modal = document.getElementById('gemini-modal');
-  if(modal) modal.style.display = 'none';
-  // Si había un callback pendiente (primer uso), cancelar
-  if(window._geminiCallback){
-    window._geminiCallback(null);
-    window._geminiCallback = null;
-  }
-}
-
-function guardarApiKeyGemini(){
-  var input = document.getElementById('gemini-key-input');
-  var key = input ? input.value.trim() : '';
-  if(!key){
-    input.style.borderColor = '#e74c3c';
-    setTimeout(function(){ input.style.borderColor = '#cd8e9d'; }, 1500);
-    return;
-  }
-  localStorage.setItem('gemini_api_key', key);
-  var modal = document.getElementById('gemini-modal');
-  if(modal) modal.style.display = 'none';
-  toast('API Key guardada correctamente');
-  // Si había callback pendiente (primer uso desde generarAnalisisIA)
-  if(window._geminiCallback){
-    window._geminiCallback(key);
-    window._geminiCallback = null;
-  }
-}
-
-function cambiarApiKeyGemini(){
-  abrirModalGemini();
-}
-
-function generarAnalisisIA(){
-  var pid = document.getElementById('ses-sel-pac').value;
-  if(!pid){ toast('Selecciona un paciente primero'); return; }
-
-  var num = document.getElementById('ses-num').value || '';
-  var fecha = document.getElementById('ses-fecha').value || '';
-  var temas = document.getElementById('ses-temas').value || '';
-  var inter = document.getElementById('ses-inter').value || '';
-  var avances = document.getElementById('ses-avances').value || '';
-  var tarea = document.getElementById('ses-tarea').value || '';
-  var acuerdos = document.getElementById('ses-acuerdos').value || '';
-  var eventos = document.getElementById('ses-eventos').value || '';
-  var pensamiento = document.getElementById('ses-pensamiento').value || '';
-  var ajustes = document.getElementById('ses-ajustes').value || '';
-  var difTarea = document.getElementById('ses-dif-tarea').value || '';
-  var tareaRevEl = document.querySelector('input[name="ses-tarea-rev"]:checked');
-  var tareaRevVal = tareaRevEl ? tareaRevEl.value : 'No registrado';
-  var humores = Array.from(document.querySelectorAll('#ses-humores input:checked')).map(function(c){return c.value;}).join(', ') || 'No registrado';
-  var tecnicas = Array.from(document.querySelectorAll('#ses-tecnicas input:checked')).map(function(c){return c.value;}).join(', ') || 'No registrado';
-  var riesgos = Array.from(document.querySelectorAll('input[name=riesgo]:checked')).map(function(c){return c.value;}).join(', ') || 'Ninguno';
-  var recursos = Array.from(document.querySelectorAll('input[name=recurso]:checked')).map(function(c){return c.value;}).join(', ') || 'No registrado';
-
-  var todasSes = (DB.get('sesiones_'+pid)||[])
-    .filter(function(s){ return s.tipo!=='cancelacion' && s.guardada_definitivo; })
-    .sort(function(a,b){ return (b.num||0)-(a.num||0); })
-    .slice(0,3);
-
-  var historial = '';
-  if(todasSes.length > 0){
-    historial = 'HISTORIAL RECIENTE (ultimas sesiones guardadas):\n' + todasSes.map(function(s){
-      return 'Sesion #'+(s.num||'?')+' ('+( s.fecha||'')+'):\n'
-        + '  - Temas: '+(s.temas||'No registrado')+'\n'
-        + '  - Avances: '+(s.avances||'No registrado')+'\n'
-        + '  - Tarea: '+(s.tarea||'No registrado');
-    }).join('\n\n');
-  } else {
-    historial = '(Primera sesion o sin historial previo guardado)';
-  }
-
-  var pacientes = DB.get('pacientes')||[];
-  var pac = pacientes.find(function(p){ return p.id===pid; });
-  var nombrePac = pac ? pac.nombre : 'paciente';
-
-
-  var resultado = document.getElementById('ses-ia-resultado');
-  var btn = document.getElementById('ses-ia-btn');
-  resultado.style.display = 'block';
-  resultado.innerHTML = '<div style="padding:20px;text-align:center;color:#cd8e9d;font-size:.9rem;">Generando analisis clinico... un momento...</div>';
-  btn.disabled = true;
-  btn.textContent = 'Generando...';
-
-  var GEMINI_KEY = localStorage.getItem('gemini_api_key') || '';
-  if(!GEMINI_KEY){
-    // Primera vez: abrir modal y esperar
-    resultado.style.display = 'block';
-    resultado.innerHTML = '<div style="padding:16px;font-size:.85rem;color:#cd8e9d;">Primero configura tu API Key de Google Gemini...</div>';
-    window._geminiCallback = function(key){
-      if(!key){ btn.disabled=false; btn.textContent='Generar analisis clinico'; resultado.style.display='none'; return; }
-      ejecutarLlamadaGemini(pid, num, fecha, temas, inter, avances, tarea, acuerdos, eventos, pensamiento, ajustes, difTarea, tareaRevVal, humores, tecnicas, riesgos, recursos, historial, nombrePac, resultado, btn, key);
-    };
-    abrirModalGemini();
-    return;
-  }
-  ejecutarLlamadaGemini(pid, num, fecha, temas, inter, avances, tarea, acuerdos, eventos, pensamiento, ajustes, difTarea, tareaRevVal, humores, tecnicas, riesgos, recursos, historial, nombrePac, resultado, btn, GEMINI_KEY);
-}
-
-function ejecutarLlamadaGemini(pid, num, fecha, temas, inter, avances, tarea, acuerdos, eventos, pensamiento, ajustes, difTarea, tareaRevVal, humores, tecnicas, riesgos, recursos, historial, nombrePac, resultado, btn, GEMINI_KEY){
-  var prompt = 'Eres una psicologa clinica experta en psicologia cognitivo-conductual. Redacta una nota clinica profesional en espanol, con lenguaje tecnico pero humanizado, en tercera persona.\n\n'
-    + 'DATOS DE LA SESION ACTUAL (#'+num+' - '+fecha+'):\n'
-    + '- Paciente: '+nombrePac+'\n'
-    + '- Estado emocional/humor: '+humores+'\n'
-    + '- Eventos desde ultima sesion: '+(eventos||'No reportados')+'\n'
-    + '- Revision de tarea: '+tareaRevVal+(difTarea ? ' - Dificultades: '+difTarea : '')+'\n'
-    + '- Temas trabajados: '+(temas||'No registrado')+'\n'
-    + '- Tecnicas utilizadas: '+tecnicas+'\n'
-    + '- Intervenciones: '+(inter||'No registrado')+'\n'
-    + '- Pensamiento automatico clave: '+(pensamiento||'No identificado')+'\n'
-    + '- Avances y observaciones: '+(avances||'No registrado')+'\n'
-    + '- Indicadores de riesgo: '+riesgos+'\n'
-    + '- Recursos del paciente: '+recursos+'\n'
-    + '- Tarea asignada: '+(tarea||'No asignada')+'\n'
-    + '- Acuerdos proxima sesion: '+(acuerdos||'No registrado')+'\n'
-    + '- Ajustes terapeuticos: '+(ajustes||'Ninguno')+'\n\n'
-    + historial+'\n\n'
-    + 'Genera DOS secciones:\n\n'
-    + '**1. RESUMEN DE SESION**\n'
-    + 'Redacta en 3-5 parrafos fluidos: como llego el paciente, que se trabajo, tecnicas usadas, respuesta, avances y pendientes. Lenguaje clinico accesible.\n\n'
-    + '**2. ANALISIS CLINICO**\n'
-    + 'Redacta en 2-3 parrafos: patrones cognitivos y conductuales, hipotesis de trabajo, continuidad con sesiones anteriores, adherencia y recomendaciones. Lenguaje tecnico especializado.\n\n'
-    + 'Tercera persona, sin tutear, sin nombre de terapeuta. Usa acentos correctos en espanol.';
-
-  fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-preview-04-17:generateContent?key='+GEMINI_KEY, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }],
-      generationConfig: { maxOutputTokens: 1500, temperature: 0.7 }
-    })
-  })
-  .then(function(r){ return r.json(); })
-  .then(function(data){
-    btn.disabled = false;
-    btn.textContent = 'Generar analisis clinico';
-    if(data.error){ resultado.innerHTML = '<div style="color:#e74c3c;padding:12px;font-size:.85rem;">Error API: '+data.error.message+'</div>'; return; }
-    if(data.candidates && data.candidates[0] && data.candidates[0].content && data.candidates[0].content.parts[0]){
-      var texto = data.candidates[0].content.parts[0].text;
-      var html = texto
-        .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
-        .replace(/\n\n/g, '</p><p>')
-        .replace(/\n/g, '<br>');
-      resultado.innerHTML = '<div style="background:#fdf0f3;border:1.5px solid #cd8e9d;border-radius:10px;padding:18px;margin-top:8px;">'
-        + '<div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">'
-        + '<span style="font-size:.8rem;color:#cd8e9d;font-weight:600;">Generado por IA - Revisa antes de usar</span>'
-        + '<div style="display:flex;gap:8px;">'
-        + '<button onclick="copiarAnalisisIA()" style="background:white;border:1px solid #cd8e9d;color:#643000;border-radius:6px;padding:4px 12px;font-size:.78rem;cursor:pointer;">Copiar</button>'
-        + '<button onclick="document.getElementById(\'ses-ia-resultado\').style.display=\'none\'" style="background:white;border:1px solid #ddd;color:#999;border-radius:6px;padding:4px 10px;font-size:.78rem;cursor:pointer;">X</button>'
-        + '</div></div>'
-        + '<div id="ses-ia-texto" style="font-size:.88rem;color:#643000;line-height:1.7;"><p>'+html+'</p></div>'
-        + '</div>';
-    } else {
-      resultado.innerHTML = '<div style="color:#e74c3c;padding:12px;font-size:.85rem;">Error al generar el analisis. Intenta de nuevo.</div>';
-    }
-  })
-  .catch(function(){
-    btn.disabled = false;
-    btn.textContent = 'Generar analisis clinico';
-    resultado.innerHTML = '<div style="color:#e74c3c;padding:12px;font-size:.85rem;">Error de conexion. Verifica tu internet e intenta de nuevo.</div>';
-  });
-}
-
-
-function copiarAnalisisIA(){
-  const el = document.getElementById('ses-ia-texto');
-  if(!el) return;
-  const texto = el.innerText;
-  navigator.clipboard.writeText(texto).then(()=>{
-    toast('✅ Análisis copiado al portapapeles');
-  }).catch(()=>{
-    toast('No se pudo copiar automáticamente');
-  });
-}
 
 function generarResumen(){
   const pid = document.getElementById('ses-sel-pac').value;
@@ -3870,6 +3671,40 @@ var _ciDrawing = false;
 var _ciLastX = 0, _ciLastY = 0;
 var _ciCanvas = null, _ciCtx = null;
 
+// --- Textos base (v2) de cada consentimiento individual ---------------
+// Estos textos se "congelan" (snapshot) dentro de ci.consentimientos[].texto
+// en el momento de la firma, para que cambios futuros aquí no alteren
+// lo que el paciente ya aceptó.
+var CI_TEXTOS_V2 = {
+  atencion: {
+    titulo: 'Consentimiento para atención psicológica',
+    texto: 'Declaro que he recibido información clara y comprensible sobre el proceso psicológico a seguir con la Psicóloga Luisa Fernanda Garcés García (T.P. 174366), y manifiesto mi consentimiento libre, voluntario e informado para recibirlo, bajo las siguientes condiciones: '
+      + '1. Confidencialidad: Toda la información compartida durante el proceso es estrictamente confidencial y está protegida por el secreto profesional, conforme a la Ley 1090 de 2006. Solo se divulgará con mi autorización expresa o cuando exista una obligación legal, riesgo inminente para mi integridad o la de terceros. '
+      + '2. Derechos del paciente: Tengo derecho a recibir información sobre mi proceso terapéutico, a participar en las decisiones sobre mi tratamiento, a retirar mi consentimiento en cualquier momento y a recibir un trato digno, respetuoso y sin discriminación. '
+      + '3. Grabaciones y registros: Cualquier grabación de audio o video de las sesiones requerirá mi autorización explícita y previa. Los registros escritos de las sesiones son propiedad de la profesional y constituyen el expediente clínico. '
+      + '4. Honorarios y cancelaciones: Conozco las tarifas acordadas para el proceso. En caso de cancelación, me comprometo a notificar con al menos 24 horas de anticipación. Las cancelaciones sin previo aviso podrán generar el cobro del valor de la sesión. '
+      + '5. Alcances y limitaciones: Entiendo que la psicología no es un servicio de emergencias. Ante una crisis o riesgo de vida, debo contactar a servicios de urgencias (Línea 106 o emergencias 123). El proceso psicológico no garantiza resultados específicos, pues depende de múltiples factores incluyendo mi participación activa. '
+      + '6. Menores de edad: Si el proceso involucra a un menor, el consentimiento es otorgado por su representante legal, quien además se compromete a apoyar el proceso.'
+  },
+  telepsicologia: {
+    titulo: 'Consentimiento para telepsicología (sesiones virtuales)',
+    texto: 'Acepto que, cuando la atención sea virtual (teleconsulta), las sesiones se realicen a través de los medios acordados con la psicóloga. Entiendo y acepto que: '
+      + '1. Queda prohibido grabar las sesiones sin autorización escrita previa de ambas partes. '
+      + '2. Me comprometo a realizar las sesiones desde un espacio privado que garantice mi confidencialidad. '
+      + '3. En caso de crisis durante una sesión virtual, autorizo a la psicóloga a contactar a la persona de emergencia registrada en mi historia clínica o a los servicios de urgencias correspondientes. '
+      + '4. Soy consciente de que la modalidad virtual puede presentar limitaciones técnicas (conectividad, calidad de audio/video) ajenas a la voluntad de la profesional.'
+  },
+  datos: {
+    titulo: 'Consentimiento para tratamiento de datos personales (Ley 1581 de 2012)',
+    texto: 'De conformidad con la Ley 1581 de 2012 y sus decretos reglamentarios, autorizo el tratamiento de mis datos personales y de salud (sensibles) por parte de la psicóloga Luisa Fernanda Garcés García, exclusivamente para: '
+      + '1. La prestación del servicio psicológico y la gestión de mi historia clínica. '
+      + '2. El cumplimiento de obligaciones legales y administrativas relacionadas con el ejercicio profesional. '
+      + 'Mis datos serán almacenados de forma segura, no serán compartidos con terceros sin mi consentimiento expreso (salvo obligación legal o riesgo para la vida), y podré solicitar en cualquier momento su consulta, corrección, actualización o eliminación, así como revocar esta autorización, sin que ello afecte la legalidad del tratamiento realizado con anterioridad a la revocatoria.'
+  }
+};
+
+var CI_ORDEN_V2 = ['atencion','telepsicologia','datos'];
+
 function renderPacConsentimiento(pid){
   _ciPacId = pid;
   var el = document.getElementById('pac-tab-consentimiento');
@@ -3877,6 +3712,29 @@ function renderPacConsentimiento(pid){
   var pacs = getPacientes();
   var pac = pacs.find(p=>p.id===pid)||{};
   var ci = DB.get('consentimiento_'+pid)||{};
+
+  // --- Registros "legacy" (formato anterior, un solo bloque) ---------
+  // Solo es legacy si ya tiene AMBAS firmas guardadas bajo el formato
+  // anterior y nunca fue marcado como v2. Se muestra igual que antes,
+  // sin migrar ni alterar nada.
+  var esLegacy = !!(ci.firmaPaciente && ci.firmaPsicologa && !ci.version && !ci.consentimientos);
+  if(esLegacy){
+    renderPacConsentimientoLegacy(pid, pac, ci, el);
+    return;
+  }
+
+  // --- Formato nuevo (v2): consentimientos individuales --------------
+  // Si es un registro nuevo (sin nada guardado todavía), lo marcamos
+  // como v2 desde ya para que no quede ambiguo en futuros renders.
+  if(!ci.version && !ci.firmaPaciente){
+    ci.version = 2;
+    DB.set('consentimiento_'+pid, ci);
+  }
+  renderPacConsentimientoV2(pid, pac, ci, el);
+}
+
+// ---- Render legacy (sin cambios respecto al formato original) -------
+function renderPacConsentimientoLegacy(pid, pac, ci, el){
   var firmado = !!(ci.firmaPaciente && ci.firmaPsicologa);
   var fechaFirmado = ci.fechaFirma ? new Date(ci.fechaFirma).toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'}) : null;
 
@@ -3901,12 +3759,96 @@ function renderPacConsentimiento(pid){
       <p><strong>7. Menores de edad:</strong> Si el proceso involucra a un menor, el consentimiento es otorgado por su representante legal, quien además se compromete a apoyar el proceso.</p>
     </div>
 
+    <div style="background:#fff8f0;border:1.5px solid #e8d0d6;border-radius:10px;padding:10px 14px;font-size:.76rem;color:#a0536a;margin-bottom:14px">
+      ℹ️ Este consentimiento fue firmado bajo el formato anterior (documento único). Si necesitas registrar consentimientos diferenciados (atención, telepsicología, datos personales) con el nuevo formato, usa "🔄 Volver a firmar (nuevo formato)".
+    </div>
+
     <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
       <div style="flex:1;min-width:180px">
         <div style="font-size:.75rem;font-weight:700;color:var(--strong);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Firma del paciente</div>
-        ${ci.firmaPaciente
+        <div style="border:1.5px solid #7ecba0;border-radius:10px;padding:6px;background:#edfaf0;text-align:center">
+          <img src="${ci.firmaPaciente}" style="height:54px;object-fit:contain;display:block;margin:0 auto">
+          <div style="font-size:.72rem;color:#2d6a4f;margin-top:3px">✅ Firmado</div>
+        </div>
+        <button class="btn" style="font-size:.72rem;margin-top:6px;width:100%" onclick="ciIniciarRefirmaV2('${pid}')">🔄 Volver a firmar (nuevo formato)</button>
+      </div>
+      <div style="flex:1;min-width:180px">
+        <div style="font-size:.75rem;font-weight:700;color:var(--strong);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Firma de la psicóloga</div>
+        ${FIRMA_DATA
+          ? `<div style="border:1.5px solid #cd8e9d;border-radius:10px;padding:6px;background:#fdf5f7;text-align:center">
+               <img src="${FIRMA_DATA}" style="height:54px;object-fit:contain;display:block;margin:0 auto;mix-blend-mode:multiply">
+               <div style="font-size:.72rem;color:#a0536a;margin-top:3px">Luisa F. Garcés García · TP 174366</div>
+             </div>`
+          : `<div style="border:2px dashed var(--border);border-radius:10px;padding:18px;text-align:center;background:#fdf5f7">
+               <div style="font-size:.8rem;color:var(--strong)">No hay firma registrada.<br><span style="font-size:.72rem">Configura tu firma en Ajustes.</span></div>
+             </div>`
+        }
+      </div>
+    </div>
+
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn" onclick="ciGenerarPDF('${pid}')" style="font-size:.82rem">📄 Generar PDF independiente</button>
+      <button class="btn" style="font-size:.82rem;background:var(--border);color:#fff" onclick="exportarHistoriaClinicaConCI('${pid}')">📋 Hist. Clínica + Consentimiento</button>
+      <button class="btn" onclick="ciLimpiarFirmaPaciente('${pid}')" style="font-size:.82rem;background:#fff3e0;color:#a0536a;border:1.5px solid #e8b87a" title="Borra solo la firma del paciente">🧹 Limpiar firma</button>
+      <button class="btn" onclick="ciEliminarConsentimiento('${pid}')" style="font-size:.82rem;background:#ffeaea;color:#c0392b;border:1.5px solid #e8a0a0" title="Elimina todo el consentimiento guardado">🗑️ Eliminar consentimiento</button>
+    </div>`;
+}
+
+// ---- Render nuevo formato v2 (consentimientos individuales) ---------
+function renderPacConsentimientoV2(pid, pac, ci, el){
+  var lista = ci.consentimientos || {};
+  var firmaPaciente = ci.firmaPaciente || '';
+  var todosAceptados = CI_ORDEN_V2.every(function(k){ return lista[k] && lista[k].aceptado; });
+  var algunoAceptado = CI_ORDEN_V2.some(function(k){ return lista[k] && lista[k].aceptado; });
+  var firmado = !!(firmaPaciente && algunoAceptado);
+
+  var fechaFirmaTxt = '', horaFirmaTxt = '';
+  if(ci.fechaFirma){
+    var dFirma = new Date(ci.fechaFirma);
+    fechaFirmaTxt = dFirma.toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'});
+    horaFirmaTxt = dFirma.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
+  }
+
+  var estadoBanner = !firmaPaciente
+    ? { color:'#a0536a', bg:'#fff8f0', border:'#e8d0d6', icon:'⏳', texto:'Pendiente de firma' }
+    : todosAceptados
+      ? { color:'#2d6a4f', bg:'#edfaf0', border:'#7ecba0', icon:'✅', texto:'Consentimientos firmados y aceptados' }
+      : { color:'#a0536a', bg:'#fff8f0', border:'#e8d0d6', icon:'⚠️', texto:'Firmado con consentimientos parcialmente aceptados' };
+
+  function checkboxBloque(key){
+    var def = CI_TEXTOS_V2[key];
+    var item = lista[key] || {};
+    var checked = !!item.aceptado;
+    return `
+    <div style="border:1.5px solid ${checked?'#7ecba0':'var(--border)'};border-radius:10px;padding:12px 14px;margin-bottom:10px;background:${checked?'#edfaf0':'#fdf5f7'}">
+      <label style="display:flex;gap:10px;align-items:flex-start;cursor:pointer">
+        <input type="checkbox" ${checked?'checked':''} onchange="ciToggleConsent('${pid}','${key}',this.checked)" style="margin-top:3px;width:18px;height:18px;flex-shrink:0;accent-color:#cd8e9d">
+        <div>
+          <div style="font-weight:700;font-size:.85rem;color:#3a1a00;font-family:'Playfair Display',serif">${def.titulo}</div>
+          <div style="font-size:.76rem;color:#666;margin-top:4px;line-height:1.6;max-height:120px;overflow-y:auto">${def.texto}</div>
+        </div>
+      </label>
+    </div>`;
+  }
+
+  el.innerHTML = `
+    <div style="background:${estadoBanner.bg};border:1.5px solid ${estadoBanner.border};border-radius:12px;padding:14px 16px;margin-bottom:14px;display:flex;align-items:center;gap:10px">
+      <div style="font-size:1.5rem">${estadoBanner.icon}</div>
+      <div>
+        <div style="font-weight:700;font-size:.9rem;color:${estadoBanner.color}">${estadoBanner.texto}</div>
+        ${fechaFirmaTxt?`<div style="font-size:.75rem;color:#666">Firmado el ${fechaFirmaTxt}${horaFirmaTxt?' a las '+horaFirmaTxt:''}</div>`:''}
+      </div>
+    </div>
+
+    <div style="font-size:.75rem;font-weight:700;color:var(--strong);margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px">Selecciona los consentimientos que aplican para ${pac.nombre||'el/la paciente'}</div>
+    ${CI_ORDEN_V2.map(checkboxBloque).join('')}
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:14px 0">
+      <div style="flex:1;min-width:180px">
+        <div style="font-size:.75rem;font-weight:700;color:var(--strong);margin-bottom:6px;text-transform:uppercase;letter-spacing:.5px">Firma del paciente</div>
+        ${firmaPaciente
           ? `<div style="border:1.5px solid #7ecba0;border-radius:10px;padding:6px;background:#edfaf0;text-align:center">
-               <img src="${ci.firmaPaciente}" style="height:54px;object-fit:contain;display:block;margin:0 auto">
+               <img src="${firmaPaciente}" style="height:54px;object-fit:contain;display:block;margin:0 auto">
                <div style="font-size:.72rem;color:#2d6a4f;margin-top:3px">✅ Firmado</div>
              </div>
              <button class="btn" style="font-size:.72rem;margin-top:6px;width:100%" onclick="abrirCIFirmaModal('${pid}')">🔄 Volver a firmar</button>`
@@ -3931,12 +3873,41 @@ function renderPacConsentimiento(pid){
     </div>
 
     <div style="display:flex;gap:8px;flex-wrap:wrap">
-      <button class="btn primary" onclick="ciGuardarConsentimiento('${pid}')" style="font-size:.82rem">💾 Guardar consentimiento</button>
-      <button class="btn" onclick="ciGenerarPDF('${pid}')" style="font-size:.82rem">📄 Generar PDF independiente</button>
+      <button class="btn primary" onclick="ciGuardarConsentimientoV2('${pid}')" style="font-size:.82rem">💾 Guardar consentimiento</button>
+      <button class="btn" onclick="ciGenerarPDFv2('${pid}')" style="font-size:.82rem">📄 Generar PDF independiente</button>
+      <button class="btn" onclick="ciGenerarLinkFirmaRemota('${pid}')" style="font-size:.82rem;background:#e8f0fe;color:#1a4d8f;border:1.5px solid #a8c5e8" title="Genera un enlace para que el paciente firme desde su celular o computador">🔗 Enviar para firma remota</button>
       ${firmado?`<button class="btn" style="font-size:.82rem;background:var(--border);color:#fff" onclick="exportarHistoriaClinicaConCI('${pid}')">📋 Hist. Clínica + Consentimiento</button>`:''}
       <button class="btn" onclick="ciLimpiarFirmaPaciente('${pid}')" style="font-size:.82rem;background:#fff3e0;color:#a0536a;border:1.5px solid #e8b87a" title="Borra solo la firma del paciente">🧹 Limpiar firma</button>
       <button class="btn" onclick="ciEliminarConsentimiento('${pid}')" style="font-size:.82rem;background:#ffeaea;color:#c0392b;border:1.5px solid #e8a0a0" title="Elimina todo el consentimiento guardado">🗑️ Eliminar consentimiento</button>
     </div>`;
+}
+
+// ---- Marca/desmarca un consentimiento individual (no guarda snapshot aún) ----
+function ciToggleConsent(pid, key, checked){
+  var ci = DB.get('consentimiento_'+pid)||{};
+  if(!ci.consentimientos) ci.consentimientos = {};
+  if(!ci.consentimientos[key]) ci.consentimientos[key] = {};
+  ci.consentimientos[key].aceptado = !!checked;
+  DB.set('consentimiento_'+pid, ci);
+  // No se re-renderiza para no perder el foco del checkbox; se actualiza al guardar.
+}
+
+// ---- Permite a un consentimiento legacy migrar a v2 mediante re-firma ----
+function ciIniciarRefirmaV2(pid){
+  if(!confirm('Esto creará un nuevo registro de consentimiento (formato con consentimientos individuales). El consentimiento anterior firmado se conservará en el PDF ya generado, pero esta vista pasará al nuevo formato. ¿Continuar?')) return;
+  var ci = DB.get('consentimiento_'+pid)||{};
+  // Conservamos la firma anterior de la psicóloga como referencia pero limpiamos
+  // la firma del paciente y el estado "legacy" para iniciar el nuevo flujo.
+  ci.legacyRespaldo = {
+    firmaPaciente: ci.firmaPaciente||'',
+    firmaPsicologa: ci.firmaPsicologa||'',
+    fechaFirma: ci.fechaFirma||''
+  };
+  ci.firmaPaciente = '';
+  ci.consentimientos = {};
+  DB.set('consentimiento_'+pid, ci);
+  renderPacConsentimiento(pid);
+  toast('Listo. Selecciona los consentimientos y firma nuevamente.');
 }
 
 function abrirCIFirmaModal(pid){
@@ -4023,6 +3994,57 @@ function ciGuardarConsentimiento(pid){
   ci.firmaPsicologa = FIRMA_DATA||'';
   ci.fechaFirma = ci.fechaFirma || new Date().toISOString();
   ci.firmaPaciente = ci.firmaPaciente||'';
+  DB.set('consentimiento_'+pid, ci);
+  renderPacConsentimiento(pid);
+  toast('💾 Consentimiento guardado');
+}
+
+// ---- Guardado v2: crea snapshot del texto de cada consentimiento aceptado,
+// registra fecha y hora exactas, y deja firma de la psicóloga.
+function ciGuardarConsentimientoV2(pid){
+  var ci = DB.get('consentimiento_'+pid)||{};
+
+  if(!ci.firmaPaciente){
+    toast('⚠️ Falta la firma del paciente');
+    return;
+  }
+  var algunoAceptado = CI_ORDEN_V2.some(function(k){
+    return ci.consentimientos && ci.consentimientos[k] && ci.consentimientos[k].aceptado;
+  });
+  if(!algunoAceptado){
+    toast('⚠️ Selecciona al menos un consentimiento');
+    return;
+  }
+
+  ci.version = 2;
+  ci.firmaPsicologa = FIRMA_DATA||'';
+  // Fecha y hora exactas de la PRIMERA firma (no se sobreescribe en guardados posteriores)
+  ci.fechaFirma = ci.fechaFirma || new Date().toISOString();
+  var ahora = new Date().toISOString();
+
+  // Congelar (snapshot) el texto de cada consentimiento la PRIMERA vez que se acepta
+  ci.consentimientos = ci.consentimientos || {};
+  CI_ORDEN_V2.forEach(function(key){
+    var item = ci.consentimientos[key] || {};
+    if(item.aceptado){
+      // Solo se toma el snapshot si aún no existe uno (primera aceptación).
+      // Así, cambios futuros en CI_TEXTOS_V2 no alteran lo que el paciente
+      // ya firmó, ni siquiera al volver a guardar (p.ej. al firmar otro ítem).
+      if(!item.fechaAceptacion){
+        item.titulo = CI_TEXTOS_V2[key].titulo;
+        item.texto = CI_TEXTOS_V2[key].texto;
+        item.fechaAceptacion = ahora;
+      }
+    } else {
+      // Si no está aceptado, se limpia cualquier snapshot/fecha previa para
+      // no dejar datos obsoletos asociados a un consentimiento no vigente.
+      delete item.titulo;
+      delete item.texto;
+      delete item.fechaAceptacion;
+    }
+    ci.consentimientos[key] = item;
+  });
+
   DB.set('consentimiento_'+pid, ci);
   renderPacConsentimiento(pid);
   toast('💾 Consentimiento guardado');
@@ -4246,6 +4268,234 @@ function ciGenerarHTMLConsentimiento(pac, ci, LOGO_B64, fechaHoy, esc){
 
   <!-- PIE -->
   <div class="footer-note">Documento digital &middot; ${fechaHoy} &middot; Confidencial</div>
+
+</div>
+<div class="no-print" style="position:fixed;bottom:24px;right:24px;display:flex;flex-direction:column;gap:10px;z-index:999">
+  <button onclick="window.print()" style="background:#cd8e9d;color:#fff;border:none;padding:12px 22px;border-radius:24px;font-size:.9rem;cursor:pointer;box-shadow:0 4px 16px rgba(100,48,0,.2)">🖨️ Imprimir / Guardar PDF</button>
+  <button onclick="window.close()" style="background:#fadae1;color:#643000;border:1px solid #cd8e9d;padding:10px 22px;border-radius:24px;font-size:.9rem;cursor:pointer">✕ Cerrar</button>
+</div>
+</body>
+</html>`;
+}
+
+// ---- Generador de PDF para el formato v2 (consentimientos individuales) ----
+// ---- Genera un link temporal para que el paciente firme el consentimiento
+// de forma remota (sin necesidad de iniciar sesión). El link expira en 7 días
+// o al ser usado una vez, lo que ocurra primero.
+function ciGenerarLinkFirmaRemota(pid){
+  if(!_firebaseDB){
+    toast('⚠️ Necesitas conexión a internet para generar el link');
+    return;
+  }
+  var pacs = getPacientes();
+  var pac = pacs.find(p=>p.id===pid)||{};
+  if(!pac.nombre){
+    toast('⚠️ No se encontró el paciente');
+    return;
+  }
+
+  // Token aleatorio (no secuencial, no relacionado al pid interno)
+  var token = Array.from(crypto.getRandomValues(new Uint8Array(16)))
+    .map(b => b.toString(16).padStart(2,'0')).join('');
+
+  var expira = new Date();
+  expira.setDate(expira.getDate() + 7);
+
+  var registro = {
+    token: token,
+    pacienteId: pid,
+    pacienteNombre: pac.nombre,
+    fechaCreacion: new Date().toISOString(),
+    expira: expira.toISOString(),
+    usado: false
+  };
+
+  toast('Generando enlace...');
+  _firebaseDB.collection('firmas_pendientes').doc(token).set(registro)
+    .then(function(){
+      var url = window.location.origin + window.location.pathname.replace(/index\.html$/,'') + 'firmar.html?t=' + token;
+      // Mostrar el link en un prompt para copiar fácilmente
+      var modal = document.createElement('div');
+      modal.style.cssText = 'position:fixed;inset:0;background:rgba(100,48,0,0.18);z-index:9999;display:flex;align-items:center;justify-content:center';
+      modal.innerHTML = `
+        <div style="background:#fff;border-radius:16px;padding:28px;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(100,48,0,.15)">
+          <div style="font-family:'Playfair Display',serif;font-size:1.05rem;color:#643000;font-weight:700;margin-bottom:10px">🔗 Enlace de firma remota</div>
+          <p style="font-size:.82rem;color:#7a5a40;margin-bottom:12px">Comparte este enlace con ${pac.nombre} (válido por 7 días, un solo uso):</p>
+          <input readonly value="${url}" style="width:100%;box-sizing:border-box;padding:10px 12px;border:1.5px solid #cd8e9d;border-radius:8px;font-size:.8rem;color:#643000;margin-bottom:14px" onclick="this.select()">
+          <div style="display:flex;gap:10px;justify-content:flex-end">
+            <button onclick="this.closest('div[style*=fixed]').remove()" style="background:none;border:1.5px solid #ddd;border-radius:8px;padding:8px 18px;color:#999;cursor:pointer;font-size:.85rem">Cerrar</button>
+            <button onclick="navigator.clipboard.writeText('${url}');this.textContent='✅ Copiado';" style="background:#cd8e9d;border:none;border-radius:8px;padding:8px 20px;color:#fff;cursor:pointer;font-size:.85rem;font-weight:600">📋 Copiar enlace</button>
+          </div>
+        </div>`;
+      document.body.appendChild(modal);
+    })
+    .catch(function(err){
+      console.warn('Error generando link de firma remota:', err);
+      toast('⚠️ No se pudo generar el enlace. Intenta de nuevo.');
+    });
+}
+
+// ---- Generador de PDF para el formato v2 (consentimientos individuales) ----
+function ciGenerarPDFv2(pid){
+  var pacs = getPacientes();
+  var pac = pacs.find(p=>p.id===pid)||{};
+  var ci = DB.get('consentimiento_'+pid)||{};
+  var LOGO_B64 = document.getElementById('logo-img')&&document.getElementById('logo-img').src ? document.getElementById('logo-img').src : '';
+  var dRef = ci.fechaFirma ? new Date(ci.fechaFirma) : new Date();
+  var fechaHoy = dRef.toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'});
+  var horaHoy = dRef.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'});
+  function esc(v){ return (v||'').toString().replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  if(!ci.firmaPsicologa) ci.firmaPsicologa = FIRMA_DATA||'';
+  var html = ciGenerarHTMLConsentimientoV2(pac, ci, LOGO_B64, fechaHoy, horaHoy, esc);
+
+  var blob = new Blob([html], {type:'text/html;charset=utf-8'});
+  var url; try { url = URL.createObjectURL(blob); } catch(e){ url = null; }
+  var opened = false;
+  if(url && !url.startsWith('blob:null')){ var w = window.open(url,'_blank'); opened=!!w; }
+  if(!opened){ descargarArchivo(html,'ConsentimientoInformado_'+(pac.nombre||'').replace(/\s+/g,'_')+'.html','text/html;charset=utf-8'); toast('Consentimiento descargado'); }
+  else { setTimeout(()=>URL.revokeObjectURL(url),30000); }
+}
+
+function ciGenerarHTMLConsentimientoV2(pac, ci, LOGO_B64, fechaHoy, horaHoy, esc){
+  // Calcular edad si hay fecha de nacimiento
+  var edadTexto = '';
+  if(pac.fnac){
+    var hoy = new Date();
+    var fn = new Date(pac.fnac);
+    var edad = hoy.getFullYear() - fn.getFullYear();
+    var m = hoy.getMonth() - fn.getMonth();
+    if(m < 0 || (m === 0 && hoy.getDate() < fn.getDate())) edad--;
+    edadTexto = edad + ' años';
+  }
+  var modalidadTexto = pac.modalidad === 'presencial' ? '🏠 Presencial' : '💻 Virtual';
+
+  var lista = ci.consentimientos || {};
+  var bloquesConsentimiento = CI_ORDEN_V2.map(function(key){
+    var item = lista[key];
+    if(!item || !item.aceptado) return '';
+    var fechaItem = item.fechaAceptacion ? new Date(item.fechaAceptacion) : null;
+    var fechaItemTxt = fechaItem ? fechaItem.toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'}) + ' · ' + fechaItem.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit'}) : (fechaHoy+' · '+horaHoy);
+    return `
+  <div class="sec-label">${esc((item.titulo||CI_TEXTOS_V2[key].titulo).toUpperCase())} ✅ ACEPTADO</div>
+  <p class="consent-text">${esc(item.texto||CI_TEXTOS_V2[key].texto)}</p>
+  <p style="font-size:.72rem;color:#888;margin-bottom:4px">Aceptado el ${fechaItemTxt}</p>`;
+  }).join('');
+
+  return `<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Consentimiento - ${esc(pac.nombre)}</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Lato:wght@300;400;700&display=swap');
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Lato',Arial,sans-serif;font-size:12.5px;color:#3a1a00;background:#fff;line-height:1.65}
+  .page{max-width:780px;margin:0 auto;padding:36px 40px 50px}
+
+  /* CABECERA */
+  .header{display:flex;align-items:center;gap:16px;border-bottom:2px solid #cd8e9d;padding-bottom:14px;margin-bottom:20px}
+  .logo-wrap img{width:72px;height:72px;object-fit:contain;border-radius:8px}
+  .logo-placeholder{width:72px;height:72px;background:#fadae1;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:1.6rem}
+  .prof-info{flex:1}
+  .prof-name{font-size:1.1rem;font-weight:700;color:#3a1a00;letter-spacing:.02em}
+  .prof-title{font-size:.78rem;color:#888;margin-top:1px}
+  .prof-contact{font-size:.76rem;color:#888;margin-top:2px}
+
+  /* TÍTULO CENTRAL */
+  .ci-title-band{text-align:center;border-top:1.5px solid #cd8e9d;border-bottom:1.5px solid #cd8e9d;padding:10px 0;margin-bottom:20px}
+  .ci-title-band h2{font-size:.95rem;font-weight:700;letter-spacing:.08em;color:#3a1a00}
+
+  /* SECCIÓN */
+  .sec-label{font-size:.7rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#cd8e9d;border-bottom:1px solid #e8d0d6;padding-bottom:4px;margin-bottom:10px;margin-top:16px}
+
+  /* DATOS DEL PACIENTE */
+  .datos-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 24px;margin-bottom:4px}
+  .dato-row{display:flex;gap:6px;font-size:.82rem}
+  .dato-label{font-weight:700;color:#3a1a00;min-width:80px}
+  .dato-val{color:#3a1a00}
+
+  /* CONSENTIMIENTO */
+  .consent-text{font-size:.82rem;line-height:1.75;text-align:justify;color:#3a1a00;margin-bottom:4px}
+
+  /* FIRMAS */
+  .firmas{display:flex;gap:40px;justify-content:space-around;margin-top:36px;padding-top:20px;border-top:1px solid #e8d0d6}
+  .firma-bloque{flex:1;text-align:center;max-width:240px}
+  .firma-img{height:68px;object-fit:contain;display:block;margin:0 auto 4px;mix-blend-mode:multiply}
+  .firma-linea{border-top:1.5px solid #3a1a00;padding-top:6px;font-size:.82rem;color:#3a1a00}
+  .firma-sub{font-size:.72rem;color:#888;margin-top:2px}
+
+  /* PIE */
+  .footer-note{margin-top:22px;border-top:1px solid #e8d0d6;padding-top:10px;font-size:.7rem;color:#aaa;text-align:center}
+
+  @media print{
+    body{font-size:12px}
+    .page{padding:20px 24px 30px}
+    .no-print{display:none!important}
+    @page{margin:1.2cm}
+  }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- CABECERA -->
+  <div class="header">
+    <div class="logo-wrap">
+      ${LOGO_B64
+        ? `<img src="${LOGO_B64}" alt="Logo">`
+        : `<div class="logo-placeholder">🌸</div>`}
+    </div>
+    <div class="prof-info">
+      <div class="prof-name">Luisa Fernanda Garcés García</div>
+      <div class="prof-title">Psicóloga Titulada &middot; T.P. 174366 &middot; C.C. 1036602429</div>
+      <div class="prof-contact">psicoluisafernandagarces@gmail.com &middot; 324 638 1485 &middot; Medellín</div>
+    </div>
+  </div>
+
+  <!-- TÍTULO -->
+  <div class="ci-title-band">
+    <h2>CONSENTIMIENTO INFORMADO FIRMADO DIGITALMENTE</h2>
+  </div>
+
+  <!-- DATOS DEL PACIENTE -->
+  <div class="sec-label">DATOS DEL PACIENTE</div>
+  <div class="datos-grid">
+    <div class="dato-row"><span class="dato-label">Nombre:</span><span class="dato-val">${esc(pac.nombre)||''}</span></div>
+    <div class="dato-row"><span class="dato-label">Cédula:</span><span class="dato-val">${esc(pac.cc)||''}</span></div>
+    <div class="dato-row"><span class="dato-label">Edad:</span><span class="dato-val">${edadTexto||''}</span></div>
+    <div class="dato-row"><span class="dato-label">Tel:</span><span class="dato-val">${esc(pac.tel||pac.telefono||'')}</span></div>
+    <div class="dato-row"><span class="dato-label">Modalidad:</span><span class="dato-val">${modalidadTexto}</span></div>
+    <div class="dato-row"><span class="dato-label">Fecha:</span><span class="dato-val">${fechaHoy}</span></div>
+    <div class="dato-row"><span class="dato-label">Hora:</span><span class="dato-val">${horaHoy}</span></div>
+  </div>
+
+  <!-- DECLARACIÓN GENERAL -->
+  <p class="consent-text" style="margin-top:14px">Yo, <strong>${esc(pac.nombre)}</strong>${pac.cc?' (C.C. '+esc(pac.cc)+')':''}, declaro que he leído y comprendido los siguientes consentimientos, que he tenido la oportunidad de formular preguntas y que estas han sido respondidas satisfactoriamente. He marcado y firmado únicamente aquellos que acepto de forma libre, voluntaria e informada.</p>
+
+  <!-- CONSENTIMIENTOS ACEPTADOS -->
+  ${bloquesConsentimiento || '<p class="consent-text">No se registró ningún consentimiento aceptado.</p>'}
+
+  <!-- FIRMAS -->
+  <div class="firmas">
+    <div class="firma-bloque">
+      ${ci.firmaPaciente
+        ? `<img src="${ci.firmaPaciente}" class="firma-img" alt="Firma paciente">`
+        : `<div style="height:68px;"></div>`}
+      <div class="firma-linea">${esc(pac.nombre)}</div>
+      <div class="firma-sub">Paciente &middot; C.C. ${esc(pac.cc)||''}</div>
+    </div>
+    <div class="firma-bloque">
+      ${ci.firmaPsicologa
+        ? `<img src="${ci.firmaPsicologa}" class="firma-img" alt="Firma psicóloga">`
+        : `<div style="height:68px;"></div>`}
+      <div class="firma-linea">Luisa Fernanda Garcés García</div>
+      <div class="firma-sub">Psicóloga &middot; T.P. 174366</div>
+    </div>
+  </div>
+
+  <!-- PIE -->
+  <div class="footer-note">Documento digital &middot; ${fechaHoy} a las ${horaHoy} &middot; Confidencial</div>
 
 </div>
 <div class="no-print" style="position:fixed;bottom:24px;right:24px;display:flex;flex-direction:column;gap:10px;z-index:999">
