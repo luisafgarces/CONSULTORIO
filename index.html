@@ -908,8 +908,8 @@ const DB = {
       </div>
     </div>
     <div class="row col3">
-      <div class="fg"><label class="lbl">Fecha y hora inicio</label><input type="datetime-local" id="ag-nuevo-inicio"></div>
-      <div class="fg"><label class="lbl">Hora fin</label><input type="datetime-local" id="ag-nuevo-fin"></div>
+      <div class="fg"><label class="lbl">Fecha y hora inicio</label><input type="datetime-local" id="ag-nuevo-inicio" onchange="agAutocompletarFin()"></div>
+      <div class="fg"><label class="lbl">Hora fin</label><input type="datetime-local" id="ag-nuevo-fin" oninput="this.dataset.editadoManual='1'"></div>
       <div class="fg"><label class="lbl">Descripción</label><input type="text" id="ag-nuevo-desc" placeholder="Nota opcional"></div>
     </div>
     <div class="row col3">

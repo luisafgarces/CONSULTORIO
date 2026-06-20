@@ -2195,6 +2195,22 @@ function agAutocompletarTitulo(){
   document.getElementById('ag-nuevo-titulo').value = 'Sesi\u00f3n #'+numSesion+' - '+pac.nombre;
 }
 
+// Calcula automáticamente la hora de fin sumando 45 minutos a la hora de
+// inicio. Solo lo hace si el campo "fin" está vacío o si el usuario no lo
+// ha editado manualmente todavía (para no pisar un valor que ya ajustó).
+function agAutocompletarFin(){
+  var inicioEl = document.getElementById('ag-nuevo-inicio');
+  var finEl = document.getElementById('ag-nuevo-fin');
+  if(!inicioEl.value) return;
+  // Si el usuario ya tocó manualmente el campo "fin", no lo sobreescribimos.
+  if(finEl.dataset.editadoManual === '1') return;
+  var inicio = new Date(inicioEl.value);
+  var fin = new Date(inicio.getTime() + 45*60*1000);
+  // Formato YYYY-MM-DDTHH:MM requerido por <input type="datetime-local">
+  var pad = function(n){ return String(n).padStart(2,'0'); };
+  finEl.value = fin.getFullYear()+'-'+pad(fin.getMonth()+1)+'-'+pad(fin.getDate())+'T'+pad(fin.getHours())+':'+pad(fin.getMinutes());
+}
+
 // Muestra/oculta los campos de repetición según la frecuencia elegida
 function agToggleRepetir(){
   var val = document.getElementById('ag-nuevo-repetir').value;
@@ -2254,6 +2270,49 @@ function agAgregarEvento(){
     iter++;
   } while(repetir && new Date(fechaInicio.getTime() + iter*intervaloDias*24*60*60*1000) <= limite);
 
+  agMostrarConfirmacion(nuevosEventos);
+}
+
+// Muestra un modal con la fecha/hora en texto legible para que la
+// psicóloga confirme visualmente antes de guardar. Esto previene errores
+// como agendar a una hora distinta a la que se pretendía por un descuido
+// al digitar.
+function agMostrarConfirmacion(nuevosEventos){
+  var primero = nuevosEventos[0];
+  var dIni = new Date(primero.inicio);
+  var dFin = new Date(primero.fin);
+  var fechaTxt = dIni.toLocaleDateString('es-CO',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  var horaIniTxt = dIni.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',hour12:true});
+  var horaFinTxt = dFin.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',hour12:true});
+  var extraRepeticion = nuevosEventos.length>1 ? `<div style="font-size:.78rem;color:#a0536a;margin-top:6px">+ ${nuevosEventos.length-1} repetici\u00f3n(es) m\u00e1s</div>` : '';
+
+  var modal = document.createElement('div');
+  modal.id = 'ag-confirmar-overlay';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(100,48,0,0.18);z-index:9999;display:flex;align-items:center;justify-content:center';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:16px;padding:28px;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(100,48,0,.15);font-family:'Lato',sans-serif">
+      <div style="font-family:'Playfair Display',serif;font-size:1.05rem;color:#643000;font-weight:700;margin-bottom:14px">🗓️ Confirmar cita</div>
+      <div style="background:#fdf5f7;border-radius:10px;padding:16px;margin-bottom:18px">
+        <div style="font-weight:700;font-size:.92rem;color:#3a1a00;margin-bottom:8px">${primero.titulo}</div>
+        <div style="font-size:.85rem;color:#643000;text-transform:capitalize">${fechaTxt}</div>
+        <div style="font-size:.85rem;color:#643000;margin-top:2px">${horaIniTxt} a ${horaFinTxt}</div>
+        ${extraRepeticion}
+      </div>
+      <p style="font-size:.82rem;color:#7a5a40;margin-bottom:18px">¿Confirmas que la fecha y hora son correctas?</p>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button onclick="document.getElementById('ag-confirmar-overlay').remove()" style="background:none;border:1.5px solid #ddd;border-radius:8px;padding:8px 18px;color:#999;cursor:pointer;font-size:.85rem">Revisar de nuevo</button>
+        <button id="ag-confirmar-btn" style="background:#cd8e9d;border:none;border-radius:8px;padding:8px 20px;color:#fff;cursor:pointer;font-size:.85rem;font-weight:600">✅ Confirmar y guardar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  document.getElementById('ag-confirmar-btn').onclick = function(){
+    agGuardarEventosConfirmados(nuevosEventos);
+    modal.remove();
+  };
+}
+
+// Guarda los eventos ya confirmados por la psicóloga y limpia el formulario.
+function agGuardarEventosConfirmados(nuevosEventos){
   agEventos = agEventos.concat(nuevosEventos);
   agGuardar();
   // Si la cita es para mañana, resetear la marca y mostrar alerta
@@ -2267,7 +2326,9 @@ function agAgregarEvento(){
   document.getElementById('ag-nuevo-pac').value='';
   document.getElementById('ag-nuevo-titulo').value='';
   document.getElementById('ag-nuevo-inicio').value='';
-  document.getElementById('ag-nuevo-fin').value='';
+  var finEl = document.getElementById('ag-nuevo-fin');
+  finEl.value='';
+  delete finEl.dataset.editadoManual;
   document.getElementById('ag-nuevo-desc').value='';
   document.getElementById('ag-nuevo-repetir').value='';
   document.getElementById('ag-nuevo-rep-dias').value='';
@@ -2298,14 +2359,53 @@ function agGuardarEdicion(){
   var id = document.getElementById('ag-edit-id').value;
   var idx = agEventos.findIndex(e=>e.id===id);
   if(idx<0){ toast('Evento no encontrado'); return; }
-  agEventos[idx].titulo = document.getElementById('ag-edit-titulo').value.trim()||agEventos[idx].titulo;
-  agEventos[idx].inicio = document.getElementById('ag-edit-inicio').value;
-  agEventos[idx].fin = document.getElementById('ag-edit-fin').value||agEventos[idx].inicio;
-  agEventos[idx].tipo = document.getElementById('ag-edit-tipo').value;
-  agEventos[idx].descripcion = document.getElementById('ag-edit-desc').value;
-  agGuardar(); renderAgenda();
-  document.getElementById('ag-edit-overlay').classList.remove('open');
-  toast('Cita actualizada \u2713');
+
+  var titulo = document.getElementById('ag-edit-titulo').value.trim()||agEventos[idx].titulo;
+  var inicio = document.getElementById('ag-edit-inicio').value;
+  var fin = document.getElementById('ag-edit-fin').value||inicio;
+  var tipo = document.getElementById('ag-edit-tipo').value;
+  var desc = document.getElementById('ag-edit-desc').value;
+
+  agMostrarConfirmacionEdicion(idx, { titulo, inicio, fin, tipo, descripcion: desc });
+}
+
+// Igual que agMostrarConfirmacion, pero para edición de una cita existente.
+function agMostrarConfirmacionEdicion(idx, datos){
+  var dIni = new Date(datos.inicio);
+  var dFin = new Date(datos.fin);
+  var fechaTxt = dIni.toLocaleDateString('es-CO',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  var horaIniTxt = dIni.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',hour12:true});
+  var horaFinTxt = dFin.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',hour12:true});
+
+  var modal = document.createElement('div');
+  modal.id = 'ag-confirmar-edicion-overlay';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(100,48,0,0.18);z-index:9999;display:flex;align-items:center;justify-content:center';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:16px;padding:28px;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(100,48,0,.15);font-family:'Lato',sans-serif">
+      <div style="font-family:'Playfair Display',serif;font-size:1.05rem;color:#643000;font-weight:700;margin-bottom:14px">🗓️ Confirmar cambios</div>
+      <div style="background:#fdf5f7;border-radius:10px;padding:16px;margin-bottom:18px">
+        <div style="font-weight:700;font-size:.92rem;color:#3a1a00;margin-bottom:8px">${datos.titulo}</div>
+        <div style="font-size:.85rem;color:#643000;text-transform:capitalize">${fechaTxt}</div>
+        <div style="font-size:.85rem;color:#643000;margin-top:2px">${horaIniTxt} a ${horaFinTxt}</div>
+      </div>
+      <p style="font-size:.82rem;color:#7a5a40;margin-bottom:18px">¿Confirmas que la nueva fecha y hora son correctas?</p>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button onclick="document.getElementById('ag-confirmar-edicion-overlay').remove()" style="background:none;border:1.5px solid #ddd;border-radius:8px;padding:8px 18px;color:#999;cursor:pointer;font-size:.85rem">Revisar de nuevo</button>
+        <button id="ag-confirmar-edicion-btn" style="background:#cd8e9d;border:none;border-radius:8px;padding:8px 20px;color:#fff;cursor:pointer;font-size:.85rem;font-weight:600">✅ Confirmar y guardar</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+  document.getElementById('ag-confirmar-edicion-btn').onclick = function(){
+    agEventos[idx].titulo = datos.titulo;
+    agEventos[idx].inicio = datos.inicio;
+    agEventos[idx].fin = datos.fin;
+    agEventos[idx].tipo = datos.tipo;
+    agEventos[idx].descripcion = datos.descripcion;
+    agGuardar(); renderAgenda();
+    document.getElementById('ag-edit-overlay').classList.remove('open');
+    toast('Cita actualizada \u2713');
+    modal.remove();
+  };
 }
 
 // ===================== FINANZAS =====================
