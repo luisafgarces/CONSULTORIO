@@ -4721,7 +4721,7 @@ function dcLimpiarTodo(){
   renderDCGrid();
 }
 
-function sincronizarAhora(){
+function sincronizarAhora(silencioso){
   DB._loaded = false;
   DB.loadAll().then(function(ok){
     if(!ok) return;
@@ -4734,9 +4734,32 @@ function sincronizarAhora(){
     if(typeof renderAgenda === 'function') renderAgenda();
     if(typeof renderAll === 'function') renderAll();
     if(typeof renderPacientes === 'function') renderPacientes();
-    toast('Datos actualizados desde la nube \u2713');
+    if(!silencioso) toast('Datos actualizados desde la nube \u2713');
   });
 }
+
+// ---- Sincronización automática cada 3 minutos --------------------------
+// Solo sincroniza si: la app está visible (no en segundo plano) y el
+// usuario no está escribiendo en un campo de texto en ese momento, para
+// no interrumpir ni arriesgar perder texto a mitad de una nota clínica.
+function _puedeSincronizarAutomatico(){
+  if(document.hidden) return false;
+  var activo = document.activeElement;
+  if(!activo) return true;
+  var tag = activo.tagName;
+  if(tag === 'TEXTAREA' || tag === 'INPUT' || activo.isContentEditable) return false;
+  return true;
+}
+
+setInterval(function(){
+  if(_puedeSincronizarAutomatico()) sincronizarAhora(true);
+}, 3 * 60 * 1000); // cada 3 minutos
+
+// También sincroniza al volver a la pestaña/app después de estar en segundo
+// plano (por ejemplo, al cambiar de app en el celular y regresar).
+document.addEventListener('visibilitychange', function(){
+  if(!document.hidden) sincronizarAhora(true);
+});
 
 document.addEventListener('DOMContentLoaded', function(){
   document.getElementById('an-fecha').valueAsDate = new Date();
