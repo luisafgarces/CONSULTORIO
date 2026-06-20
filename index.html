@@ -578,6 +578,12 @@ const DB = {
       <div class="card">
         <div class="sec-title" id="ses-form-title">Nueva Sesión</div>
 
+        <!-- CONTEXTO CLÍNICO: resumen de Anamnesis + Plan de Tratamiento -->
+        <details id="ses-contexto-wrap" style="margin-bottom:18px;background:#fff8f9;border:1.5px solid #fadae1;border-radius:10px;padding:4px 14px">
+          <summary style="cursor:pointer;padding:10px 0;font-weight:700;color:#a0536a;font-size:.85rem">🧩 Contexto clínico del paciente (Anamnesis + Plan de Tratamiento)</summary>
+          <div id="ses-contexto-content" style="padding-bottom:12px;font-size:.82rem;line-height:1.7;color:var(--text)"></div>
+        </details>
+
         <!-- PLAN PARA ESTA SESIÓN (guía, va primero) -->
         <div class="fg" style="margin-bottom:18px;background:#fdf5f7;border:1.5px solid #e8d0d6;border-radius:10px;padding:14px">
           <label class="lbl" style="color:#cd8e9d">🧭 Plan para esta sesión (tu guía)</label>

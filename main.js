@@ -314,6 +314,53 @@ function abrirAnamnesisDePaciente(pid){
   }, 50);
 }
 
+// Muestra, dentro del formulario de Sesión, un resumen de solo lectura
+// con los datos clave de la Anamnesis y el Plan de Tratamiento del
+// paciente, para no tener que ir y venir entre páginas. Es información
+// de referencia: no se edita aquí, se sigue editando en sus propias
+// páginas (Anamnesis / Plan de Tratamiento).
+function renderContextoClinico(pid){
+  var cont = document.getElementById('ses-contexto-content');
+  if(!cont) return;
+  var an = DB.get('anamnesis_'+pid) || {};
+  var pl = DB.get('plan_'+pid) || {};
+
+  var bloques = [];
+
+  if(an.motivo){
+    bloques.push('<div style="margin-bottom:8px"><strong style="color:#a0536a">Motivo de consulta:</strong> '+pscEsc(an.motivo)+'</div>');
+  }
+  var metasAn = [an.mCorto, an.mMedio, an.mLargo].filter(Boolean);
+  if(metasAn.length){
+    bloques.push('<div style="margin-bottom:8px"><strong style="color:#a0536a">Metas (Anamnesis):</strong><br>'
+      + (an.mCorto ? '· Corto plazo: '+pscEsc(an.mCorto)+'<br>' : '')
+      + (an.mMedio ? '· Mediano plazo: '+pscEsc(an.mMedio)+'<br>' : '')
+      + (an.mLargo ? '· Largo plazo: '+pscEsc(an.mLargo) : '')
+      + '</div>');
+  }
+  if(pl.objetivo){
+    bloques.push('<div style="margin-bottom:8px"><strong style="color:#a0536a">Objetivo terapéutico (Plan):</strong> '+pscEsc(pl.objetivo)+'</div>');
+  }
+  if(pl.dx){
+    bloques.push('<div style="margin-bottom:8px"><strong style="color:#a0536a">Diagnóstico (Plan):</strong> '+pscEsc(pl.dx)+'</div>');
+  }
+
+  // Avances de la sesión anterior, si existe, como referencia rápida
+  var sesiones = (DB.get('sesiones_'+pid) || []).filter(function(s){ return s.tipo!=='cancelacion'; });
+  if(sesiones.length){
+    var ultima = sesiones[sesiones.length-1];
+    if(ultima && ultima.avances){
+      bloques.push('<div style="margin-bottom:8px"><strong style="color:#a0536a">Avances (última sesión):</strong> '+pscEsc(ultima.avances)+'</div>');
+    }
+  }
+
+  if(!bloques.length){
+    cont.innerHTML = '<p style="color:var(--border);font-style:italic">Aún no hay Anamnesis ni Plan de Tratamiento registrados para este paciente. <a href="#" onclick="abrirAnamnesisDePaciente(\''+pid+'\');return false;" style="color:var(--strong)">Completar Anamnesis →</a></p>';
+  } else {
+    cont.innerHTML = bloques.join('');
+  }
+}
+
 function loadAnamnesis(){
   const pid = document.getElementById('an-sel-pac').value;
   if(!pid) return;
@@ -745,6 +792,7 @@ function nuevaSesion(){
   document.getElementById('ses-motivo-cancel-wrap').style.display='none';
   window._sesDcSeleccionadas = {};
   renderSesDCGrid();
+  renderContextoClinico(pid);
   document.getElementById('ses-form-title').textContent='Nueva Sesi\u00f3n';
   document.getElementById('sesion-form').style.display='block';
   document.getElementById('sesion-placeholder').style.display='none';
@@ -766,6 +814,7 @@ function abrirSesion(pid, sid){
   const s = ses.find(x=>x.id===sid);
   if(!s) return;
   currentSesionId = sid;
+  renderContextoClinico(pid);
   document.getElementById('ses-plan').value = s.planSesion||'';
   document.getElementById('ses-num').value = s.num||'';
   document.getElementById('ses-fecha').value = s.fecha||'';
@@ -960,7 +1009,51 @@ function guardarSesion(){
   DB.set('sesiones_'+pid, ses);
   renderListaSesiones(pid);
   toast(tipo==='cancelacion' ? 'Cancelación registrada ✓' : 'Sesión guardada definitivamente ✓');
+
+  // Si la sesión tiene "avances" registrados, ofrecer (sin obligar) la
+  // posibilidad de reflejarlos en el Plan de Tratamiento. Esto NUNCA se
+  // hace automáticamente: requiere que la psicóloga lo revise y confirme,
+  // para mantener el criterio clínico en sus manos.
+  if(sesData.avances && sesData.avances.trim() && tipo!=='cancelacion'){
+    sesionPendienteParaPlan = { pid: pid, avances: sesData.avances, numSesion: sesData.num };
+    mostrarSugerenciaActualizarPlan();
+  }
+
   limpiarFormSesion();
+}
+
+// ── Sugerencia (no automática) de reflejar avances en el Plan ──
+var sesionPendienteParaPlan = null;
+
+function mostrarSugerenciaActualizarPlan(){
+  if(!sesionPendienteParaPlan) return;
+  var modal = document.createElement('div');
+  modal.id = 'sugerencia-plan-overlay';
+  modal.style.cssText = 'position:fixed;inset:0;background:rgba(100,48,0,0.18);z-index:9999;display:flex;align-items:center;justify-content:center';
+  modal.innerHTML = `
+    <div style="background:#fff;border-radius:16px;padding:26px;max-width:420px;width:90%;box-shadow:0 8px 32px rgba(100,48,0,.15);font-family:'Lato',sans-serif">
+      <div style="font-family:'Playfair Display',serif;font-size:1.02rem;color:#643000;font-weight:700;margin-bottom:12px">🧭 ¿Reflejar estos avances en el Plan de Tratamiento?</div>
+      <div style="background:#fdf5f7;border-radius:10px;padding:12px 14px;margin-bottom:16px;font-size:.82rem;color:#643000;line-height:1.6;max-height:140px;overflow-y:auto">${pscEsc(sesionPendienteParaPlan.avances)}</div>
+      <p style="font-size:.78rem;color:#888;margin-bottom:16px">Esto NO modifica nada automáticamente. Te llevará al Plan de Tratamiento para que tú decidas qué agregar o ajustar, con este texto como referencia.</p>
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button onclick="document.getElementById('sugerencia-plan-overlay').remove();sesionPendienteParaPlan=null" style="background:none;border:1.5px solid #ddd;border-radius:8px;padding:8px 18px;color:#999;cursor:pointer;font-size:.85rem">No, gracias</button>
+        <button onclick="irARevisarPlan()" style="background:#cd8e9d;border:none;border-radius:8px;padding:8px 20px;color:#fff;cursor:pointer;font-size:.85rem;font-weight:600">Revisar Plan →</button>
+      </div>
+    </div>`;
+  document.body.appendChild(modal);
+}
+
+function irARevisarPlan(){
+  if(!sesionPendienteParaPlan) return;
+  var pid = sesionPendienteParaPlan.pid;
+  document.getElementById('sugerencia-plan-overlay').remove();
+  goPage('plan');
+  setTimeout(function(){
+    var sel = document.getElementById('pl-sel-pac');
+    if(sel){ sel.value = pid; loadPlan(); }
+    toast('Revisa el campo "Objetivo terapéutico" y ajústalo si corresponde');
+  }, 50);
+  sesionPendienteParaPlan = null;
 }
 
 // ── GUARDAR CORRECCIÓN sobre sesión inmutable ──
