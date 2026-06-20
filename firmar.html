@@ -255,40 +255,36 @@ async function enviarFirma(){
     const ahora = new Date().toISOString();
     const pid = _registro.pacienteId;
 
-    // Leer consentimiento existente (si lo hay) para no sobreescribir
-    // firmas previas o datos de la psicóloga.
-    const ciDoc = await db.collection('suitedata').doc('consentimiento_'+pid).get();
-    const ciExistente = (ciDoc.exists && ciDoc.data().value) ? ciDoc.data().value : {};
-
-    const consentimientos = ciExistente.consentimientos || {};
+    // Construimos solo lo que el paciente marcó/firmó AHORA. No leemos ni
+    // tocamos el consentimiento real del paciente (que vive en suitedata)
+    // desde este formulario público: eso lo hace la app principal, con la
+    // sesión autenticada de la psicóloga, cuando "recoge" esta firma desde
+    // la bandeja temporal. Así este formulario nunca necesita permiso de
+    // lectura/escritura sobre los datos clínicos reales.
+    const consentimientosMarcados = {};
     CI_ORDEN_V2.forEach(key => {
       const aceptado = document.getElementById('chk-'+key).checked;
-      const item = consentimientos[key] || {};
       if(aceptado){
-        if(!item.fechaAceptacion){
-          item.titulo = CI_TEXTOS_V2[key].titulo;
-          item.texto = CI_TEXTOS_V2[key].texto;
-          item.fechaAceptacion = ahora;
-        }
-        item.aceptado = true;
-      } else {
-        item.aceptado = false;
-        delete item.titulo;
-        delete item.texto;
-        delete item.fechaAceptacion;
+        consentimientosMarcados[key] = {
+          aceptado: true,
+          titulo: CI_TEXTOS_V2[key].titulo,
+          texto: CI_TEXTOS_V2[key].texto,
+          fechaAceptacion: ahora
+        };
       }
-      consentimientos[key] = item;
     });
 
-    const nuevoCi = {
-      ...ciExistente,
-      version: 2,
-      consentimientos: consentimientos,
+    // Guardamos en la colección aislada, identificada por el propio token
+    // (que ya es único y de un solo uso), no por el pacienteId.
+    await db.collection('firmas_en_proceso').doc(_token).set({
+      token: _token,
+      pacienteId: pid,
+      pacienteNombre: _registro.pacienteNombre,
       firmaPaciente: firmaPaciente,
-      fechaFirma: ciExistente.fechaFirma || ahora
-    };
-
-    await db.collection('suitedata').doc('consentimiento_'+pid).set({ value: nuevoCi });
+      consentimientos: consentimientosMarcados,
+      fechaFirma: ahora,
+      procesado: false
+    });
     await db.collection('firmas_pendientes').doc(_token).update({ usado: true, fechaUso: ahora });
 
     document.getElementById('contenido').innerHTML = `

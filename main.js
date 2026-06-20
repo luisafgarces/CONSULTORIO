@@ -130,6 +130,7 @@ var FIRMA_DATA = FIRMA_B64;
 function crearPaciente(){
   const nombre = document.getElementById('np-nombre').value.trim();
   if(!nombre){ toast('Ingresa el nombre del paciente'); return; }
+  window._guardandoActivamente = true;
   const pacs = getPacientes();
   const nuevo = {
     id: genId(),
@@ -157,6 +158,7 @@ function crearPaciente(){
   renderPacientes();
   fillSelects();
   toast('Paciente creado \u2713');
+  window._guardandoActivamente = false;
 }
 
 function renderPacientes(){
@@ -4550,6 +4552,62 @@ function ciGenerarHTMLConsentimiento(pac, ci, LOGO_B64, fechaHoy, esc){
 // ---- Genera un link temporal para que el paciente firme el consentimiento
 // de forma remota (sin necesidad de iniciar sesión). El link expira en 7 días
 // o al ser usado una vez, lo que ocurra primero.
+// ---- Recoge firmas remotas completadas (de firmas_en_proceso) y las
+// traslada al consentimiento real del paciente en suitedata. Se ejecuta
+// con la sesión autenticada de la psicóloga, que es la única con permiso
+// real de escribir en los expedientes clínicos. El formulario público
+// (firmar.html) nunca toca suitedata directamente; solo deja la firma en
+// esta bandeja aislada, sin exponer ni necesitar permisos sobre datos
+// clínicos reales.
+function recogerFirmasRemotas(){
+  if(!_firebaseDB || !window.ROL_ACTUAL) return;
+  _firebaseDB.collection('firmas_en_proceso').where('procesado', '==', false).get()
+    .then(function(snap){
+      if(snap.empty) return;
+      var procesados = [];
+      snap.forEach(function(doc){
+        var f = doc.data();
+        var pid = f.pacienteId;
+        if(!pid) return;
+        var ciRef = _firebaseDB.collection('suitedata').doc('consentimiento_'+pid);
+        procesados.push(
+          ciRef.get().then(function(ciDoc){
+            var ciExistente = (ciDoc.exists && ciDoc.data().value) ? ciDoc.data().value : {};
+            var consentimientos = ciExistente.consentimientos || {};
+            // Solo agregamos los consentimientos que el paciente marcó en
+            // este envío; no tocamos los que ya existían si no fueron
+            // remarcados (igual que el flujo de firma en persona).
+            Object.keys(f.consentimientos||{}).forEach(function(key){
+              consentimientos[key] = f.consentimientos[key];
+            });
+            var nuevoCi = {
+              ...ciExistente,
+              version: 2,
+              consentimientos: consentimientos,
+              firmaPaciente: f.firmaPaciente,
+              fechaFirma: ciExistente.fechaFirma || f.fechaFirma
+            };
+            return ciRef.set({ value: nuevoCi });
+          }).then(function(){
+            return doc.ref.update({ procesado: true, fechaProcesado: new Date().toISOString() });
+          }).catch(function(err){
+            console.error('Error procesando firma remota de', pid, err);
+          })
+        );
+      });
+      return Promise.all(procesados);
+    })
+    .then(function(resultados){
+      if(resultados && resultados.length){
+        toast('✅ ' + resultados.length + ' consentimiento(s) recibido(s) por firma remota');
+        if(typeof renderPacConsentimiento === 'function' && _ciPacId) renderPacConsentimiento(_ciPacId);
+      }
+    })
+    .catch(function(err){
+      console.error('Error recogiendo firmas remotas:', err);
+    });
+}
+
 function ciGenerarLinkFirmaRemota(pid){
   if(!_firebaseDB){
     toast('⚠️ Necesitas conexión a internet para generar el link');
@@ -4983,9 +5041,27 @@ function dcLimpiarTodo(){
   renderDCGrid();
 }
 
+// ---- Sincronización automática cada 3 minutos --------------------------
+// Solo sincroniza si: la app está visible (no en segundo plano) y el
+// usuario no está escribiendo en un campo de texto en ese momento, para
+// no interrumpir ni arriesgar perder texto a mitad de una nota clínica.
+function _puedeSincronizarAutomatico(){
+  if(document.hidden) return false;
+  if(window._sincronizacionEnCurso) return false; // evita solapar dos sincronizaciones
+  if(window._guardandoActivamente) return false; // evita chocar con un guardado en curso
+  var activo = document.activeElement;
+  if(!activo) return true;
+  var tag = activo.tagName;
+  if(tag === 'TEXTAREA' || tag === 'INPUT' || tag === 'SELECT' || activo.isContentEditable) return false;
+  return true;
+}
+
 function sincronizarAhora(silencioso){
+  if(window._sincronizacionEnCurso) return; // ya hay una sincronización en curso, no dupliques
+  window._sincronizacionEnCurso = true;
   DB._loaded = false;
   DB.loadAll().then(function(ok){
+    window._sincronizacionEnCurso = false;
     if(!ok) return;
     var ag = DB.get('agenda_eventos');
     if(ag){ agEventos.length=0; ag.forEach(function(e){ agEventos.push(e); }); }
@@ -4996,21 +5072,11 @@ function sincronizarAhora(silencioso){
     if(typeof renderAgenda === 'function') renderAgenda();
     if(typeof renderAll === 'function') renderAll();
     if(typeof renderPacientes === 'function') renderPacientes();
+    if(typeof recogerFirmasRemotas === 'function') recogerFirmasRemotas();
     if(!silencioso) toast('Datos actualizados desde la nube \u2713');
+  }).catch(function(){
+    window._sincronizacionEnCurso = false;
   });
-}
-
-// ---- Sincronización automática cada 3 minutos --------------------------
-// Solo sincroniza si: la app está visible (no en segundo plano) y el
-// usuario no está escribiendo en un campo de texto en ese momento, para
-// no interrumpir ni arriesgar perder texto a mitad de una nota clínica.
-function _puedeSincronizarAutomatico(){
-  if(document.hidden) return false;
-  var activo = document.activeElement;
-  if(!activo) return true;
-  var tag = activo.tagName;
-  if(tag === 'TEXTAREA' || tag === 'INPUT' || activo.isContentEditable) return false;
-  return true;
 }
 
 setInterval(function(){
@@ -5020,7 +5086,7 @@ setInterval(function(){
 // También sincroniza al volver a la pestaña/app después de estar en segundo
 // plano (por ejemplo, al cambiar de app en el celular y regresar).
 document.addEventListener('visibilitychange', function(){
-  if(!document.hidden) sincronizarAhora(true);
+  if(!document.hidden && _puedeSincronizarAutomatico()) sincronizarAhora(true);
 });
 
 document.addEventListener('DOMContentLoaded', function(){
@@ -5049,6 +5115,7 @@ document.addEventListener('DOMContentLoaded', function(){
     if(typeof renderAgenda === 'function') renderAgenda();
     if(typeof renderAll === 'function') renderAll();
     if(typeof renderPacientes === 'function') renderPacientes();
+    if(typeof recogerFirmasRemotas === 'function') recogerFirmasRemotas();
     // Verificar cumplea\u00f1os con datos frescos
     setTimeout(verificarCumpleanos, 400);
     setTimeout(verificarCitasManana, 800);
