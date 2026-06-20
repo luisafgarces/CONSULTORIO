@@ -333,6 +333,15 @@ function loadAnamnesis(){
     const el = document.getElementById('an-'+f);
     if(el) el.value = data[f]||'';
   });
+
+  // Autocompletar contacto de emergencia desde el perfil del paciente,
+  // pero SOLO si en la anamnesis todavía no hay nada guardado en esos
+  // campos (es decir, no se sobreescribe si la psicóloga ya los editó
+  // aquí con un valor distinto al del perfil del paciente).
+  if(!data['emergN']) document.getElementById('an-emergN').value = pac.emergNombre||'';
+  if(!data['emergParent']) document.getElementById('an-emergParent').value = pac.emergParentesco||'';
+  if(!data['emergT']) document.getElementById('an-emergT').value = pac.emergTel||'';
+
   // radio
   const modalidad = data['modalidad'];
   if(modalidad){ document.querySelectorAll('input[name="an-modalidad"]').forEach(r=>{ r.checked = r.value===modalidad; }); }
