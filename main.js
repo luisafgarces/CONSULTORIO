@@ -301,6 +301,18 @@ function switchTab(prefix, name){
 // nombre, edad, genero, tel, email, ocup come from the patient profile \u2014 not duplicated here
 const AN_FIELDS = ['fecha','estado','edu','estrato','ciudad','emergN','emergParent','emergT','motivo','decision','duracion','intensidad','intentos','dx','ttoPrev','hosp','hospD','med','desarrollo','famMental','relFam','pens','creencias','conductas','placer','emociones','sinFis','mant','dc-obs','salc','salcD','stab','stabD','scan','scanD','sotras','sobs','alCond','alImag','alPeso','alEmoc','suCal','suHoras','suAcost','suLev','suAlter','suObs','trEv','trImp','trAten','raCal','raAis','raPers','raRel','raCrisis','mCorto','mMedio','mLargo','oAfront','oActit','oFortal','oRiesgo','oNotas','cc-situacion','cc-pa','cc-significado','cc-emocion','cc-hipotesis'];
 
+// Abre la página de Anamnesis con el paciente ya seleccionado, para que
+// pueda verse/editarse/completarse directamente desde la ficha del
+// paciente, sin tener que buscarlo de nuevo en el selector.
+function abrirAnamnesisDePaciente(pid){
+  cerrarPacModal();
+  goPage('anamnesis');
+  setTimeout(function(){
+    var sel = document.getElementById('an-sel-pac');
+    if(sel){ sel.value = pid; loadAnamnesis(); }
+  }, 50);
+}
+
 function loadAnamnesis(){
   const pid = document.getElementById('an-sel-pac').value;
   if(!pid) return;
@@ -1805,7 +1817,7 @@ function renderDashboard(){
 
   const recent = pacs.slice(-6).reverse();
   document.getElementById('dash-recent-patients').innerHTML = recent.length ?
-    `<div class="patient-grid">${recent.map(p=>`<div class="patient-card" onclick="goPageDirect('pacientes')"><h3>${p.nombre}</h3><div class="meta">${p.ocup||'\u2014'}</div><div class="badge">${getSesionesCount(p.id)} sesi\u00f3n(es)</div></div>`).join('')}</div>` :
+    `<div class="patient-grid">${recent.map(p=>`<div class="patient-card" onclick="abrirPacModal('${p.id}')"><h3>${p.nombre}</h3><div class="meta">${p.ocup||'\u2014'}</div><div class="badge">${getSesionesCount(p.id)} sesi\u00f3n(es)</div></div>`).join('')}</div>` :
     '<p style="font-size:.85rem;color:var(--border)">A\u00fan no tienes pacientes. <a href="#" onclick="goPageDirect(\'pacientes\')" style="color:var(--border)">Crea el primero \u2192</a></p>';
 
   // \u00faltimas sesiones
@@ -3529,6 +3541,9 @@ function renderPacModalDatos(pac){
       </div>
     </div>
     <p style="font-size:.73rem;color:var(--border);margin-top:6px">Paciente desde: ${pac.creado ? new Date(pac.creado).toLocaleDateString('es-CO') : '\u2014'}</p>
+    <div style="margin-top:14px">
+      <button class="btn" style="font-size:.82rem;background:#fdf5f7;color:#cd8e9d;border:1.5px solid #e8d0d6" onclick="abrirAnamnesisDePaciente('${pac.id}')">🧾 Ver / completar Anamnesis</button>
+    </div>
   `;
 }
 
