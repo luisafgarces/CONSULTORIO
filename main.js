@@ -780,6 +780,7 @@ function nuevaSesion(){
   const pid = document.getElementById('ses-sel-pac').value;
   if(!pid){ toast('Selecciona un paciente'); return; }
   currentSesionId = null;
+  limpiarCamposFormSesion();
   const ses = DB.get('sesiones_'+pid)||[];
   // Auto-numero: next session number (counting only non-cancelled)
   const numSesiones = ses.filter(s=>s.tipo!=='cancelacion').length;
@@ -1082,7 +1083,10 @@ function guardarCorreccion(sesionId, pid){
   renderListaSesiones(pid);
 }
 
-function limpiarFormSesion(){
+// Limpia únicamente los VALORES del formulario de sesión (textareas,
+// checkboxes, radios), sin tocar la visibilidad del formulario. Se usa
+// tanto al empezar una sesión nueva como al terminar de guardar una.
+function limpiarCamposFormSesion(){
   ['ses-plan','ses-temas','ses-inter','ses-avances','ses-tarea','ses-acuerdos','ses-notas-priv','ses-eventos','ses-dif-tarea','ses-pensamiento','ses-ajustes'].forEach(id=>{
     var el = document.getElementById(id); if(el) el.value='';
   });
@@ -1096,6 +1100,12 @@ function limpiarFormSesion(){
   document.getElementById('ses-test-otro').style.display='none';
   document.getElementById('ses-resumen-box').style.display='none';
   document.getElementById('ses-export-btns').style.display='none';
+}
+
+// Limpia los campos Y oculta el formulario (vuelve al estado "sin sesión
+// seleccionada"). Se usa al terminar de guardar una sesión.
+function limpiarFormSesion(){
+  limpiarCamposFormSesion();
   document.getElementById('ses-estado').value=5;
   document.getElementById('ses-eval').textContent='5';
   document.getElementById('ses-tipo-sesion').value='sesion';
