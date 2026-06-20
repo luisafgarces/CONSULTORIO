@@ -257,7 +257,10 @@ function goPage(name){
     if(oc.indexOf("'"+name+"'")!==-1 || oc.indexOf('"'+name+'"')!==-1) b.classList.add('active');
   });
   if(name==='dashboard') renderDashboard();
-  if(name==='pacientes') renderPacientes();
+  if(name==='pacientes'){
+    renderPacientes();
+    if(!DB._loaded && _firebaseDB){ DB.whenReady(function(){ renderPacientes(); }); }
+  }
   if(name==='tests') loadTest();
   if(name==='seguimiento') loadSeguimiento();
   if(name==='agenda'){ renderAgenda(); agActualizarBadgeCumple(); }
@@ -1890,7 +1893,10 @@ function goPageDirect(name){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
-  if(name==='pacientes') renderPacientes();
+  if(name==='pacientes'){
+    renderPacientes();
+    if(!DB._loaded && _firebaseDB){ DB.whenReady(function(){ renderPacientes(); }); }
+  }
 }
 
 // ===================== TOAST =====================
@@ -4727,6 +4733,7 @@ function sincronizarAhora(){
     fillSelects();
     if(typeof renderAgenda === 'function') renderAgenda();
     if(typeof renderAll === 'function') renderAll();
+    if(typeof renderPacientes === 'function') renderPacientes();
     toast('Datos actualizados desde la nube \u2713');
   });
 }
@@ -4756,6 +4763,7 @@ document.addEventListener('DOMContentLoaded', function(){
     fillSelects();
     if(typeof renderAgenda === 'function') renderAgenda();
     if(typeof renderAll === 'function') renderAll();
+    if(typeof renderPacientes === 'function') renderPacientes();
     // Verificar cumplea\u00f1os con datos frescos
     setTimeout(verificarCumpleanos, 400);
     setTimeout(verificarCitasManana, 800);
