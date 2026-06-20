@@ -276,16 +276,27 @@ async function enviarFirma(){
 
     // Guardamos en la colección aislada, identificada por el propio token
     // (que ya es único y de un solo uso), no por el pacienteId.
-    await db.collection('firmas_en_proceso').doc(_token).set({
-      token: _token,
-      pacienteId: pid,
-      pacienteNombre: _registro.pacienteNombre,
-      firmaPaciente: firmaPaciente,
-      consentimientos: consentimientosMarcados,
-      fechaFirma: ahora,
-      procesado: false
-    });
-    await db.collection('firmas_pendientes').doc(_token).update({ usado: true, fechaUso: ahora });
+    try {
+      await db.collection('firmas_en_proceso').doc(_token).set({
+        token: _token,
+        pacienteId: pid,
+        pacienteNombre: _registro.pacienteNombre,
+        firmaPaciente: firmaPaciente,
+        consentimientos: consentimientosMarcados,
+        fechaFirma: ahora,
+        procesado: false
+      });
+    } catch(errPaso1){
+      console.error('FALLÓ EL PASO 1 (guardar en firmas_en_proceso):', errPaso1);
+      throw errPaso1;
+    }
+
+    try {
+      await db.collection('firmas_pendientes').doc(_token).update({ usado: true, fechaUso: ahora });
+    } catch(errPaso2){
+      console.error('FALLÓ EL PASO 2 (marcar token como usado):', errPaso2);
+      throw errPaso2;
+    }
 
     document.getElementById('contenido').innerHTML = `
       <div class="card">
@@ -301,7 +312,8 @@ async function enviarFirma(){
     console.error(e);
     btn.disabled = false;
     btn.textContent = '✅ Firmar y enviar';
-    alert('Hubo un error al enviar tu firma. Por favor intenta de nuevo.');
+    var detalle = e && e.message ? ' (' + e.message + ')' : '';
+    alert('Hubo un error al enviar tu firma. Por favor intenta de nuevo.' + detalle);
   }
 }
 
