@@ -731,6 +731,7 @@ function abrirSesion(pid, sid){
   const s = ses.find(x=>x.id===sid);
   if(!s) return;
   currentSesionId = sid;
+  document.getElementById('ses-plan').value = s.planSesion||'';
   document.getElementById('ses-num').value = s.num||'';
   document.getElementById('ses-fecha').value = s.fecha||'';
   document.getElementById('ses-dur').value = s.dur||50;
@@ -878,6 +879,7 @@ function guardarSesion(){
 
   const sesData = {
     id: currentSesionId || genId(),
+    planSesion: document.getElementById('ses-plan').value,
     num: document.getElementById('ses-num').value,
     fecha: document.getElementById('ses-fecha').value,
     dur: document.getElementById('ses-dur').value,
@@ -953,7 +955,7 @@ function guardarCorreccion(sesionId, pid){
 }
 
 function limpiarFormSesion(){
-  ['ses-temas','ses-inter','ses-avances','ses-tarea','ses-acuerdos','ses-notas-priv','ses-eventos','ses-dif-tarea','ses-pensamiento','ses-ajustes'].forEach(id=>{
+  ['ses-plan','ses-temas','ses-inter','ses-avances','ses-tarea','ses-acuerdos','ses-notas-priv','ses-eventos','ses-dif-tarea','ses-pensamiento','ses-ajustes'].forEach(id=>{
     var el = document.getElementById(id); if(el) el.value='';
   });
   document.querySelectorAll('#ses-tests-chk input[type=checkbox]').forEach(c=>c.checked=false);

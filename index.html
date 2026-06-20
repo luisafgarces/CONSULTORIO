@@ -576,6 +576,13 @@ const DB = {
     <div id="sesion-form" style="display:none">
       <div class="card">
         <div class="sec-title" id="ses-form-title">Nueva Sesión</div>
+
+        <!-- PLAN PARA ESTA SESIÓN (guía, va primero) -->
+        <div class="fg" style="margin-bottom:18px;background:#fdf5f7;border:1.5px solid #e8d0d6;border-radius:10px;padding:14px">
+          <label class="lbl" style="color:#cd8e9d">🧭 Plan para esta sesión (tu guía)</label>
+          <textarea id="ses-plan" placeholder="¿Qué planeas trabajar hoy? Objetivos, técnicas a usar, temas pendientes de la sesión anterior..." style="min-height:80px"></textarea>
+        </div>
+
         <!-- DATOS BÁSICOS -->
         <div class="row col3">
           <div class="fg"><label class="lbl">Fecha</label><input type="date" id="ses-fecha"></div>
