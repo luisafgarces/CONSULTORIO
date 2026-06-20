@@ -246,6 +246,13 @@ function rellenarPacienteDesdeSelector(){
 
 // ===================== NAV =====================
 function goPage(name){
+  // Bloqueo por rol: si la persona logueada no tiene permiso para esta
+  // página, no la dejamos navegar ahí (esto complementa el ocultamiento
+  // de botones en el menú, por si se llama goPage() desde otro lugar).
+  if(typeof window.tienePermiso === 'function' && window.ROL_ACTUAL && !window.tienePermiso(name)){
+    toast('No tienes permiso para acceder a esta sección');
+    return;
+  }
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   var pageEl = document.getElementById('page-'+name);
@@ -264,8 +271,12 @@ function goPage(name){
   if(name==='tests') loadTest();
   if(name==='seguimiento') loadSeguimiento();
   if(name==='agenda'){ renderAgenda(); agActualizarBadgeCumple(); }
-  if(name==='finanzas') renderAll();
+  if(name==='finanzas'){
+    renderAll();
+    if(typeof aplicarPermisosFinanzas === 'function') aplicarPermisosFinanzas();
+  }
   if(name==='documentos') renderDocumentos();
+  if(name==='usuarios') usrRenderLista();
   if(name==='informes') ilInit();
   if(name==='informe-global') igInit();
 }
@@ -1890,6 +1901,10 @@ function renderDashboard(){
 }
 
 function goPageDirect(name){
+  if(typeof window.tienePermiso === 'function' && window.ROL_ACTUAL && !window.tienePermiso(name)){
+    toast('No tienes permiso para acceder a esta sección');
+    return;
+  }
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
@@ -2488,6 +2503,94 @@ function finSwitchTab(tab,el){
   el.classList.add('active');
 }
 
+// ---- Bandeja de revisión para movimientos registrados por Administrador/a
+// Estos movimientos NO entran directo al historial financiero oficial,
+// porque ese rol no tiene permiso de leer finanzas_registros. Quedan en
+// finanzas_pendientes_revision hasta que la dueña o el contador los
+// aprueben (momento en el que sí se incorporan al historial real).
+function finEnviarARevision(reg){
+  if(!_firebaseDB){
+    toast('⚠️ Necesitas conexión a internet para enviar este movimiento');
+    return;
+  }
+  reg.registradoPor = (firebase.auth().currentUser && firebase.auth().currentUser.email) || 'desconocido';
+  reg.fechaEnvio = new Date().toISOString();
+  _firebaseDB.collection('finanzas_pendientes_revision').doc(String(reg.id)).set(reg)
+    .catch(function(err){
+      console.error('Error enviando movimiento a revisión:', err);
+      toast('⚠️ No se pudo enviar el movimiento. Intenta de nuevo.');
+    });
+}
+
+// Muestra la bandeja de revisión (solo visible/útil para dueña y contador,
+// que son los únicos roles con permiso real de leer esta colección).
+function finAbrirRevision(){
+  if(!_firebaseDB){ toast('⚠️ Necesitas conexión a internet'); return; }
+  var cont = document.getElementById('fin-revision-lista');
+  if(!cont) return;
+  cont.innerHTML = '<p style="font-size:.85rem;color:var(--border)">Cargando...</p>';
+  _firebaseDB.collection('finanzas_pendientes_revision').get()
+    .then(function(snap){
+      if(snap.empty){
+        cont.innerHTML = '<p style="font-size:.85rem;color:var(--border)">No hay movimientos pendientes de revisión.</p>';
+        return;
+      }
+      var filas = [];
+      snap.forEach(function(doc){
+        var r = doc.data();
+        var esIngreso = r.tipo === 'ingreso';
+        filas.push(`
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-bottom:1px solid #f0dde2">
+          <div>
+            <div style="font-weight:700;font-size:.85rem;color:#3a1a00">${esIngreso ? '💰 '+(r.paciente||'') : '📤 '+(r.descripcion||'')}</div>
+            <div style="font-size:.78rem;color:#888">${r.fecha||''} · ${formatPesos(r.monto||0)} · Registrado por ${r.registradoPor||'?'}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            <button class="btn" style="font-size:.74rem;padding:5px 12px;background:#edfaf0;color:#2d6a4f;border:1.5px solid #7ecba0" onclick="finAprobarRevision('${doc.id}')">✅ Aprobar</button>
+            <button class="btn" style="font-size:.74rem;padding:5px 12px;background:#ffeaea;color:#c0392b;border:1.5px solid #e8a0a0" onclick="finRechazarRevision('${doc.id}')">✕ Rechazar</button>
+          </div>
+        </div>`);
+      });
+      cont.innerHTML = filas.join('');
+    })
+    .catch(function(err){
+      console.error('Error cargando bandeja de revisión:', err);
+      cont.innerHTML = '<p style="color:#c0392b;font-size:.85rem">⚠️ No se pudo cargar (¿tienes permiso para ver finanzas?)</p>';
+    });
+}
+
+// Aprueba un movimiento pendiente: lo agrega al historial oficial y lo
+// quita de la bandeja de revisión.
+function finAprobarRevision(docId){
+  _firebaseDB.collection('finanzas_pendientes_revision').doc(docId).get()
+    .then(function(doc){
+      if(!doc.exists) return;
+      var reg = doc.data();
+      delete reg.registradoPor;
+      delete reg.fechaEnvio;
+      registros.push(reg);
+      finGuardar();
+      renderAll();
+      return _firebaseDB.collection('finanzas_pendientes_revision').doc(docId).delete();
+    })
+    .then(function(){
+      toast('✅ Movimiento aprobado y agregado al historial');
+      finAbrirRevision();
+    })
+    .catch(function(err){
+      console.error('Error aprobando movimiento:', err);
+      toast('⚠️ No se pudo aprobar el movimiento');
+    });
+}
+
+// Rechaza un movimiento pendiente: lo elimina sin agregarlo al historial.
+function finRechazarRevision(docId){
+  if(!confirm('¿Rechazar este movimiento? No se agregará al historial financiero.')) return;
+  _firebaseDB.collection('finanzas_pendientes_revision').doc(docId).delete()
+    .then(function(){ toast('Movimiento rechazado'); finAbrirRevision(); })
+    .catch(function(err){ console.error(err); toast('⚠️ No se pudo rechazar el movimiento'); });
+}
+
 function registrarPago(abrirR){
   var paciente=document.getElementById('r_paciente').value.trim();
   var fecha=document.getElementById('r_fecha').value;
@@ -2499,10 +2602,20 @@ function registrarPago(abrirR){
   var motivoEspecial = tipoVal==='especial' ? (document.getElementById('r_motivo_especial').value.trim()||'') : '';
   var tipoSesionLabel = tipoVal==='custom' ? 'Otro' : tipoVal==='especial' ? ('🌟 Tarifa especial'+(motivoEspecial?' · '+motivoEspecial:'')) : (tiposLabel[tipoVal]||'Sesi\u00f3n');
   var reg={id:Date.now(),tipo:'ingreso',paciente,fecha,monto,metodo,estado,fechaRecibo:finHoy(),tipoSesion:tipoSesionLabel,tarifaEspecial:tipoVal==='especial',motivoEspecial};
-  registros.push(reg); finGuardar(); renderAll();
+
+  // Si quien registra es Administrador/a, el movimiento va a una bandeja de
+  // revisión en vez de entrar directo al historial financiero, ya que ese
+  // rol no tiene permiso de leer las finanzas completas (solo de aportar
+  // movimientos para que la dueña o el contador los confirmen).
+  if(window.ROL_ACTUAL === 'administrador'){
+    finEnviarARevision(reg);
+  } else {
+    registros.push(reg); finGuardar(); renderAll();
+  }
+
   document.getElementById('r_paciente').value='';
   document.getElementById('r_fecha').value=finHoy();
-  if(!abrirR) toast('\u2705 Pago registrado');
+  if(!abrirR) toast(window.ROL_ACTUAL==='administrador' ? '✅ Pago enviado para revisión' : '✅ Pago registrado');
   return reg;
 }
 function registrarYRecibo(){ var reg=registrarPago(true); if(reg) abrirRecibo(reg); }
@@ -2512,10 +2625,16 @@ function registrarGasto(){
   var monto=parseInt(document.getElementById('g_monto').value)||0;
   var cat=document.getElementById('g_cat').value;
   if(!desc||!monto){ toast('Completa descripci\u00f3n y monto'); return; }
-  registros.push({id:Date.now(),tipo:'gasto',descripcion:desc,fecha,monto,categoria:cat});
-  finGuardar(); renderAll();
+  var reg = {id:Date.now(),tipo:'gasto',descripcion:desc,fecha,monto,categoria:cat};
+
+  if(window.ROL_ACTUAL === 'administrador'){
+    finEnviarARevision(reg);
+  } else {
+    registros.push(reg); finGuardar(); renderAll();
+  }
+
   document.getElementById('g_desc').value=''; document.getElementById('g_monto').value='';
-  toast('\u2705 Gasto registrado');
+  toast(window.ROL_ACTUAL==='administrador' ? '✅ Gasto enviado para revisión' : '✅ Gasto registrado');
 }
 function eliminar(id){
   if(!confirm('\u00bfEliminar este registro?')) return;
@@ -5465,4 +5584,114 @@ function citaImgWA(){
     }, 800);
     toast('\uD83D\uDCF1 Imagen descargada \u2014 \u00e1brela en WhatsApp para enviarla');
   }
+}
+
+// ===================== USUARIOS Y ROLES =====================
+// Administración de quién puede entrar a Suite Clínica y con qué rol.
+// Solo el rol 'duena' puede ver y usar esta página (controlado por
+// PERMISOS_POR_ROL en index.html).
+
+var ROLES_LABEL = {
+  duena: 'Dueña (acceso total)',
+  psicologo: 'Psicólogo/a',
+  contador: 'Contador/a',
+  administrador: 'Administrador/a (agenda)'
+};
+
+function usrAgregar(){
+  var email = document.getElementById('usr-nuevo-email').value.trim().toLowerCase();
+  var nombre = document.getElementById('usr-nuevo-nombre').value.trim();
+  var rol = document.getElementById('usr-nuevo-rol').value;
+
+  if(!email || !email.includes('@')){
+    toast('⚠️ Ingresa un correo de Google válido');
+    return;
+  }
+  if(!nombre){
+    toast('⚠️ Ingresa un nombre para identificar al usuario');
+    return;
+  }
+  if(!_firebaseDB){
+    toast('⚠️ Necesitas conexión a internet para agregar usuarios');
+    return;
+  }
+
+  _firebaseDB.collection('usuarios_app').doc(email).set({
+    email: email,
+    nombre: nombre,
+    rol: rol,
+    activo: true,
+    fechaCreacion: new Date().toISOString()
+  })
+  .then(function(){
+    document.getElementById('usr-nuevo-email').value = '';
+    document.getElementById('usr-nuevo-nombre').value = '';
+    document.getElementById('usr-nuevo-rol').value = 'psicologo';
+    toast('✅ Usuario agregado');
+    usrRenderLista();
+  })
+  .catch(function(err){
+    console.error('Error agregando usuario:', err);
+    toast('⚠️ No se pudo agregar el usuario. Intenta de nuevo.');
+  });
+}
+
+function usrRenderLista(){
+  var cont = document.getElementById('usr-lista');
+  if(!cont) return;
+  if(!_firebaseDB){
+    cont.innerHTML = '<p style="color:var(--border);font-size:.85rem">Necesitas conexión a internet para ver la lista de usuarios.</p>';
+    return;
+  }
+  cont.innerHTML = '<p style="color:var(--border);font-size:.85rem">Cargando...</p>';
+  _firebaseDB.collection('usuarios_app').get()
+    .then(function(snap){
+      if(snap.empty){
+        cont.innerHTML = '<p style="color:var(--border);font-size:.85rem">No hay usuarios registrados todavía (aparte de ti).</p>';
+        return;
+      }
+      var filas = [];
+      snap.forEach(function(doc){
+        var u = doc.data();
+        var esMiPropiaCuenta = false;
+        try {
+          var auth = firebase.auth();
+          esMiPropiaCuenta = auth.currentUser && auth.currentUser.email && auth.currentUser.email.toLowerCase() === u.email;
+        } catch(e){}
+        filas.push(`
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-bottom:1px solid #f0dde2;${u.activo===false?'opacity:.5':''}">
+          <div>
+            <div style="font-weight:700;font-size:.88rem;color:#3a1a00">${u.nombre||'(sin nombre)'} ${esMiPropiaCuenta?'<span style="font-size:.7rem;color:#a0536a">(tú)</span>':''}</div>
+            <div style="font-size:.78rem;color:#888">${u.email}</div>
+            <div style="font-size:.76rem;color:#cd8e9d;margin-top:2px">${ROLES_LABEL[u.rol]||u.rol}${u.activo===false?' · ⛔ Desactivado':''}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-shrink:0">
+            ${u.activo===false
+              ? `<button class="btn" style="font-size:.74rem;padding:5px 12px" onclick="usrReactivar('${u.email}')">✅ Reactivar</button>`
+              : (esMiPropiaCuenta
+                  ? `<button class="btn" style="font-size:.74rem;padding:5px 12px;background:#f0f0f0;color:#aaa;border:1.5px solid #ddd" disabled title="No puedes desactivar tu propia cuenta">⛔ Desactivar</button>`
+                  : `<button class="btn" style="font-size:.74rem;padding:5px 12px;background:#fff3e0;color:#a0536a;border:1.5px solid #e8b87a" onclick="usrDesactivar('${u.email}')">⛔ Desactivar</button>`)
+            }
+          </div>
+        </div>`);
+      });
+      cont.innerHTML = filas.join('');
+    })
+    .catch(function(err){
+      console.error('Error cargando usuarios:', err);
+      cont.innerHTML = '<p style="color:#c0392b;font-size:.85rem">⚠️ No se pudo cargar la lista de usuarios.</p>';
+    });
+}
+
+function usrDesactivar(email){
+  if(!confirm('¿Desactivar el acceso de ' + email + '? Ya no podrá iniciar sesión hasta que lo reactives.')) return;
+  _firebaseDB.collection('usuarios_app').doc(email).update({ activo: false })
+    .then(function(){ toast('Usuario desactivado'); usrRenderLista(); })
+    .catch(function(err){ console.error(err); toast('⚠️ No se pudo desactivar el usuario'); });
+}
+
+function usrReactivar(email){
+  _firebaseDB.collection('usuarios_app').doc(email).update({ activo: true })
+    .then(function(){ toast('Usuario reactivado ✅'); usrRenderLista(); })
+    .catch(function(err){ console.error(err); toast('⚠️ No se pudo reactivar el usuario'); });
 }

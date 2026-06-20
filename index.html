@@ -92,7 +92,7 @@ const DB = {
 <body>
 
 <!-- LOGIN OVERLAY -->
-<div id="login-overlay" style="display:none;position:fixed;inset:0;background:#fdf2f5;z-index:99999;align-items:center;justify-content:center;flex-direction:column;font-family:'Lato',sans-serif;">
+<div id="login-overlay" style="display:flex;position:fixed;inset:0;background:#fdf2f5;z-index:99999;align-items:center;justify-content:center;flex-direction:column;font-family:'Lato',sans-serif;">
   <div style="background:white;border-radius:16px;padding:40px;max-width:380px;width:90%;box-shadow:0 8px 32px rgba(100,48,0,0.15);text-align:center;">
     <div style="font-family:'Playfair Display',serif;font-size:1.5rem;color:#643000;font-weight:700;margin-bottom:8px;">Suite Clínica</div>
     <p style="color:#7a5a40;margin-bottom:24px;font-size:.9rem;">Inicia sesión para acceder a tus pacientes</p>
@@ -153,6 +153,7 @@ const DB = {
     <button class="nav-btn" onclick="goPage('cumpleanos');cerrarSidebarMobile()"><span class="icon">🎂</span><span class="nav-label"> Cumpleaños</span></button>
     <div class="nav-section">Reportes</div>
     <button class="nav-btn" onclick="goPage('informe-global');cerrarSidebarMobile()"><span class="icon">📊</span><span class="nav-label"> Informe Global</span></button>
+    <button class="nav-btn" onclick="goPage('usuarios');cerrarSidebarMobile()"><span class="icon">🔐</span><span class="nav-label"> Usuarios y Roles</span></button>
   </nav>
   <div class="version">
     <div style="margin-bottom:8px;font-size:0.65rem;color:var(--border)">Suite Clínica v1.0 · 2025</div>
@@ -968,6 +969,7 @@ const DB = {
     <button class="fin-tab" onclick="finSwitchTab('registrar',this)">Registrar</button>
     <button class="fin-tab" onclick="finSwitchTab('historial',this)">Historial</button>
     <button class="fin-tab" onclick="finSwitchTab('deudores',this)">Pendientes</button>
+    <button class="fin-tab" onclick="finSwitchTab('revision',this);finAbrirRevision()">🔍 Bandeja</button>
   </div>
 
   <!-- RESUMEN -->
@@ -1070,6 +1072,14 @@ const DB = {
   <div class="fin-screen" id="fin-deudores">
     <h2 style="font-family:'Playfair Display',serif;font-size:1.3rem;margin-bottom:20px">Pacientes con pago pendiente</h2>
     <div id="deudores-lista"></div>
+  </div>
+
+  <div class="fin-screen" id="fin-revision">
+    <h2 style="font-family:'Playfair Display',serif;font-size:1.3rem;margin-bottom:10px">Movimientos pendientes de revisión</h2>
+    <p style="font-size:.82rem;color:var(--strong);margin-bottom:18px">
+      Pagos y gastos registrados por el rol Administrador/a. Revísalos y apruébalos para que entren al historial financiero oficial, o recházalos si hay un error.
+    </p>
+    <div id="fin-revision-lista"></div>
   </div>
 </div>
 
@@ -1416,6 +1426,39 @@ const DB = {
   </div>
 </div>
 
+<!-- ========== USUARIOS Y ROLES (solo visible para Dueña) ========== -->
+<div class="page" id="page-usuarios">
+  <div class="page-header">
+    <h1>Usuarios y Roles 🔐</h1>
+    <p>Administra quién puede entrar a Suite Clínica y qué puede ver cada quien</p>
+  </div>
+
+  <div class="card" style="margin-bottom:20px">
+    <div class="sec-title">➕ Agregar usuario</div>
+    <p style="font-size:.82rem;color:var(--strong);margin-bottom:14px">
+      La persona debe iniciar sesión con este correo de Google exacto. No necesitas crearle una contraseña por separado: usará su propia cuenta de Google, y este sistema controla qué puede ver una vez entra.
+    </p>
+    <div class="row col3">
+      <div class="fg"><label class="lbl">Correo de Google</label><input type="email" id="usr-nuevo-email" placeholder="persona@gmail.com"></div>
+      <div class="fg"><label class="lbl">Nombre (para identificarlo en la lista)</label><input type="text" id="usr-nuevo-nombre" placeholder="Ej: Juan Pérez"></div>
+      <div class="fg"><label class="lbl">Rol</label>
+        <select id="usr-nuevo-rol">
+          <option value="psicologo">Psicólogo/a</option>
+          <option value="contador">Contador/a</option>
+          <option value="administrador">Administrador/a (agenda)</option>
+          <option value="duena">Dueña (acceso total)</option>
+        </select>
+      </div>
+    </div>
+    <div class="btn-row"><button class="btn primary" onclick="usrAgregar()">+ Agregar usuario</button></div>
+  </div>
+
+  <div class="card">
+    <div class="sec-title">👥 Usuarios con acceso</div>
+    <div id="usr-lista"></div>
+  </div>
+</div>
+
 <!-- ========== HERRAMIENTAS TCC ========== -->
 <div class="page" id="page-herramientas">
   <div class="page-header">
@@ -1694,6 +1737,68 @@ const DB = {
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script>
+// ===================== ROLES Y PERMISOS =====================
+// Rol actual de la persona logueada. null mientras no se ha verificado.
+// Valores posibles: 'duena', 'psicologo', 'contador', 'administrador'.
+window.ROL_ACTUAL = null;
+
+// Qué páginas puede ver cada rol. 'dashboard' siempre visible para todos
+// los roles autorizados (es solo un resumen, no expone datos sensibles
+// por sí solo más allá de lo que cada rol ya puede ver en su propia página).
+var PERMISOS_POR_ROL = {
+  duena: null, // null = acceso a todo, sin restricción
+  psicologo: ['dashboard','pacientes','anamnesis','plan','sesiones','tests','seguimiento','agenda','documentos','herramientas','cumpleanos','informe-global'],
+  contador: ['dashboard','finanzas'],
+  // Administrador entra a 'finanzas' SOLO para registrar pagos/gastos (ver
+  // aplicarPermisosFinanzas, que oculta el resto de pestañas de esa página
+  // para este rol). La protección real de los datos financieros la dan las
+  // reglas de Firestore, no solo esta lista.
+  administrador: ['dashboard','agenda','cumpleanos','finanzas']
+};
+
+// Devuelve true si el rol actual puede ver la página indicada.
+window.tienePermiso = function(pagina){
+  if(!window.ROL_ACTUAL) return false;
+  var permitidas = PERMISOS_POR_ROL[window.ROL_ACTUAL];
+  if(permitidas === null) return true; // dueña: acceso total
+  return permitidas.indexOf(pagina) !== -1;
+};
+
+// Oculta del menú lateral los botones de navegación que el rol actual no
+// puede usar, según el atributo onclick="goPage('xxx')" de cada botón.
+function aplicarPermisosMenu(){
+  document.querySelectorAll('.nav-btn').forEach(function(btn){
+    var oc = btn.getAttribute('onclick')||'';
+    var match = oc.match(/goPage\('([a-z-]+)'/);
+    if(!match) return;
+    var pagina = match[1];
+    btn.style.display = window.tienePermiso(pagina) ? '' : 'none';
+  });
+  aplicarPermisosFinanzas();
+}
+
+// Dentro de la página de Finanzas, el rol Administrador/a solo debe ver la
+// pestaña "Registrar" (para anotar pagos/gastos que van a la bandeja de
+// revisión). El resto de pestañas (Resumen, Historial, Pendientes, Bandeja)
+// muestran información financiera agregada que no le corresponde ver, y
+// además las reglas de Firestore le negarían los datos si lo intentara.
+function aplicarPermisosFinanzas(){
+  var esAdmin = window.ROL_ACTUAL === 'administrador';
+  document.querySelectorAll('.fin-tab').forEach(function(btn){
+    var oc = btn.getAttribute('onclick')||'';
+    var esTabRegistrar = oc.indexOf("'registrar'") !== -1;
+    btn.style.display = (esAdmin && !esTabRegistrar) ? 'none' : '';
+  });
+  // Si el administrador entra a Finanzas, lo llevamos directo a Registrar
+  // en vez de dejarlo en Resumen (que no puede ver).
+  if(esAdmin){
+    var tabRegistrar = Array.from(document.querySelectorAll('.fin-tab')).find(function(b){
+      return (b.getAttribute('onclick')||'').indexOf("'registrar'") !== -1;
+    });
+    if(tabRegistrar) finSwitchTab('registrar', tabRegistrar);
+  }
+}
+
 (function(){
   try {
     firebase.initializeApp(FIREBASE_CONFIG);
@@ -1717,26 +1822,89 @@ const DB = {
     };
 
     window.cerrarSesion = function(){
+      window.ROL_ACTUAL = null;
       _auth.signOut();
     };
+
+    // Verifica si el correo logueado está autorizado en la colección
+    // 'usuarios_app' y obtiene su rol. Si no está autorizado, cierra la
+    // sesión y muestra un mensaje claro en vez de dejarlo entrar.
+    function verificarUsuarioAutorizado(user){
+      var overlay = document.getElementById('login-overlay');
+      var errEl = document.getElementById('login-error');
+      _firebaseDB.collection('usuarios_app').doc(user.email.toLowerCase()).get()
+        .then(function(doc){
+          if(!doc.exists || !doc.data().activo){
+            window.ROL_ACTUAL = null;
+            // Limpiar cualquier dato cacheado (en memoria y en disco) en
+            // este dispositivo, para que una cuenta no autorizada no pueda
+            // ver datos clínicos viejos que hayan quedado guardados de una
+            // sesión anterior (propia o de otra persona) en este navegador.
+            try { localStorage.clear(); } catch(e){}
+            try { DB._cache = {}; DB._loaded = false; } catch(e){}
+            if(errEl){
+              errEl.textContent = 'Tu cuenta (' + user.email + ') no está autorizada para entrar a Suite Clínica. Contacta a la administradora.';
+              errEl.style.display = 'block';
+            }
+            if(overlay) overlay.style.display = 'flex';
+            _auth.signOut();
+            return;
+          }
+          window.ROL_ACTUAL = doc.data().rol;
+          if(overlay) overlay.style.display = 'none';
+          aplicarPermisosMenu();
+          // Si la página activa actualmente no está permitida para este rol,
+          // redirige al dashboard (que todos los roles autorizados pueden ver).
+          var pageActiva = document.querySelector('.page.active');
+          if(pageActiva && pageActiva.id){
+            var nombrePagina = pageActiva.id.replace('page-','');
+            if(!window.tienePermiso(nombrePagina) && typeof goPage === 'function'){
+              goPage('dashboard');
+            }
+          }
+          // Sincronizar datos al conectar
+          DB.loadAll().then(function(ok){
+            if(!ok) return;
+            var ag = DB.get('agenda_eventos');
+            if(ag && typeof agEventos !== 'undefined'){ agEventos.length=0; ag.forEach(function(e){ agEventos.push(e); }); }
+            var fin = DB.get('finanzas_registros');
+            if(fin && typeof registros !== 'undefined'){ registros.length=0; fin.forEach(function(r){ registros.push(r); }); }
+            if(typeof renderDashboard==='function') renderDashboard();
+            if(typeof fillSelects==='function') fillSelects();
+            if(typeof renderAgenda==='function') renderAgenda();
+            if(typeof renderAll==='function') renderAll();
+          });
+        })
+        .catch(function(err){
+          console.error('Error verificando usuario autorizado:', err);
+          window.ROL_ACTUAL = null;
+          // Solo borramos los datos locales si el error es específicamente
+          // de permisos denegados (es decir, la cuenta no está autorizada).
+          // Si es un error de red/conexión, NO borramos nada, para no
+          // arriesgar perder la copia local de respaldo de la dueña por
+          // un simple problema de señal.
+          var esErrorDePermisos = err && err.code === 'permission-denied';
+          if(esErrorDePermisos){
+            try { localStorage.clear(); } catch(e){}
+            try { DB._cache = {}; DB._loaded = false; } catch(e){}
+          }
+          if(errEl){
+            errEl.textContent = esErrorDePermisos
+              ? 'Tu cuenta (' + user.email + ') no está autorizada para entrar a Suite Clínica. Contacta a la administradora.'
+              : 'No se pudo verificar tu acceso. Revisa tu conexión e intenta de nuevo.';
+            errEl.style.display = 'block';
+          }
+          if(overlay) overlay.style.display = 'flex';
+          _auth.signOut();
+        });
+    }
 
     _auth.onAuthStateChanged(function(user){
       var overlay = document.getElementById('login-overlay');
       if(user){
-        if(overlay) overlay.style.display='none';
-        // Sincronizar datos al conectar
-        DB.loadAll().then(function(ok){
-          if(!ok) return;
-          var ag = DB.get('agenda_eventos');
-          if(ag && typeof agEventos !== 'undefined'){ agEventos.length=0; ag.forEach(function(e){ agEventos.push(e); }); }
-          var fin = DB.get('finanzas_registros');
-          if(fin && typeof registros !== 'undefined'){ registros.length=0; fin.forEach(function(r){ registros.push(r); }); }
-          if(typeof renderDashboard==='function') renderDashboard();
-          if(typeof fillSelects==='function') fillSelects();
-          if(typeof renderAgenda==='function') renderAgenda();
-          if(typeof renderAll==='function') renderAll();
-        });
+        verificarUsuarioAutorizado(user);
       } else {
+        window.ROL_ACTUAL = null;
         if(overlay) overlay.style.display='flex';
       }
     });
