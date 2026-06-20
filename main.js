@@ -1921,6 +1921,16 @@ var agDias = ['domingo','lunes','martes','mi\u00e9rcoles','jueves','viernes','s\
 function agGetFecha(offset){ var d=new Date(); d.setDate(d.getDate()+(offset||0)); return d; }
 function agFormatFecha(d){ return agDias[d.getDay()]+', '+d.getDate()+' de '+agMeses[d.getMonth()]; }
 function agFormatHora(str){ var d=new Date(str); return d.toLocaleTimeString('es-CO',{hour:'2-digit',minute:'2-digit',hour12:true}); }
+
+// Convierte un objeto Date a string "YYYY-MM-DDTHH:MM" usando la hora LOCAL
+// del dispositivo (no UTC). Esto evita el desfase de varias horas que
+// ocurría al usar toISOString() (que sí convierte a UTC) para luego volver
+// a leer ese string con `new Date()`, que lo reinterpreta como hora local
+// y suma el desfase una segunda vez.
+function agFechaLocalISO(d){
+  var pad = function(n){ return String(n).padStart(2,'0'); };
+  return d.getFullYear()+'-'+pad(d.getMonth()+1)+'-'+pad(d.getDate())+'T'+pad(d.getHours())+':'+pad(d.getMinutes());
+}
 function agMismoDia(d1,d2){ return d1.getFullYear()===d2.getFullYear()&&d1.getMonth()===d2.getMonth()&&d1.getDate()===d2.getDate(); }
 
 function renderAgenda(){
@@ -2262,8 +2272,8 @@ function agAgregarEvento(){
     nuevosEventos.push({
       id:'ev'+Date.now()+'_'+iter,
       titulo: tituloEv,
-      inicio: ini.toISOString().slice(0,16),
-      fin: finEv.toISOString().slice(0,16),
+      inicio: agFechaLocalISO(ini),
+      fin: agFechaLocalISO(finEv),
       tipo, descripcion: desc,
       pacienteId: pacId || null
     });
@@ -2341,6 +2351,39 @@ function agEliminar(id){
   if(!confirm('\u00bfEliminar este evento?')) return;
   agEventos=agEventos.filter(e=>e.id!==id);
   agGuardar(); renderAgenda();
+}
+
+// ---- Revisión manual de todas las citas guardadas ----------------------
+// Lista todas las citas (pasadas y futuras) para que la psicóloga pueda
+// detectar a simple vista alguna hora que no coincida con lo que recuerda
+// haber agendado (por ejemplo, por el bug histórico de zona horaria que
+// sumaba 5 horas a algunas citas creadas antes de esta corrección).
+function agAbrirRevision(){
+  var lista = document.getElementById('ag-revision-lista');
+  if(!agEventos.length){
+    lista.innerHTML = '<p style="font-size:.85rem;color:var(--border)">No hay citas guardadas todavía.</p>';
+  } else {
+    var ordenados = agEventos.slice().sort(function(a,b){
+      return new Date(a.inicio) - new Date(b.inicio);
+    });
+    lista.innerHTML = ordenados.map(function(e){
+      var d = new Date(e.inicio);
+      var fechaTxt = d.toLocaleDateString('es-CO',{weekday:'short',year:'numeric',month:'short',day:'numeric'});
+      var horaTxt = agFormatHora(e.inicio);
+      var horaFinTxt = e.fin ? agFormatHora(e.fin) : '';
+      var hoy = new Date(); hoy.setHours(0,0,0,0);
+      var esPasado = d < hoy;
+      return `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 14px;border-bottom:1px solid #f0dde2;${esPasado?'opacity:.6':''}">
+        <div>
+          <div style="font-weight:700;font-size:.85rem;color:#3a1a00">${e.titulo}</div>
+          <div style="font-size:.78rem;color:#888;text-transform:capitalize">${fechaTxt} · ${horaTxt}${horaFinTxt?' a '+horaFinTxt:''}</div>
+        </div>
+        <button class="btn" style="font-size:.74rem;padding:5px 12px;flex-shrink:0" onclick="document.getElementById('ag-revision-overlay').classList.remove('open');agEditarEvento('${e.id}')">✏️ Editar</button>
+      </div>`;
+    }).join('');
+  }
+  document.getElementById('ag-revision-overlay').classList.add('open');
 }
 
 function agEditarEvento(id){

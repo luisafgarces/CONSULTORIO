@@ -873,6 +873,7 @@ const DB = {
       <p>Citas y eventos del consultorio</p>
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <button class="btn" style="font-size:.78rem;padding:7px 16px;background:#fff8f0;border:1.5px solid #e8b87a;color:#a0536a" onclick="agAbrirRevision()">🔍 Revisar todas mis citas</button>
       <button class="btn primary" style="font-size:.78rem;padding:7px 16px" onclick="document.getElementById('ics-input').click()">📥 Importar desde Google Calendar (.ics)</button>
       <input type="file" id="ics-input" accept=".ics" style="display:none" onchange="importarICS(event)">
       <button class="btn danger" style="font-size:.78rem;padding:7px 16px" onclick="agLimpiarTodo()">🗑 Limpiar todos</button>
@@ -1658,6 +1659,20 @@ const DB = {
       <button class="btn" onclick="document.getElementById('ag-edit-overlay').classList.remove('open')">Cancelar</button>
       <button class="btn primary" onclick="agGuardarEdicion()">💾 Guardar cambios</button>
     </div>
+  </div>
+</div>
+
+<!-- MODAL REVISIÓN DE TODAS LAS CITAS (detectar horarios incorrectos) -->
+<div class="pac-modal-overlay" id="ag-revision-overlay" onclick="if(event.target===this)this.classList.remove('open')" style="z-index:700">
+  <div class="pac-modal" style="max-width:680px;max-height:85vh;overflow-y:auto">
+    <div class="pac-modal-header">
+      <div class="pac-modal-title">🔍 Revisar todas mis citas</div>
+      <button class="pac-modal-close" onclick="document.getElementById('ag-revision-overlay').classList.remove('open')">✕</button>
+    </div>
+    <p style="font-size:.82rem;color:#7a5a40;margin-bottom:14px">
+      Estas son todas tus citas guardadas, ordenadas por fecha. Revisa si alguna hora no coincide con lo que recuerdas haber agendado (por ejemplo, una sesión que sabes que era en la mañana pero aquí aparece en la tarde). Si encuentras una mal, dale clic a "✏️ Editar" para corregirla directamente.
+    </p>
+    <div id="ag-revision-lista"></div>
   </div>
 </div>
 
