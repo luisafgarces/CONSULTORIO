@@ -840,6 +840,7 @@ const DB = {
                 <option>C-SSRS</option>
                 <option>Otro</option>
               </select>
+              <button type="button" class="btn" style="font-size:.76rem;margin-top:6px;background:#fdf5f7;color:#cd8e9d;border:1.5px solid #e8d0d6" onclick="cssrsAbrir()">📋 Aplicar C-SSRS</button>
             </div>
           </div>
           <div class="row col2">
@@ -1913,6 +1914,63 @@ const DB = {
       Estas son todas tus citas guardadas, ordenadas por fecha. Revisa si alguna hora no coincide con lo que recuerdas haber agendado (por ejemplo, una sesión que sabes que era en la mañana pero aquí aparece en la tarde). Si encuentras una mal, dale clic a "✏️ Editar" para corregirla directamente.
     </p>
     <div id="ag-revision-lista"></div>
+  </div>
+</div>
+
+<!-- MODAL C-SSRS (Escala Columbia de Severidad Suicida - Versión Screener) -->
+<div class="pac-modal-overlay" id="cssrs-overlay" onclick="if(event.target===this)cssrsCerrar()" style="z-index:900">
+  <div class="pac-modal" style="max-width:620px;max-height:88vh;overflow-y:auto">
+    <div class="pac-modal-header">
+      <div class="pac-modal-title">📋 Escala C-SSRS (Versión Screener)</div>
+      <button class="pac-modal-close" onclick="cssrsCerrar()">✕</button>
+    </div>
+    <p style="font-size:.76rem;color:#888;margin-bottom:16px">Columbia-Suicide Severity Rating Scale · Versión exploratoria reciente. Formula las preguntas en negrilla tal como están escritas.</p>
+
+    <div id="cssrs-preguntas">
+      <div class="fg cssrs-pregunta" data-q="1" style="margin-bottom:14px;padding:12px 14px;background:#fdf5f7;border-radius:10px">
+        <label class="lbl" style="white-space:normal"><strong>1) ¿Ha deseado estar muerto(a) o poder dormirse y no despertar?</strong></label>
+        <div class="checks"><label class="chk"><input type="radio" name="cssrs-1" value="si" onchange="cssrsActualizarVisibilidad()"> Sí</label><label class="chk"><input type="radio" name="cssrs-1" value="no" onchange="cssrsActualizarVisibilidad()"> No</label></div>
+      </div>
+
+      <div class="fg cssrs-pregunta" data-q="2" style="margin-bottom:14px;padding:12px 14px;background:#fdf5f7;border-radius:10px">
+        <label class="lbl" style="white-space:normal"><strong>2) ¿Ha tenido realmente la idea de suicidarse?</strong></label>
+        <div class="checks"><label class="chk"><input type="radio" name="cssrs-2" value="si" onchange="cssrsActualizarVisibilidad()"> Sí</label><label class="chk"><input type="radio" name="cssrs-2" value="no" onchange="cssrsActualizarVisibilidad()"> No</label></div>
+      </div>
+
+      <div class="fg cssrs-pregunta" data-q="3" style="display:none;margin-bottom:14px;padding:12px 14px;background:#fdf5f7;border-radius:10px">
+        <label class="lbl" style="white-space:normal"><strong>3) ¿Ha pensado en cómo llevaría esto a cabo?</strong></label>
+        <p style="font-size:.74rem;color:#888;margin:4px 0 8px">Ej.: "He tenido la idea de tomar una sobredosis, pero nunca hice un plan específico sobre el momento, el lugar o cómo lo haría realmente… y nunca lo haría."</p>
+        <div class="checks"><label class="chk"><input type="radio" name="cssrs-3" value="si" onchange="cssrsActualizarVisibilidad()"> Sí</label><label class="chk"><input type="radio" name="cssrs-3" value="no" onchange="cssrsActualizarVisibilidad()"> No</label></div>
+      </div>
+
+      <div class="fg cssrs-pregunta" data-q="4" style="display:none;margin-bottom:14px;padding:12px 14px;background:#fdf5f7;border-radius:10px">
+        <label class="lbl" style="white-space:normal"><strong>4) ¿Ha tenido estas ideas y en cierto grado la intención de llevarlas a cabo?</strong></label>
+        <p style="font-size:.74rem;color:#888;margin:4px 0 8px">A diferencia de "Tengo los pensamientos, pero definitivamente no haré nada al respecto".</p>
+        <div class="checks"><label class="chk"><input type="radio" name="cssrs-4" value="si" onchange="cssrsActualizarVisibilidad()"> Sí</label><label class="chk"><input type="radio" name="cssrs-4" value="no" onchange="cssrsActualizarVisibilidad()"> No</label></div>
+      </div>
+
+      <div class="fg cssrs-pregunta" data-q="5" style="display:none;margin-bottom:14px;padding:12px 14px;background:#fdf5f7;border-radius:10px">
+        <label class="lbl" style="white-space:normal"><strong>5) ¿Ha comenzado a elaborar o ha elaborado los detalles sobre cómo suicidarse? ¿Tenía intenciones de llevar a cabo este plan?</strong></label>
+        <div class="checks"><label class="chk"><input type="radio" name="cssrs-5" value="si" onchange="cssrsActualizarVisibilidad()"> Sí</label><label class="chk"><input type="radio" name="cssrs-5" value="no" onchange="cssrsActualizarVisibilidad()"> No</label></div>
+      </div>
+
+      <div class="fg cssrs-pregunta" data-q="6" style="margin-bottom:14px;padding:12px 14px;background:#fdf5f7;border-radius:10px">
+        <label class="lbl" style="white-space:normal"><strong>6) ¿Alguna vez ha hecho algo usted, comenzado a hacer algo o se ha preparado para hacer algo para terminar su vida?</strong></label>
+        <p style="font-size:.74rem;color:#888;margin:4px 0 8px">Ej.: Recolectar pastillas, obtener un arma, regalar cosas de valor, escribir una nota de despedida, sacar pastillas del frasco sin tomarlas, agarrar un arma pero cambiar de decisión, subir a un techo sin saltar; o realmente tomar pastillas, intentar dispararse, cortarse, intentar ahorcarse, etc.</p>
+        <div class="checks"><label class="chk"><input type="radio" name="cssrs-6" value="si" onchange="cssrsActualizarVisibilidad()"> Sí</label><label class="chk"><input type="radio" name="cssrs-6" value="no" onchange="cssrsActualizarVisibilidad()"> No</label></div>
+        <div id="cssrs-q6-periodo" style="display:none;margin-top:8px">
+          <label class="lbl" style="font-size:.78rem">¿Fue esto en los últimos 3 meses?</label>
+          <div class="checks"><label class="chk"><input type="radio" name="cssrs-6periodo" value="si"> Sí, últimos 3 meses</label><label class="chk"><input type="radio" name="cssrs-6periodo" value="no"> No, hace más tiempo (en el curso de la vida)</label></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="cssrs-resultado" style="display:none;margin:16px 0;padding:14px 16px;border-radius:10px"></div>
+
+    <div class="btn-row">
+      <button class="btn" onclick="cssrsCerrar()">Cancelar</button>
+      <button class="btn primary" onclick="cssrsCalcularYAplicar()">✅ Calcular y aplicar al formulario</button>
+    </div>
   </div>
 </div>
 

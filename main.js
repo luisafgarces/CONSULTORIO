@@ -929,6 +929,129 @@ function crLimpiarFormulario(){
   document.getElementById('cr-notas-confidenciales').value = '';
 }
 
+// ===================== ESCALA C-SSRS =====================
+// Columbia-Suicide Severity Rating Scale, versión Screener (exploratoria
+// reciente). Sigue el flujo condicional oficial: las preguntas 1 y 2
+// siempre se formulan; si la respuesta a la pregunta 2 es "Sí", se
+// formulan también las preguntas 3, 4 y 5; la pregunta 6 siempre se
+// formula al final, con un sub-ítem de periodo (últimos 3 meses / en el
+// curso de la vida) si la respuesta es "Sí".
+//
+// Clasificación de riesgo (criterio estándar de Columbia Lighthouse
+// Project): Bajo = "Sí" únicamente en 1 y/o 2. Moderado = "Sí" en 3.
+// Alto = "Sí" en 4, 5, o 6 con periodo "últimos 3 meses". Un "Sí" en 6
+// solo "en el curso de la vida" (sin reciente) se considera riesgo
+// moderado-alto según contexto clínico; aquí se clasifica como alto por
+// precaución, ya que un intento/conducta preparatoria previa es el
+// factor de riesgo más fiable para conducta suicida futura.
+function cssrsAbrir(){
+  document.getElementById('cssrs-overlay').classList.add('open');
+  cssrsLimpiar();
+}
+
+function cssrsCerrar(){
+  document.getElementById('cssrs-overlay').classList.remove('open');
+}
+
+function cssrsLimpiar(){
+  document.querySelectorAll('#cssrs-preguntas input[type=radio]').forEach(r=>r.checked=false);
+  document.querySelectorAll('.cssrs-pregunta[data-q="3"], .cssrs-pregunta[data-q="4"], .cssrs-pregunta[data-q="5"]').forEach(function(el){ el.style.display='none'; });
+  document.getElementById('cssrs-q6-periodo').style.display = 'none';
+  document.getElementById('cssrs-resultado').style.display = 'none';
+}
+
+// Muestra/oculta las preguntas 3, 4, 5 según la respuesta a la pregunta 2,
+// y el sub-ítem de periodo de la pregunta 6 según su propia respuesta.
+function cssrsActualizarVisibilidad(){
+  var r2 = document.querySelector('input[name=cssrs-2]:checked');
+  var mostrarCondicionales = r2 && r2.value==='si';
+  ['3','4','5'].forEach(function(n){
+    document.querySelector('.cssrs-pregunta[data-q="'+n+'"]').style.display = mostrarCondicionales ? 'block' : 'none';
+  });
+  if(!mostrarCondicionales){
+    document.querySelectorAll('input[name=cssrs-3],input[name=cssrs-4],input[name=cssrs-5]').forEach(r=>r.checked=false);
+  }
+
+  var r6 = document.querySelector('input[name=cssrs-6]:checked');
+  var mostrarPeriodo = r6 && r6.value==='si';
+  document.getElementById('cssrs-q6-periodo').style.display = mostrarPeriodo ? 'block' : 'none';
+  if(!mostrarPeriodo){
+    document.querySelectorAll('input[name=cssrs-6periodo]').forEach(r=>r.checked=false);
+  }
+}
+
+// Calcula el nivel de riesgo según las respuestas y lo aplica al
+// formulario de Sesión de Crisis (campos Nivel de riesgo y Puntaje).
+function cssrsCalcularYAplicar(){
+  function resp(n){ var r = document.querySelector('input[name=cssrs-'+n+']:checked'); return r ? r.value : null; }
+  var r1 = resp(1), r2 = resp(2), r3 = resp(3), r4 = resp(4), r5 = resp(5), r6 = resp(6);
+
+  if(!r1 || !r2){
+    toast('⚠️ Responde al menos las preguntas 1 y 2');
+    return;
+  }
+  if(r2==='si' && (!r3 || !r4 || !r5)){
+    toast('⚠️ Responde las preguntas 3, 4 y 5 (obligatorias porque respondiste Sí a la pregunta 2)');
+    return;
+  }
+  if(!r6){
+    toast('⚠️ Responde la pregunta 6');
+    return;
+  }
+  var r6periodo = null;
+  if(r6==='si'){
+    var pr = document.querySelector('input[name=cssrs-6periodo]:checked');
+    if(!pr){ toast('⚠️ Indica si la pregunta 6 fue en los últimos 3 meses o en el curso de la vida'); return; }
+    r6periodo = pr.value;
+  }
+
+  // Determinar el ítem más severo afirmado, para el resumen y el puntaje.
+  var itemsAfirmados = [];
+  if(r1==='si') itemsAfirmados.push(1);
+  if(r2==='si') itemsAfirmados.push(2);
+  if(r3==='si') itemsAfirmados.push(3);
+  if(r4==='si') itemsAfirmados.push(4);
+  if(r5==='si') itemsAfirmados.push(5);
+  if(r6==='si') itemsAfirmados.push(6);
+
+  var nivel, nivelTexto;
+  if(r4==='si' || r5==='si' || r6==='si'){
+    nivel = 'alto'; nivelTexto = 'Alto';
+  } else if(r3==='si'){
+    nivel = 'moderado'; nivelTexto = 'Moderado';
+  } else if(r1==='si' || r2==='si'){
+    nivel = 'bajo'; nivelTexto = 'Bajo';
+  } else {
+    nivel = 'bajo'; nivelTexto = 'Bajo (sin ideación reportada)';
+  }
+
+  var itemMasAlto = itemsAfirmados.length ? Math.max.apply(null, itemsAfirmados) : 0;
+  var puntajeTexto = itemMasAlto + '/6';
+  if(r6==='si'){
+    puntajeTexto += ' (ítem 6 ' + (r6periodo==='si' ? 'últimos 3 meses' : 'en el curso de la vida') + ')';
+  }
+
+  // Mostrar resumen visual antes de aplicar
+  var colores = { bajo:{bg:'#edfaf0',border:'#7ecba0',text:'#2d6a4f'}, moderado:{bg:'#fff8f0',border:'#e8b87a',text:'#a0536a'}, alto:{bg:'#fdeeee',border:'#e8845a',text:'#c0392b'} };
+  var c = colores[nivel];
+  var resDiv = document.getElementById('cssrs-resultado');
+  resDiv.style.background = c.bg;
+  resDiv.style.border = '1.5px solid '+c.border;
+  resDiv.style.color = c.text;
+  resDiv.innerHTML = '<strong>Resultado: Riesgo '+nivelTexto+'</strong><br>'
+    + 'Ítems afirmados: '+(itemsAfirmados.length?itemsAfirmados.join(', '):'ninguno')+' · Puntaje: '+puntajeTexto;
+  resDiv.style.display = 'block';
+
+  // Aplicar al formulario de crisis
+  document.getElementById('cr-nivel-riesgo').value = nivel;
+  crActualizarColorNivel();
+  document.getElementById('cr-puntaje').value = puntajeTexto;
+  document.getElementById('cr-herramienta').value = 'C-SSRS';
+
+  toast('✅ C-SSRS aplicado: Riesgo '+nivelTexto);
+  setTimeout(cssrsCerrar, 1200);
+}
+
 function toggleTestOtro(){
   const chk = document.getElementById('ses-test-otro-chk');
   document.getElementById('ses-test-otro').style.display = chk.checked ? 'inline-block' : 'none';
