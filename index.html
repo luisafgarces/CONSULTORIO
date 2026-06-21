@@ -619,6 +619,9 @@ const DB = {
           </div>
         </div>
 
+        <!-- ===== FORMULARIO NORMAL (seguimiento / evaluación / cierre) ===== -->
+        <div id="ses-form-normal">
+
         <!-- I. DATOS CLAVE DE LA SESIÓN -->
         <div class="subsec" style="margin-top:18px">I. Datos Clave de la Sesión</div>
         
@@ -795,6 +798,118 @@ const DB = {
         </div>
 
         <div class="fg"><label class="lbl">Notas confidenciales (solo tuyas, no van al resumen)</label><textarea id="ses-notas-priv"></textarea></div>
+
+        </div>
+        <!-- ===== FIN FORMULARIO NORMAL ===== -->
+
+        <!-- ===== FORMULARIO DE CRISIS / CONTENCIÓN ===== -->
+        <div id="ses-form-crisis" style="display:none">
+
+          <div class="row col3">
+            <div class="fg"><label class="lbl">Hora de inicio</label><input type="time" id="cr-hora-inicio"></div>
+            <div class="fg"><label class="lbl">Hora de fin</label><input type="time" id="cr-hora-fin"></div>
+            <div class="fg"><label class="lbl"><input type="checkbox" id="cr-en-curso" onchange="document.getElementById('cr-hora-fin').disabled=this.checked"> Aún en curso</label></div>
+          </div>
+          <div class="row col2">
+            <div class="fg"><label class="lbl">Modalidad</label>
+              <select id="cr-modalidad"><option>Presencial</option><option>Telefónica</option><option>Otro</option></select>
+            </div>
+            <div class="fg"><label class="lbl">¿Quién alertó la crisis?</label>
+              <select id="cr-quien-alerto">
+                <option>Paciente</option>
+                <option>Terapeuta detectó en sesión</option>
+                <option>Resultado de test</option>
+                <option>Tercero (familiar, pareja, etc.)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="subsec" style="margin-top:18px">I. Naturaleza del Riesgo</div>
+          <div class="row col2">
+            <div class="fg"><label class="lbl">Tipo de riesgo</label>
+              <select id="cr-tipo-riesgo">
+                <option>Ideación suicida</option>
+                <option>Intento en curso</option>
+                <option>Autolesión</option>
+                <option>Otro</option>
+              </select>
+            </div>
+            <div class="fg"><label class="lbl">Herramienta de evaluación usada</label>
+              <select id="cr-herramienta">
+                <option>C-SSRS</option>
+                <option>Otro</option>
+              </select>
+            </div>
+          </div>
+          <div class="row col2">
+            <div class="fg"><label class="lbl">Nivel de riesgo (resultado)</label>
+              <select id="cr-nivel-riesgo" onchange="crActualizarColorNivel()">
+                <option value="">— Seleccionar —</option>
+                <option value="bajo">Bajo</option>
+                <option value="moderado">Moderado</option>
+                <option value="alto">Alto</option>
+                <option value="critico">Crítico</option>
+              </select>
+              <div id="cr-nivel-indicador" style="margin-top:6px;height:8px;border-radius:4px;background:#eee"></div>
+            </div>
+            <div class="fg"><label class="lbl">Puntaje (si aplica)</label><input type="text" id="cr-puntaje"></div>
+          </div>
+
+          <div class="row col2">
+            <div class="fg"><label class="lbl">¿Hay plan verbalizado?</label>
+              <div class="checks"><label class="chk"><input type="radio" name="cr-plan" value="Sí"> Sí</label><label class="chk"><input type="radio" name="cr-plan" value="No"> No</label></div>
+              <textarea id="cr-plan-detalle" placeholder="Detalle (sin necesidad de explicitar método si no es clínicamente indispensable)" style="margin-top:6px"></textarea>
+            </div>
+            <div class="fg"><label class="lbl">¿Hay acceso a medios?</label>
+              <div class="checks"><label class="chk"><input type="radio" name="cr-medios" value="Sí"> Sí</label><label class="chk"><input type="radio" name="cr-medios" value="No"> No</label></div>
+              <textarea id="cr-medios-detalle" placeholder="Detalle" style="margin-top:6px"></textarea>
+            </div>
+          </div>
+          <div class="fg"><label class="lbl">¿Está acompañada en este momento?</label>
+            <div class="checks"><label class="chk"><input type="radio" name="cr-acompanada" value="Sí"> Sí</label><label class="chk"><input type="radio" name="cr-acompanada" value="No"> No</label></div>
+            <input type="text" id="cr-acompanada-quien" placeholder="¿Por quién?" style="margin-top:6px">
+          </div>
+
+          <div class="subsec" style="margin-top:18px">II. Acción Inmediata Tomada</div>
+          <div class="fg" style="margin-bottom:8px">
+            <div class="checks" id="cr-acciones" style="flex-direction:column;align-items:flex-start;gap:10px">
+              <label class="chk" style="display:flex;align-items:center;gap:8px"><input type="checkbox" data-accion="Contención presencial sostenida"> Contención presencial sostenida <input type="time" class="cr-hora-accion" style="width:120px;margin-left:8px"></label>
+              <label class="chk" style="display:flex;align-items:center;gap:8px"><input type="checkbox" data-accion="Medios de riesgo asegurados/alejados"> Medios de riesgo asegurados/alejados — ¿por quién? <input type="text" placeholder="Por quién" style="width:140px;margin-left:6px" id="cr-medios-por-quien"> <input type="time" class="cr-hora-accion" style="width:120px;margin-left:8px"></label>
+              <label class="chk" style="display:flex;align-items:center;gap:8px"><input type="checkbox" data-accion="Contacto con Línea 106"> Contacto con Línea 106 <input type="time" class="cr-hora-accion" style="width:120px;margin-left:8px"></label>
+              <label class="chk" style="display:flex;align-items:center;gap:8px"><input type="checkbox" data-accion="Contacto con línea 123 / emergencias"> Contacto con línea 123 / emergencias <input type="time" class="cr-hora-accion" style="width:120px;margin-left:8px"></label>
+              <label class="chk" style="display:flex;align-items:center;gap:8px"><input type="checkbox" data-accion="Traslado a urgencias"> Traslado a urgencias — ¿cómo, con quién? <input type="text" placeholder="Cómo / con quién" style="width:160px;margin-left:6px" id="cr-traslado-detalle"> <input type="time" class="cr-hora-accion" style="width:120px;margin-left:8px"></label>
+              <label class="chk" style="display:flex;align-items:center;gap:8px"><input type="checkbox" data-accion="Contacto con red de apoyo/familiar"> Contacto con red de apoyo/familiar — ¿quién? <input type="text" placeholder="Quién" style="width:140px;margin-left:6px" id="cr-redapoyo-quien"> <input type="time" class="cr-hora-accion" style="width:120px;margin-left:8px"></label>
+            </div>
+            <div class="fg" style="margin-top:10px"><label class="lbl">Otra acción</label><input type="text" id="cr-otra-accion-texto" placeholder="Describe otra acción tomada"><input type="time" id="cr-otra-accion-hora" style="width:120px;margin-top:6px"></div>
+          </div>
+
+          <div class="subsec" style="margin-top:18px">III. Desenlace</div>
+          <div class="row col2">
+            <div class="fg"><label class="lbl">¿Fue recibida en servicio de urgencias?</label>
+              <div class="checks"><label class="chk"><input type="radio" name="cr-urgencias" value="Sí"> Sí</label><label class="chk"><input type="radio" name="cr-urgencias" value="No"> No</label></div>
+              <input type="text" id="cr-urgencias-detalle" placeholder="¿Dónde, quién la recibió?" style="margin-top:6px">
+            </div>
+            <div class="fg"><label class="lbl">¿Hospitalización?</label>
+              <select id="cr-hospitalizacion"><option>No</option><option>Sí</option><option>Pendiente de valoración</option></select>
+            </div>
+          </div>
+          <div class="fg"><label class="lbl">Profesional/institución de contacto para seguimiento</label><input type="text" id="cr-institucion-seguimiento" placeholder="Nombre, teléfono, institución"></div>
+
+          <div class="subsec" style="margin-top:18px">IV. Seguimiento</div>
+          <div class="row col2">
+            <div class="fg"><label class="lbl">Próximo contacto programado</label><input type="date" id="cr-proximo-contacto"></div>
+            <div class="fg"><label class="lbl">Responsable del seguimiento</label>
+              <select id="cr-responsable-seguimiento"><option>Tú</option><option>Equipo hospitalario</option><option>Ambos</option></select>
+            </div>
+          </div>
+          <div class="fg"><label class="lbl">Ajustes al plan de tratamiento</label><textarea id="cr-ajustes-plan" placeholder="Ej: pausar fase de reestructuración, retomar según indicación de psiquiatría..."></textarea></div>
+
+          <div class="subsec" style="margin-top:18px">V. Notas Confidenciales</div>
+          <p style="font-size:.76rem;color:var(--border);margin-bottom:8px">Solo terapeuta — no va a ningún resumen para el paciente.</p>
+          <div class="fg"><textarea id="cr-notas-confidenciales" style="min-height:140px" placeholder="Espacio libre para todo el detalle clínico sensible, cronología completa, lo que verbalizó textualmente si es relevante para el equipo que la recibe..."></textarea></div>
+
+        </div>
+        <!-- ===== FIN FORMULARIO DE CRISIS ===== -->
       </div>
       <div class="card">
         <div class="sec-title">📤 Resumen para el Paciente</div>

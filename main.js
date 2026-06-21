@@ -791,6 +791,7 @@ function nuevaSesion(){
   document.getElementById('ses-eval').textContent = 5;
   document.getElementById('ses-tipo-sesion').value = 'sesion';
   document.getElementById('ses-motivo-cancel-wrap').style.display='none';
+  toggleCancelacion();
   window._sesDcSeleccionadas = {};
   renderSesDCGrid();
   renderContextoClinico(pid);
@@ -803,6 +804,107 @@ function nuevaSesion(){
 function toggleCancelacion(){
   const tipo = document.getElementById('ses-tipo-sesion').value;
   document.getElementById('ses-motivo-cancel-wrap').style.display = tipo==='cancelacion' ? 'block' : 'none';
+
+  // Alternar entre el formulario normal (seguimiento/evaluación/cierre/
+  // cancelación) y el formulario especial de crisis/contención.
+  const esCrisis = tipo==='crisis';
+  const formNormal = document.getElementById('ses-form-normal');
+  const formCrisis = document.getElementById('ses-form-crisis');
+  if(formNormal) formNormal.style.display = esCrisis ? 'none' : 'block';
+  if(formCrisis) formCrisis.style.display = esCrisis ? 'block' : 'none';
+}
+
+// Colorea el indicador de nivel de riesgo tipo semáforo según lo seleccionado.
+function crActualizarColorNivel(){
+  var sel = document.getElementById('cr-nivel-riesgo');
+  var indicador = document.getElementById('cr-nivel-indicador');
+  if(!sel || !indicador) return;
+  var colores = { bajo:'#7ecba0', moderado:'#e8b87a', alto:'#e8845a', critico:'#c0392b' };
+  indicador.style.background = colores[sel.value] || '#eee';
+}
+
+// Carga los datos guardados de una sesión de crisis existente en el
+// formulario, al reabrirla.
+function crCargarDatos(c){
+  document.getElementById('cr-hora-inicio').value = c.horaInicio||'';
+  document.getElementById('cr-hora-fin').value = c.horaFin||'';
+  document.getElementById('cr-en-curso').checked = !!c.enCurso;
+  document.getElementById('cr-hora-fin').disabled = !!c.enCurso;
+  document.getElementById('cr-modalidad').value = c.modalidad||'Presencial';
+  document.getElementById('cr-quien-alerto').value = c.quienAlerto||'Paciente';
+  document.getElementById('cr-tipo-riesgo').value = c.tipoRiesgo||'Ideación suicida';
+  document.getElementById('cr-herramienta').value = c.herramienta||'C-SSRS';
+  document.getElementById('cr-nivel-riesgo').value = c.nivelRiesgo||'';
+  crActualizarColorNivel();
+  document.getElementById('cr-puntaje').value = c.puntaje||'';
+  document.querySelectorAll('input[name=cr-plan]').forEach(r=>{ r.checked = r.value===(c.planVerbalizado||''); });
+  document.getElementById('cr-plan-detalle').value = c.planDetalle||'';
+  document.querySelectorAll('input[name=cr-medios]').forEach(r=>{ r.checked = r.value===(c.accesoMedios||''); });
+  document.getElementById('cr-medios-detalle').value = c.accesoMediosDetalle||'';
+  document.querySelectorAll('input[name=cr-acompanada]').forEach(r=>{ r.checked = r.value===(c.acompanada||''); });
+  document.getElementById('cr-acompanada-quien').value = c.acompanadaQuien||'';
+
+  // Acciones (checkboxes + hora cada una)
+  var accionesGuardadas = c.acciones || [];
+  document.querySelectorAll('#cr-acciones input[type=checkbox]').forEach(function(chk){
+    var encontrada = accionesGuardadas.find(function(a){ return a.accion===chk.dataset.accion; });
+    chk.checked = !!encontrada;
+    var horaEl = chk.parentElement.querySelector('.cr-hora-accion');
+    if(horaEl) horaEl.value = encontrada ? (encontrada.hora||'') : '';
+  });
+  document.getElementById('cr-medios-por-quien').value = c.mediosPorQuien||'';
+  document.getElementById('cr-traslado-detalle').value = c.trasladoDetalle||'';
+  document.getElementById('cr-redapoyo-quien').value = c.redApoyoQuien||'';
+  // "Otra acción" — buscar una acción que no coincida con ninguno de los checkboxes fijos
+  var accionesFijas = Array.from(document.querySelectorAll('#cr-acciones input[type=checkbox]')).map(function(c){ return c.dataset.accion; });
+  var otra = accionesGuardadas.find(function(a){ return !accionesFijas.includes(a.accion); });
+  document.getElementById('cr-otra-accion-texto').value = otra ? otra.accion : '';
+  document.getElementById('cr-otra-accion-hora').value = otra ? (otra.hora||'') : '';
+
+  document.querySelectorAll('input[name=cr-urgencias]').forEach(r=>{ r.checked = r.value===(c.recibidaUrgencias||''); });
+  document.getElementById('cr-urgencias-detalle').value = c.urgenciasDetalle||'';
+  document.getElementById('cr-hospitalizacion').value = c.hospitalizacion||'No';
+  document.getElementById('cr-institucion-seguimiento').value = c.institucionSeguimiento||'';
+  document.getElementById('cr-proximo-contacto').value = c.proximoContacto||'';
+  document.getElementById('cr-responsable-seguimiento').value = c.responsableSeguimiento||'Tú';
+  document.getElementById('cr-ajustes-plan').value = c.ajustesPlan||'';
+  document.getElementById('cr-notas-confidenciales').value = c.notasConfidenciales||'';
+}
+
+// Limpia el formulario de crisis (se usa al iniciar una sesión nueva).
+function crLimpiarFormulario(){
+  document.getElementById('cr-hora-inicio').value = '';
+  document.getElementById('cr-hora-fin').value = '';
+  document.getElementById('cr-hora-fin').disabled = false;
+  document.getElementById('cr-en-curso').checked = false;
+  document.getElementById('cr-modalidad').selectedIndex = 0;
+  document.getElementById('cr-quien-alerto').selectedIndex = 0;
+  document.getElementById('cr-tipo-riesgo').selectedIndex = 0;
+  document.getElementById('cr-herramienta').selectedIndex = 0;
+  document.getElementById('cr-nivel-riesgo').value = '';
+  crActualizarColorNivel();
+  document.getElementById('cr-puntaje').value = '';
+  document.querySelectorAll('input[name=cr-plan]').forEach(r=>r.checked=false);
+  document.getElementById('cr-plan-detalle').value = '';
+  document.querySelectorAll('input[name=cr-medios]').forEach(r=>r.checked=false);
+  document.getElementById('cr-medios-detalle').value = '';
+  document.querySelectorAll('input[name=cr-acompanada]').forEach(r=>r.checked=false);
+  document.getElementById('cr-acompanada-quien').value = '';
+  document.querySelectorAll('#cr-acciones input[type=checkbox]').forEach(c=>c.checked=false);
+  document.querySelectorAll('.cr-hora-accion').forEach(h=>h.value='');
+  document.getElementById('cr-medios-por-quien').value = '';
+  document.getElementById('cr-traslado-detalle').value = '';
+  document.getElementById('cr-redapoyo-quien').value = '';
+  document.getElementById('cr-otra-accion-texto').value = '';
+  document.getElementById('cr-otra-accion-hora').value = '';
+  document.querySelectorAll('input[name=cr-urgencias]').forEach(r=>r.checked=false);
+  document.getElementById('cr-urgencias-detalle').value = '';
+  document.getElementById('cr-hospitalizacion').selectedIndex = 0;
+  document.getElementById('cr-institucion-seguimiento').value = '';
+  document.getElementById('cr-proximo-contacto').value = '';
+  document.getElementById('cr-responsable-seguimiento').selectedIndex = 0;
+  document.getElementById('cr-ajustes-plan').value = '';
+  document.getElementById('cr-notas-confidenciales').value = '';
 }
 
 function toggleTestOtro(){
@@ -823,8 +925,10 @@ function abrirSesion(pid, sid){
   document.getElementById('ses-estado').value = s.estado||5;
   document.getElementById('ses-eval').textContent = s.estado||5;
   document.getElementById('ses-tipo-sesion').value = s.tipo||'sesion';
+  toggleCancelacion(); // alterna entre formulario normal y de crisis según corresponda
   document.getElementById('ses-motivo-cancel-wrap').style.display = s.tipo==='cancelacion' ? 'block' : 'none';
   if(s.tipo==='cancelacion') document.getElementById('ses-motivo-cancel').value = s.motivoCancelacion||'';
+  if(s.tipo==='crisis') crCargarDatos(s.crisis||{});
   document.getElementById('ses-temas').value = s.temas||'';
   document.getElementById('ses-inter').value = s.inter||'';
   document.getElementById('ses-avances').value = s.avances||'';
@@ -962,6 +1066,55 @@ function guardarSesion(){
   document.querySelectorAll('input[name=recurso]:checked').forEach(c=>recursos.push(c.value));
   const tareaRev = document.querySelector('input[name=ses-tarea-rev]:checked');
 
+  // Si es una sesión de crisis, recopilar los datos del formulario especial
+  // en vez de (o además de) los campos normales.
+  let crisisData = null;
+  if(tipo==='crisis'){
+    const acciones = [];
+    document.querySelectorAll('#cr-acciones input[type=checkbox]:checked').forEach(function(c){
+      const horaEl = c.parentElement.querySelector('.cr-hora-accion');
+      acciones.push({ accion: c.dataset.accion, hora: horaEl ? horaEl.value : '' });
+    });
+    const otraAccionTexto = document.getElementById('cr-otra-accion-texto').value.trim();
+    if(otraAccionTexto){
+      acciones.push({ accion: otraAccionTexto, hora: document.getElementById('cr-otra-accion-hora').value });
+    }
+    const planRadio = document.querySelector('input[name=cr-plan]:checked');
+    const mediosRadio = document.querySelector('input[name=cr-medios]:checked');
+    const acompanadaRadio = document.querySelector('input[name=cr-acompanada]:checked');
+    const urgenciasRadio = document.querySelector('input[name=cr-urgencias]:checked');
+
+    crisisData = {
+      horaInicio: document.getElementById('cr-hora-inicio').value,
+      horaFin: document.getElementById('cr-en-curso').checked ? '' : document.getElementById('cr-hora-fin').value,
+      enCurso: document.getElementById('cr-en-curso').checked,
+      modalidad: document.getElementById('cr-modalidad').value,
+      quienAlerto: document.getElementById('cr-quien-alerto').value,
+      tipoRiesgo: document.getElementById('cr-tipo-riesgo').value,
+      herramienta: document.getElementById('cr-herramienta').value,
+      nivelRiesgo: document.getElementById('cr-nivel-riesgo').value,
+      puntaje: document.getElementById('cr-puntaje').value,
+      planVerbalizado: planRadio ? planRadio.value : '',
+      planDetalle: document.getElementById('cr-plan-detalle').value,
+      accesoMedios: mediosRadio ? mediosRadio.value : '',
+      accesoMediosDetalle: document.getElementById('cr-medios-detalle').value,
+      acompanada: acompanadaRadio ? acompanadaRadio.value : '',
+      acompanadaQuien: document.getElementById('cr-acompanada-quien').value,
+      acciones: acciones,
+      mediosPorQuien: document.getElementById('cr-medios-por-quien').value,
+      trasladoDetalle: document.getElementById('cr-traslado-detalle').value,
+      redApoyoQuien: document.getElementById('cr-redapoyo-quien').value,
+      recibidaUrgencias: urgenciasRadio ? urgenciasRadio.value : '',
+      urgenciasDetalle: document.getElementById('cr-urgencias-detalle').value,
+      hospitalizacion: document.getElementById('cr-hospitalizacion').value,
+      institucionSeguimiento: document.getElementById('cr-institucion-seguimiento').value,
+      proximoContacto: document.getElementById('cr-proximo-contacto').value,
+      responsableSeguimiento: document.getElementById('cr-responsable-seguimiento').value,
+      ajustesPlan: document.getElementById('cr-ajustes-plan').value,
+      notasConfidenciales: document.getElementById('cr-notas-confidenciales').value
+    };
+  }
+
   const sesData = {
     id: currentSesionId || genId(),
     planSesion: document.getElementById('ses-plan').value,
@@ -989,6 +1142,7 @@ function guardarSesion(){
     ajustes: document.getElementById('ses-ajustes').value,
     notasPriv: document.getElementById('ses-notas-priv').value,
     testsAplicados: testsAplicados,
+    crisis: crisisData,
     guardada: new Date().toISOString(),
     guardada_definitivo: true,        // ← INMUTABILIDAD: marca la sesión como definitiva
     correcciones: []                  // ← array para futuras correcciones
@@ -1100,6 +1254,7 @@ function limpiarCamposFormSesion(){
   document.getElementById('ses-test-otro').style.display='none';
   document.getElementById('ses-resumen-box').style.display='none';
   document.getElementById('ses-export-btns').style.display='none';
+  crLimpiarFormulario();
 }
 
 // Limpia los campos Y oculta el formulario (vuelve al estado "sin sesión
