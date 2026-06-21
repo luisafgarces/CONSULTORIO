@@ -280,6 +280,7 @@ function goPage(name){
   if(name==='documentos') renderDocumentos();
   if(name==='psicoeducacion') psiInit();
   if(name==='usuarios') usrRenderLista();
+  if(name==='habilitacion') habInit();
   if(name==='informes') ilInit();
   if(name==='informe-global') igInit();
 }
@@ -6620,4 +6621,308 @@ function psiGenerarDocumento(){
   ventana.document.write('<!DOCTYPE html><html lang="es"><head><meta charset="UTF-8"><title>'+pscEsc(pieza.titulo)+'</title></head><body>'+html+'<div class="no-print" style="position:fixed;bottom:20px;right:20px;display:flex;gap:10px;z-index:999"><button onclick="window.print()" style="background:#cd8e9d;color:#fff;border:none;border-radius:20px;padding:10px 24px;font-size:.9rem;cursor:pointer">Imprimir / Guardar PDF</button><button onclick="window.close()" style="background:#fff;color:#643000;border:1.5px solid #cd8e9d;border-radius:20px;padding:10px 20px;font-size:.9rem;cursor:pointer">Cerrar</button></div><style>@media print{.no-print{display:none!important}@page{margin:1.5cm}}</style></body></html>');
   ventana.document.close();
   toast('Documento listo para guardar como PDF');
+}
+
+// ===================== HABILITACIÓN / DOCUMENTOS LEGALES =====================
+// Checklist y archivo de documentos exigidos por la Secretaría Seccional
+// de Salud (Resolución 3100 de 2019) para visitas de inspección,
+// vigilancia y control. Los archivos se guardan en Firebase Storage; los
+// metadatos (nombre, fecha de vigencia, notas, si está subido) en
+// Firestore, bajo la clave 'habilitacion_documentos'.
+
+const HAB_CATEGORIAS = [
+  {
+    nombre: 'Talento Humano',
+    icon: '🎓',
+    docs: [
+      { id: 'diploma', nombre: 'Diploma de Psicología' },
+      { id: 'acta_grado', nombre: 'Acta de grado' },
+      { id: 'tarjeta_profesional', nombre: 'Tarjeta Profesional (COLPSIC)' },
+      { id: 'rethus', nombre: 'Certificado de inscripción en RETHUS' },
+      { id: 'registro_titulo_antioquia', nombre: 'Registro del título en la Secretaría de Antioquia' },
+      { id: 'certificaciones_adicionales', nombre: 'Certificaciones / especializaciones adicionales' },
+      { id: 'cedula', nombre: 'Cédula de ciudadanía' },
+    ]
+  },
+  {
+    nombre: 'Infraestructura',
+    icon: '🏢',
+    docs: [
+      { id: 'contrato_arrendamiento', nombre: 'Contrato de arrendamiento o título de propiedad' },
+      { id: 'uso_suelo', nombre: 'Certificado de uso de suelo' },
+      { id: 'plano_consultorio', nombre: 'Plano del consultorio' },
+      { id: 'certificado_bomberos', nombre: 'Certificado de revisión de Bomberos' },
+      { id: 'saneamiento_ambiental', nombre: 'Certificado de saneamiento ambiental' },
+    ]
+  },
+  {
+    nombre: 'Dotación',
+    icon: '🪑',
+    docs: [
+      { id: 'inventario_dotacion', nombre: 'Lista / inventario de dotación' },
+      { id: 'certificados_mantenimiento', nombre: 'Certificados de mantenimiento de equipos' },
+    ]
+  },
+  {
+    nombre: 'Historia Clínica y Consentimientos',
+    icon: '📋',
+    docs: [
+      { id: 'modelo_consentimiento', nombre: 'Modelo de consentimiento informado' },
+      { id: 'modelo_consentimiento_teleconsulta', nombre: 'Modelo de consentimiento para teleconsulta' },
+      { id: 'politica_acceso_hc', nombre: 'Política de acceso a historias clínicas' },
+      { id: 'formato_evolucion', nombre: 'Formato de evolución de sesión' },
+    ]
+  },
+  {
+    nombre: 'Seguridad Social y Parafiscales',
+    icon: '🏥',
+    docs: [
+      { id: 'afiliacion_eps', nombre: 'Certificado de afiliación a EPS' },
+      { id: 'afiliacion_pension', nombre: 'Certificado de afiliación a pensión' },
+      { id: 'afiliacion_arl', nombre: 'Certificado de afiliación a ARL' },
+      { id: 'pago_sena', nombre: 'Certificado de pago SENA' },
+      { id: 'pago_icetex', nombre: 'Certificado de pago ICETEX' },
+    ]
+  },
+  {
+    nombre: 'Tributario y Cámara de Comercio',
+    icon: '🧾',
+    docs: [
+      { id: 'rut', nombre: 'RUT actualizado' },
+      { id: 'registro_mercantil', nombre: 'Registro mercantil / acta de constitución' },
+      { id: 'certificado_existencia', nombre: 'Certificado de existencia y representación legal' },
+      { id: 'reps_formulario', nombre: 'Formulario de inscripción REPS' },
+      { id: 'reps_distintivo', nombre: 'Distintivo de habilitación REPS' },
+      { id: 'reps_certificado', nombre: 'Certificado de inscripción en REPS' },
+      { id: 'facturacion_electronica', nombre: 'Certificado de facturación electrónica (DIAN)' },
+    ]
+  },
+  {
+    nombre: 'Procesos y Protocolos',
+    icon: '📐',
+    docs: [
+      { id: 'manual_procedimientos', nombre: 'Manual de procedimientos generales' },
+      { id: 'protocolo_riesgo_suicida', nombre: 'Protocolo de riesgo suicida / conductas autolesivas' },
+      { id: 'protocolo_crisis', nombre: 'Protocolo de crisis psicológica' },
+      { id: 'protocolo_nnya', nombre: 'Protocolo para niños, niñas y adolescentes' },
+      { id: 'protocolo_limpieza', nombre: 'Protocolo de limpieza y desinfección' },
+      { id: 'matriz_riesgos', nombre: 'Matriz de riesgos del servicio' },
+      { id: 'codigo_etica', nombre: 'Código de Ética de Psicología (Ley 1090/2006)' },
+      { id: 'politica_datos', nombre: 'Política de protección de datos personales (Ley 1581/2012)' },
+      { id: 'convenios_interdependencia', nombre: 'Convenios de referencia (psiquiatría / urgencias), si aplica' },
+    ]
+  }
+];
+
+var _habDocActual = null; // { catIdx, docId } del documento que se está editando en el modal
+var _habDataCache = {};
+
+function habGetData(){ return DB.get('habilitacion_documentos') || {}; }
+function habGuardarData(data){ DB.set('habilitacion_documentos', data); }
+
+function habInit(){
+  _habDataCache = habGetData();
+  habRenderResumen();
+  habRenderCategorias();
+}
+
+function habRenderResumen(){
+  var total = 0, completos = 0;
+  HAB_CATEGORIAS.forEach(function(cat){
+    cat.docs.forEach(function(d){
+      total++;
+      if(_habDataCache[d.id] && _habDataCache[d.id].url) completos++;
+    });
+  });
+  var pct = total ? Math.round((completos/total)*100) : 0;
+  var color = pct>=80 ? '#2d6a4f' : pct>=40 ? '#a0536a' : '#c0392b';
+  document.getElementById('hab-resumen').innerHTML = `
+    <div style="flex:1;min-width:200px">
+      <div style="font-size:1.6rem;font-weight:700;color:${color}">${completos} / ${total}</div>
+      <div style="font-size:.78rem;color:var(--strong)">documentos cargados (${pct}%)</div>
+    </div>
+    <div style="flex:2;min-width:200px">
+      <div style="height:10px;background:#fadae1;border-radius:5px;overflow:hidden">
+        <div style="height:100%;width:${pct}%;background:${color};transition:width .3s"></div>
+      </div>
+    </div>
+  `;
+}
+
+function habRenderCategorias(){
+  var cont = document.getElementById('hab-categorias');
+  cont.innerHTML = HAB_CATEGORIAS.map(function(cat, catIdx){
+    var rows = cat.docs.map(function(d){
+      var info = _habDataCache[d.id];
+      var cargado = info && info.url;
+      var vigenciaTxt = '';
+      if(cargado && info.vigencia){
+        var hoy = new Date(); hoy.setHours(0,0,0,0);
+        var fv = new Date(info.vigencia+'T00:00:00');
+        var diasRestantes = Math.round((fv-hoy)/(1000*60*60*24));
+        if(diasRestantes < 0){
+          vigenciaTxt = '<span style="color:#c0392b;font-weight:700">⚠️ Vencido (' + fv.toLocaleDateString('es-CO') + ')</span>';
+        } else if(diasRestantes <= 30){
+          vigenciaTxt = '<span style="color:#a0536a;font-weight:700">⏳ Vence en ' + diasRestantes + ' días</span>';
+        } else {
+          vigenciaTxt = '<span style="color:#888">Vigente hasta ' + fv.toLocaleDateString('es-CO') + '</span>';
+        }
+      }
+      return `
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 12px;border-bottom:1px solid #f0dde2">
+        <div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0">
+          <div style="font-size:1.1rem;flex-shrink:0">${cargado?'✅':'⬜'}</div>
+          <div style="min-width:0">
+            <div style="font-size:.84rem;color:var(--text);font-weight:${cargado?'400':'700'}">${d.nombre}</div>
+            ${vigenciaTxt?`<div style="font-size:.74rem;margin-top:2px">${vigenciaTxt}</div>`:''}
+          </div>
+        </div>
+        <button class="btn" style="font-size:.76rem;flex-shrink:0;background:${cargado?'#fdf5f7':'#cd8e9d'};color:${cargado?'#cd8e9d':'#fff'};border:1.5px solid #e8d0d6" onclick="habAbrirModal(${catIdx},'${d.id}')">${cargado?'Ver / actualizar':'+ Subir'}</button>
+      </div>`;
+    }).join('');
+
+    var catCompletos = cat.docs.filter(function(d){ return _habDataCache[d.id] && _habDataCache[d.id].url; }).length;
+    return `
+    <div class="card" style="margin-bottom:14px">
+      <div class="sec-title" style="display:flex;justify-content:space-between;align-items:center">
+        <span>${cat.icon} ${cat.nombre}</span>
+        <span style="font-size:.74rem;color:var(--border);font-weight:400">${catCompletos}/${cat.docs.length}</span>
+      </div>
+      ${rows}
+    </div>`;
+  }).join('');
+}
+
+function habAbrirModal(catIdx, docId){
+  var cat = HAB_CATEGORIAS[catIdx];
+  var docDef = cat.docs.find(function(d){ return d.id===docId; });
+  _habDocActual = { catIdx: catIdx, docId: docId };
+
+  document.getElementById('hab-doc-titulo').textContent = docDef.nombre;
+  document.getElementById('hab-doc-info').textContent = 'Categoría: ' + cat.nombre;
+  document.getElementById('hab-doc-input').value = '';
+  document.getElementById('hab-doc-progreso').style.display = 'none';
+
+  var info = _habDataCache[docId];
+  if(info && info.url){
+    document.getElementById('hab-doc-actual').style.display = 'block';
+    document.getElementById('hab-doc-actual-nombre').textContent = info.nombreArchivo || 'Archivo cargado';
+    document.getElementById('hab-doc-actual-link').href = info.url;
+    document.getElementById('hab-doc-vigencia').value = info.vigencia || '';
+    document.getElementById('hab-doc-notas').value = info.notas || '';
+  } else {
+    document.getElementById('hab-doc-actual').style.display = 'none';
+    document.getElementById('hab-doc-vigencia').value = '';
+    document.getElementById('hab-doc-notas').value = '';
+  }
+
+  document.getElementById('hab-doc-overlay').classList.add('open');
+}
+
+function habCerrarModal(){
+  document.getElementById('hab-doc-overlay').classList.remove('open');
+  _habDocActual = null;
+}
+
+function habGuardarDocumento(){
+  if(!_habDocActual) return;
+  if(!window._firebaseStorage){
+    toast('⚠️ Necesitas conexión a internet para subir archivos');
+    return;
+  }
+  var docId = _habDocActual.docId;
+  var fileInput = document.getElementById('hab-doc-input');
+  var vigencia = document.getElementById('hab-doc-vigencia').value;
+  var notas = document.getElementById('hab-doc-notas').value;
+  var file = fileInput.files[0];
+
+  function guardarMetadatos(url, nombreArchivo){
+    var data = habGetData();
+    data[docId] = {
+      url: url || (data[docId]&&data[docId].url) || '',
+      nombreArchivo: nombreArchivo || (data[docId]&&data[docId].nombreArchivo) || '',
+      vigencia: vigencia,
+      notas: notas,
+      actualizado: new Date().toISOString()
+    };
+    habGuardarData(data);
+    _habDataCache = data;
+    habRenderResumen();
+    habRenderCategorias();
+    habCerrarModal();
+    toast('💾 Documento guardado');
+  }
+
+  if(!file){
+    // Solo se actualizan vigencia/notas, sin subir archivo nuevo
+    if(!_habDataCache[docId] || !_habDataCache[docId].url){
+      toast('⚠️ Selecciona un archivo para subir');
+      return;
+    }
+    guardarMetadatos(null, null);
+    return;
+  }
+
+  // Validar tamaño (máximo 10MB, razonable para documentos escaneados)
+  if(file.size > 10*1024*1024){
+    toast('⚠️ El archivo es muy grande (máx. 10MB)');
+    return;
+  }
+
+  document.getElementById('hab-doc-progreso').style.display = 'block';
+  var barra = document.getElementById('hab-doc-progreso-barra');
+  barra.style.width = '0%';
+
+  var ext = file.name.split('.').pop();
+  var pathRef = window._firebaseStorage.ref('habilitacion/' + docId + '_' + Date.now() + '.' + ext);
+  var uploadTask = pathRef.put(file);
+
+  uploadTask.on('state_changed',
+    function(snapshot){
+      var pct = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
+      barra.style.width = pct + '%';
+    },
+    function(error){
+      console.error('Error subiendo documento:', error);
+      toast('⚠️ Error al subir el archivo. Intenta de nuevo.');
+      document.getElementById('hab-doc-progreso').style.display = 'none';
+    },
+    function(){
+      uploadTask.snapshot.ref.getDownloadURL().then(function(url){
+        guardarMetadatos(url, file.name);
+      });
+    }
+  );
+}
+
+function habEliminarDocumento(){
+  if(!_habDocActual) return;
+  if(!confirm('¿Eliminar este documento? Tendrás que volver a subirlo si lo necesitas después.')) return;
+  var docId = _habDocActual.docId;
+  var data = habGetData();
+  var info = data[docId];
+
+  function borrarMetadatos(){
+    delete data[docId];
+    habGuardarData(data);
+    _habDataCache = data;
+    habRenderResumen();
+    habRenderCategorias();
+    habCerrarModal();
+    toast('Documento eliminado');
+  }
+
+  if(info && info.url && window._firebaseStorage){
+    // Intentar borrar el archivo real de Storage; si falla (por ejemplo,
+    // ya no existe), igual limpiamos los metadatos para no dejar un
+    // registro huérfano apuntando a un archivo inexistente.
+    try{
+      var ref = window._firebaseStorage.refFromURL(info.url);
+      ref.delete().then(borrarMetadatos).catch(borrarMetadatos);
+    } catch(e){
+      borrarMetadatos();
+    }
+  } else {
+    borrarMetadatos();
+  }
 }

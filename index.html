@@ -156,6 +156,7 @@ const DB = {
     <div class="nav-section">Reportes</div>
     <button class="nav-btn" onclick="goPage('informe-global');cerrarSidebarMobile()"><span class="icon">📊</span><span class="nav-label"> Informe Global</span></button>
     <button class="nav-btn" onclick="goPage('usuarios');cerrarSidebarMobile()"><span class="icon">🔐</span><span class="nav-label"> Usuarios y Roles</span></button>
+    <button class="nav-btn" onclick="goPage('habilitacion');cerrarSidebarMobile()"><span class="icon">📑</span><span class="nav-label"> Habilitación / Doc. Legales</span></button>
   </nav>
   <div class="version">
     <div style="margin-bottom:8px;font-size:0.65rem;color:var(--border)">Suite Clínica v1.0 · 2025</div>
@@ -1592,6 +1593,65 @@ const DB = {
   </div>
 </div>
 
+<!-- ========== HABILITACIÓN / DOCUMENTOS LEGALES ========== -->
+<div class="page" id="page-habilitacion">
+  <div class="page-header">
+    <h1>Habilitación / Documentos Legales 📑</h1>
+    <p>Checklist y archivo de los documentos exigidos por la Secretaría Seccional de Salud para visitas de inspección, vigilancia y control (Resolución 3100 de 2019)</p>
+  </div>
+
+  <div class="card" style="margin-bottom:18px;background:#fdf5f7">
+    <div id="hab-resumen" style="display:flex;gap:18px;flex-wrap:wrap;align-items:center">
+      <div style="font-size:.85rem;color:var(--strong)">Cargando resumen...</div>
+    </div>
+  </div>
+
+  <div id="hab-categorias"></div>
+</div>
+
+<!-- MODAL: subir/ver documento de habilitación -->
+<div class="pac-modal-overlay" id="hab-doc-overlay" onclick="if(event.target===this)habCerrarModal()" style="z-index:900">
+  <div class="pac-modal" style="max-width:520px">
+    <div class="pac-modal-header">
+      <div class="pac-modal-title" id="hab-doc-titulo">Documento</div>
+      <button class="pac-modal-close" onclick="habCerrarModal()">✕</button>
+    </div>
+    <p style="font-size:.78rem;color:#888;margin-bottom:14px" id="hab-doc-info"></p>
+
+    <div id="hab-doc-actual" style="display:none;margin-bottom:14px;padding:12px 14px;background:#edfaf0;border:1.5px solid #7ecba0;border-radius:10px">
+      <div style="font-size:.82rem;color:#2d6a4f;font-weight:700">✅ Documento cargado</div>
+      <div style="font-size:.78rem;color:#2d6a4f;margin-top:4px" id="hab-doc-actual-nombre"></div>
+      <div style="display:flex;gap:8px;margin-top:8px">
+        <a id="hab-doc-actual-link" href="#" target="_blank" class="btn" style="font-size:.76rem;text-decoration:none">👁️ Ver / descargar</a>
+        <button class="btn" style="font-size:.76rem;background:#ffeaea;color:#c0392b;border:1.5px solid #e8a0a0" onclick="habEliminarDocumento()">🗑️ Eliminar</button>
+      </div>
+    </div>
+
+    <div class="fg">
+      <label class="lbl">Subir / reemplazar archivo (PDF o imagen)</label>
+      <input type="file" id="hab-doc-input" accept=".pdf,.jpg,.jpeg,.png">
+    </div>
+    <div class="fg">
+      <label class="lbl">Fecha de vigencia (opcional, si aplica)</label>
+      <input type="date" id="hab-doc-vigencia">
+    </div>
+    <div class="fg">
+      <label class="lbl">Notas</label>
+      <textarea id="hab-doc-notas" placeholder="Ej: número de TP, observaciones, dónde se tramitó..."></textarea>
+    </div>
+
+    <div id="hab-doc-progreso" style="display:none;margin-bottom:10px">
+      <div style="height:8px;background:#fadae1;border-radius:4px;overflow:hidden"><div id="hab-doc-progreso-barra" style="height:100%;width:0%;background:#cd8e9d;transition:width .2s"></div></div>
+      <p style="font-size:.74rem;color:#888;margin-top:4px">Subiendo...</p>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn" onclick="habCerrarModal()">Cerrar</button>
+      <button class="btn primary" onclick="habGuardarDocumento()">💾 Guardar</button>
+    </div>
+  </div>
+</div>
+
 <!-- ========== HERRAMIENTAS TCC ========== -->
 <div class="page" id="page-herramientas">
   <div class="page-header">
@@ -1991,6 +2051,7 @@ const DB = {
 <!-- Firebase cargado al final del body para garantizar que esté disponible -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script>
 // ===================== ROLES Y PERMISOS =====================
@@ -2059,6 +2120,7 @@ function aplicarPermisosFinanzas(){
   try {
     firebase.initializeApp(FIREBASE_CONFIG);
     _firebaseDB = firebase.firestore();
+    window._firebaseStorage = firebase.storage();
     console.log("Firebase conectado correctamente");
 
     // ── Autenticación con Google ──
