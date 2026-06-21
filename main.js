@@ -314,6 +314,28 @@ function abrirAnamnesisDePaciente(pid){
   }, 50);
 }
 
+// Abre la página de Plan de Tratamiento con el paciente ya seleccionado,
+// igual que abrirAnamnesisDePaciente pero para el Plan.
+function abrirPlanDePaciente(pid){
+  cerrarPacModal();
+  goPage('plan');
+  setTimeout(function(){
+    var sel = document.getElementById('pl-sel-pac');
+    if(sel){ sel.value = pid; loadPlan(); }
+  }, 50);
+}
+
+// Abre la página de Sesiones con el paciente ya seleccionado y el
+// formulario de nueva sesión listo para escribir directamente.
+function abrirNuevaSesionDePaciente(pid){
+  cerrarPacModal();
+  goPage('sesiones');
+  setTimeout(function(){
+    var sel = document.getElementById('ses-sel-pac');
+    if(sel){ sel.value = pid; loadSesiones(); nuevaSesion(); }
+  }, 50);
+}
+
 // Muestra, dentro del formulario de Sesión, un resumen de solo lectura
 // con los datos clave de la Anamnesis y el Plan de Tratamiento del
 // paciente, para no tener que ir y venir entre páginas. Es información
@@ -3836,8 +3858,10 @@ function renderPacModalDatos(pac){
       </div>
     </div>
     <p style="font-size:.73rem;color:var(--border);margin-top:6px">Paciente desde: ${pac.creado ? new Date(pac.creado).toLocaleDateString('es-CO') : '\u2014'}</p>
-    <div style="margin-top:14px">
+    <div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn" style="font-size:.82rem;background:#fdf5f7;color:#cd8e9d;border:1.5px solid #e8d0d6" onclick="abrirAnamnesisDePaciente('${pac.id}')">🧾 Ver / completar Anamnesis</button>
+      <button class="btn" style="font-size:.82rem;background:#fdf5f7;color:#cd8e9d;border:1.5px solid #e8d0d6" onclick="abrirPlanDePaciente('${pac.id}')">🗺️ Ver / completar Plan de Tratamiento</button>
+      <button class="btn" style="font-size:.82rem;background:#fdf5f7;color:#cd8e9d;border:1.5px solid #e8d0d6" onclick="abrirNuevaSesionDePaciente('${pac.id}')">📝 Nueva sesión</button>
     </div>
   `;
 }
