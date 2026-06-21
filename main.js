@@ -4370,22 +4370,9 @@ function exportarHistoriaClinica(pacId){
     </div>
   </div>` : ''}
 
-  <!-- FIRMA HISTORIA CLÍNICA -->
+  <!-- NOTA FINAL -->
   <div class="footer">
-    <div style="display:flex;justify-content:space-around;align-items:flex-end;margin-bottom:16px;">
-      <div style="text-align:center;min-width:190px;">
-        <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;color:#a0536a;letter-spacing:.5px;margin-bottom:8px;">Paciente</div>
-        <div style="height:50px;border-bottom:1.5px solid #cd8e9d;margin-bottom:6px;"></div>
-        <div style="font-size:.8rem;color:#643000;">${esc(pac.nombre)}</div>
-      </div>
-      <div style="text-align:center;min-width:210px;">
-        <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;color:#a0536a;letter-spacing:.5px;margin-bottom:6px;">Psic&oacute;loga Tratante</div>
-        <img src="${FIRMA_DATA}" alt="Firma" style="height:50px;object-fit:contain;display:block;margin:0 auto 6px;">
-        <div style="border-top:1.5px solid #cd8e9d;padding-top:6px;font-size:.8rem;color:#643000;"><strong>Luisa Fernanda Garc&eacute;s Garc&iacute;a</strong></div>
-        <div style="font-size:.62rem;color:#cd8e9d;">TP 174366</div>
-      </div>
-    </div>
-    <p style="margin-top:16px">Este documento es confidencial y de uso exclusivo cl&iacute;nico &middot; Generado con Suite Cl&iacute;nica</p>
+    <p>Este documento es confidencial y de uso exclusivo cl&iacute;nico &middot; Generado con Suite Cl&iacute;nica</p>
   </div>
 
 </div>
