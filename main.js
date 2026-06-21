@@ -934,6 +934,11 @@ function toggleTestOtro(){
   document.getElementById('ses-test-otro').style.display = chk.checked ? 'inline-block' : 'none';
 }
 
+function toggleHumorOtro(){
+  const chk = document.getElementById('ses-humor-otro-chk');
+  document.getElementById('ses-humor-otro').style.display = chk.checked ? 'inline-block' : 'none';
+}
+
 function abrirSesion(pid, sid){
   const ses = DB.get('sesiones_'+pid)||[];
   const s = ses.find(x=>x.id===sid);
@@ -963,9 +968,17 @@ function abrirSesion(pid, sid){
   document.getElementById('ses-pensamiento').value = s.pensamiento||'';
   document.getElementById('ses-ajustes').value = s.ajustes||'';
   // Humores
-  document.querySelectorAll('#ses-humores input[type=checkbox]').forEach(c=>{
+  const humoresFijos = ['Estable','Ansioso/a','Depresivo/a','Irritable'];
+  document.querySelectorAll('#ses-humores input[type=checkbox][name=humor]').forEach(c=>{
     c.checked = (s.humores||[]).includes(c.value);
   });
+  const otroHumorGuardado = (s.humores||[]).find(h=>!humoresFijos.includes(h));
+  const humorOtroChkEl = document.getElementById('ses-humor-otro-chk');
+  if(humorOtroChkEl){
+    humorOtroChkEl.checked = !!otroHumorGuardado;
+    document.getElementById('ses-humor-otro').value = otroHumorGuardado||'';
+    document.getElementById('ses-humor-otro').style.display = otroHumorGuardado ? 'inline-block' : 'none';
+  }
   // T\u00e9cnicas
   document.querySelectorAll('#ses-tecnicas input[type=checkbox]').forEach(c=>{
     c.checked = (s.tecnicas||[]).includes(c.value);
@@ -1077,7 +1090,12 @@ function guardarSesion(){
     }
   });
   const humores = [];
-  document.querySelectorAll('#ses-humores input[type=checkbox]:checked').forEach(c=>humores.push(c.value));
+  document.querySelectorAll('#ses-humores input[type=checkbox][name=humor]:checked').forEach(c=>humores.push(c.value));
+  const humorOtroChk = document.getElementById('ses-humor-otro-chk');
+  if(humorOtroChk && humorOtroChk.checked){
+    const otroHumor = document.getElementById('ses-humor-otro').value.trim();
+    if(otroHumor) humores.push(otroHumor);
+  }
   const tecnicas = [];
   document.querySelectorAll('#ses-tecnicas input[type=checkbox]:checked').forEach(c=>tecnicas.push(c.value));
   const tareasCheck = [];
@@ -1274,6 +1292,8 @@ function limpiarCamposFormSesion(){
   document.querySelectorAll('input[name=recurso]').forEach(c=>c.checked=false);
   document.querySelectorAll('input[name=ses-tarea-rev]').forEach(c=>c.checked=false);
   document.getElementById('ses-test-otro').style.display='none';
+  document.getElementById('ses-humor-otro').value='';
+  document.getElementById('ses-humor-otro').style.display='none';
   document.getElementById('ses-resumen-box').style.display='none';
   document.getElementById('ses-export-btns').style.display='none';
   crLimpiarFormulario();

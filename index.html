@@ -638,7 +638,8 @@ const DB = {
             <label class="chk"><input type="checkbox" name="humor" value="Ansioso/a"> Ansioso/a</label>
             <label class="chk"><input type="checkbox" name="humor" value="Depresivo/a"> Depresivo/a</label>
             <label class="chk"><input type="checkbox" name="humor" value="Irritable"> Irritable</label>
-            <label class="chk"><input type="checkbox" name="humor" value="Otro"> Otro</label>
+            <label class="chk"><input type="checkbox" value="Otro" id="ses-humor-otro-chk" onchange="toggleHumorOtro()"> Otro</label>
+            <input type="text" id="ses-humor-otro" placeholder="Especifica el humor" style="display:none;width:180px;padding:5px 10px;border:1.5px solid #e8d0d6;border-radius:8px;font-size:.83rem">
           </div>
         </div>
 
