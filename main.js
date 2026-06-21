@@ -3988,18 +3988,217 @@ function exportarHistoriaClinica(pacId){
   const fechaHoy = new Date().toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'});
   const fnacStr = pac.fnac ? new Date(pac.fnac).toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'}) + (edad(pac.fnac)?' ('+edad(pac.fnac)+')':'') : '\u2014';
 
+  // ---- ANAMNESIS COMPLETA (todos los campos diligenciados, igual que el PDF de Anamnesis) ----
+  let anamnesisHtml = '';
+  if(Object.keys(an).length){
+    function filaAn(label, val){ return fila(label, val); }
+    anamnesisHtml = `<h3 class="sec-title">📝 Anamnesis</h3>`;
+
+    let bloque1 = [
+      filaAn('Fecha de consulta', an.fecha),
+      filaAn('Estado civil', an.estado),
+      filaAn('Nivel educativo', an.edu),
+      filaAn('Estrato', an.estrato),
+      filaAn('Ciudad', an.ciudad)
+    ].filter(Boolean).join('');
+    if(bloque1) anamnesisHtml += `<table class="info-table">${bloque1}</table>`;
+
+    let bloque2 = [
+      filaAn('Motivo de consulta', an.motivo),
+      filaAn('\u00bfPor qu\u00e9 ahora?', an.decision),
+      filaAn('Duraci\u00f3n del problema', an.duracion),
+      filaAn('Intensidad (1-10)', an.intensidad?an.intensidad+'/10':null),
+      filaAn('Intentos previos de soluci\u00f3n', an.intentos)
+    ].filter(Boolean).join('');
+    if(bloque2) anamnesisHtml += `<table class="info-table">${bloque2}</table>`;
+
+    let bloque3 = [
+      filaAn('Diagn\u00f3sticos previos', an.dx),
+      filaAn('Tratamientos anteriores', an.ttoPrev),
+      filaAn('Hospitalizaciones', an.hosp ? an.hosp+(an.hospD?' - '+an.hospD:'') : null),
+      filaAn('Medicaci\u00f3n actual', an.med),
+      filaAn('Historia del desarrollo', an.desarrollo),
+      filaAn('Antecedentes familiares de salud mental', an.famMental),
+      filaAn('Relaci\u00f3n familiar actual', an.relFam)
+    ].filter(Boolean).join('');
+    if(bloque3) anamnesisHtml += `<table class="info-table">${bloque3}</table>`;
+
+    let bloque4 = [
+      filaAn('Pensamientos autom\u00e1ticos', an.pens),
+      filaAn('Creencias nucleares', an.creencias),
+      filaAn('Conductas problema', an.conductas),
+      filaAn('Actividades placenteras', an.placer),
+      filaAn('Emoci\u00f3n predominante', an.emociones),
+      filaAn('S\u00edntomas f\u00edsicos', an.sinFis),
+      filaAn('Factores de mantenimiento', an.mant)
+    ].filter(Boolean).join('');
+    if(bloque4) anamnesisHtml += `<table class="info-table">${bloque4}</table>`;
+
+    let bloque5 = [
+      filaAn('Alcohol', an.salc ? an.salc+(an.salcD?' - '+an.salcD:'') : null),
+      filaAn('Tabaco', an.stab ? an.stab+(an.stabD?' - '+an.stabD:'') : null),
+      filaAn('Cannabis', an.scan ? an.scan+(an.scanD?' - '+an.scanD:'') : null),
+      filaAn('Otras sustancias', an.sotras),
+      filaAn('Observaciones (consumo)', an.sobs)
+    ].filter(Boolean).join('');
+    if(bloque5) anamnesisHtml += `<table class="info-table">${bloque5}</table>`;
+
+    let bloque6 = [
+      filaAn('Conductas de riesgo alimentario', an.alCond),
+      filaAn('Imagen corporal percibida', an.alImag),
+      filaAn('Peso / Talla', an.alPeso),
+      filaAn('Relaci\u00f3n emocional con la comida', an.alEmoc)
+    ].filter(Boolean).join('');
+    if(bloque6) anamnesisHtml += `<table class="info-table">${bloque6}</table>`;
+
+    let bloque7 = [
+      filaAn('Calidad del sue\u00f1o', an.suCal),
+      filaAn('Horas promedio', an.suHoras),
+      filaAn('Hora de acostarse', an.suAcost),
+      filaAn('Hora de levantarse', an.suLev),
+      filaAn('Alteraciones del sue\u00f1o', an.suAlter),
+      filaAn('Observaciones (sue\u00f1o)', an.suObs)
+    ].filter(Boolean).join('');
+    if(bloque7) anamnesisHtml += `<table class="info-table">${bloque7}</table>`;
+
+    let bloque8 = [
+      filaAn('Eventos traum\u00e1ticos referidos', an.trEv),
+      filaAn('Descripci\u00f3n del impacto', an.trImp),
+      filaAn('Atenci\u00f3n previa por trauma', an.trAten)
+    ].filter(Boolean).join('');
+    if(bloque8) anamnesisHtml += `<table class="info-table">${bloque8}</table>`;
+
+    let bloque9 = [
+      filaAn('Calidad de la red de apoyo', an.raCal),
+      filaAn('\u00bfAislamiento?', an.raAis),
+      filaAn('Personas de confianza', an.raPers),
+      filaAn('Calidad de relaciones interpersonales', an.raRel),
+      filaAn('Apoyo disponible en crisis', an.raCrisis)
+    ].filter(Boolean).join('');
+    if(bloque9) anamnesisHtml += `<table class="info-table">${bloque9}</table>`;
+
+    let bloque10 = [
+      filaAn('Situaci\u00f3n desencadenante', an['cc-situacion']),
+      filaAn('Pensamientos autom\u00e1ticos (conceptualizaci\u00f3n)', an['cc-pa']),
+      filaAn('Creencia nuclear subyacente', an['cc-significado']),
+      filaAn('Emoci\u00f3n y conducta resultante', an['cc-emocion']),
+      filaAn('Hip\u00f3tesis de trabajo', an['cc-hipotesis'])
+    ].filter(Boolean).join('');
+    if(bloque10) anamnesisHtml += `<table class="info-table">${bloque10}</table>`;
+
+    let bloque11 = [
+      filaAn('Metas a corto plazo', an.mCorto),
+      filaAn('Metas a mediano plazo', an.mMedio),
+      filaAn('Metas a largo plazo', an.mLargo)
+    ].filter(Boolean).join('');
+    if(bloque11) anamnesisHtml += `<table class="info-table">${bloque11}</table>`;
+
+    let bloque12 = [
+      filaAn('Estilo de afrontamiento', an.oAfront),
+      filaAn('Actitud hacia la terapia', an.oActit),
+      filaAn('Fortalezas detectadas', an.oFortal),
+      filaAn('Factores de riesgo', an.oRiesgo),
+      filaAn('Notas adicionales', an.oNotas)
+    ].filter(Boolean).join('');
+    if(bloque12) anamnesisHtml += `<table class="info-table">${bloque12}</table>`;
+
+    // Distorsiones cognitivas (formato real: objeto con keys de distorsión)
+    if(an.distorsiones && Object.keys(an.distorsiones).length && !an.distorsiones['__no_aplica']){
+      const dcActivas = Object.keys(an.distorsiones).filter(function(k){ return an.distorsiones[k] && an.distorsiones[k].selected; });
+      if(dcActivas.length){
+        anamnesisHtml += `<p style="margin:6px 0 4px"><strong style="color:#a0536a">Distorsiones cognitivas identificadas:</strong></p><ul style="margin-left:18px;line-height:1.8">`;
+        dcActivas.forEach(function(k){
+          const v = an.distorsiones[k];
+          anamnesisHtml += `<li>${esc(k.replace(/_/g,' '))}${v.nivel?' \u2014 <em>'+esc(v.nivel)+'</em>':''}</li>`;
+        });
+        anamnesisHtml += `</ul>`;
+      }
+    }
+    if(an['dc-obs']) anamnesisHtml += `<p><strong>Observaciones sobre distorsiones:</strong> ${esc(an['dc-obs'])}</p>`;
+  }
+
+  // ---- PLAN DE TRATAMIENTO COMPLETO ----
+  let planHtml = '';
+  if(Object.keys(plan).length){
+    planHtml = `<h3 class="sec-title">🗺️ Plan de Tratamiento</h3>`;
+    let planFilas = [
+      fila('Fecha de elaboraci\u00f3n', plan.fecha ? new Date(plan.fecha).toLocaleDateString('es-CO',{year:'numeric',month:'long',day:'numeric'}) : null),
+      fila('Modalidad', plan.modalidad),
+      fila('Frecuencia', plan.frecuencia),
+      fila('Diagn\u00f3stico (Plan)', plan.dx),
+      fila('Contacto de emergencia (registrado en el Plan)', plan.emerg)
+    ].filter(Boolean).join('');
+    if(planFilas) planHtml += `<table class="info-table">${planFilas}</table>`;
+    if(plan.objetivo) planHtml += `<p style="margin:8px 0"><strong style="color:#a0536a">Objetivo general del proceso:</strong><br>${esc(plan.objetivo)}</p>`;
+
+    if(plan.fases && plan.fases.length){
+      const fasesConDatos = plan.fases.filter(function(f){ return f.some(function(v){ return v && v.trim && v.trim(); }); });
+      if(fasesConDatos.length){
+        planHtml += `<table class="info-table"><thead><tr><th>#</th><th>Fase</th><th>Objetivos</th><th>T\u00e9cnicas</th><th>Semanas</th></tr></thead><tbody>`;
+        fasesConDatos.forEach(function(f, i){
+          planHtml += `<tr><td>${i+1}</td><td>${esc(f[0])}</td><td>${esc(f[1])}</td><td>${esc(f[2])}</td><td>${esc(f[3])}</td></tr>`;
+        });
+        planHtml += `</tbody></table>`;
+      }
+    }
+
+    let planTareas = [
+      fila('Tareas para casa (semanas 1\u20134)', plan.t1),
+      fila('Tareas para casa (semanas 5+)', plan.t2),
+      fila('Materiales / lecturas recomendadas', plan.mat),
+      fila('Apps recomendadas', plan.apps)
+    ].filter(Boolean).join('');
+    if(planTareas) planHtml += `<table class="info-table">${planTareas}</table>`;
+  }
+
   // Sesiones HTML
   let sesHtml = '';
   if(sesSinCancel.length){
     sesHtml = `<h3 class="sec-title">📝 Registro de Sesiones (${sesSinCancel.length})</h3>`;
     sesSinCancel.forEach(s=>{
+      if(s.tipo==='crisis' && s.crisis){
+        const c = s.crisis;
+        const accionesTxt = (c.acciones||[]).map(function(a){ return a.accion+(a.hora?' ('+a.hora+')':''); }).join(' \u00b7 ');
+        sesHtml += `<div class="ses-block" style="border-color:#c0392b">
+          <div class="ses-header" style="background:linear-gradient(90deg,#fde0e0,#fdf0f0)">🚨 Sesi\u00f3n #${s.num} \u2014 ${esc(s.fecha)} \u2014 SESI\u00d3N DE CRISIS / CONTENCI\u00d3N</div>
+          ${c.horaInicio?`<p><strong>Hora inicio:</strong> ${esc(c.horaInicio)} ${c.enCurso?'(en curso al momento del registro)':c.horaFin?'\u2014 <strong>Hora fin:</strong> '+esc(c.horaFin):''}</p>`:''}
+          ${c.modalidad?`<p><strong>Modalidad:</strong> ${esc(c.modalidad)}</p>`:''}
+          ${c.quienAlerto?`<p><strong>Qui\u00e9n alert\u00f3 la crisis:</strong> ${esc(c.quienAlerto)}</p>`:''}
+          ${c.tipoRiesgo?`<p><strong>Tipo de riesgo:</strong> ${esc(c.tipoRiesgo)}</p>`:''}
+          ${c.herramienta?`<p><strong>Herramienta de evaluaci\u00f3n:</strong> ${esc(c.herramienta)}${c.puntaje?' \u2014 Puntaje: '+esc(c.puntaje):''}</p>`:''}
+          ${c.nivelRiesgo?`<p><strong>Nivel de riesgo:</strong> ${esc(c.nivelRiesgo.toUpperCase())}</p>`:''}
+          ${c.planVerbalizado?`<p><strong>\u00bfPlan verbalizado?:</strong> ${esc(c.planVerbalizado)}${c.planDetalle?' \u2014 '+esc(c.planDetalle):''}</p>`:''}
+          ${c.accesoMedios?`<p><strong>\u00bfAcceso a medios?:</strong> ${esc(c.accesoMedios)}${c.accesoMediosDetalle?' \u2014 '+esc(c.accesoMediosDetalle):''}</p>`:''}
+          ${c.acompanada?`<p><strong>\u00bfAcompa\u00f1ada en el momento?:</strong> ${esc(c.acompanada)}${c.acompanadaQuien?' \u2014 '+esc(c.acompanadaQuien):''}</p>`:''}
+          ${accionesTxt?`<p><strong>Acciones inmediatas tomadas:</strong> ${esc(accionesTxt)}</p>`:''}
+          ${c.recibidaUrgencias?`<p><strong>\u00bfRecibida en urgencias?:</strong> ${esc(c.recibidaUrgencias)}${c.urgenciasDetalle?' \u2014 '+esc(c.urgenciasDetalle):''}</p>`:''}
+          ${c.hospitalizacion?`<p><strong>Hospitalizaci\u00f3n:</strong> ${esc(c.hospitalizacion)}</p>`:''}
+          ${c.institucionSeguimiento?`<p><strong>Instituci\u00f3n de contacto para seguimiento:</strong> ${esc(c.institucionSeguimiento)}</p>`:''}
+          ${c.proximoContacto?`<p><strong>Pr\u00f3ximo contacto programado:</strong> ${esc(c.proximoContacto)}</p>`:''}
+          ${c.responsableSeguimiento?`<p><strong>Responsable de seguimiento:</strong> ${esc(c.responsableSeguimiento)}</p>`:''}
+          ${c.ajustesPlan?`<p><strong>Ajustes al plan de tratamiento:</strong> ${esc(c.ajustesPlan)}</p>`:''}
+          ${c.notasConfidenciales?`<p><strong>Notas confidenciales:</strong> ${esc(c.notasConfidenciales)}</p>`:''}
+        </div>`;
+        return;
+      }
       sesHtml += `<div class="ses-block">
-        <div class="ses-header">Sesi\u00f3n #${s.num} &mdash; ${esc(s.fecha)} &nbsp;|&nbsp; ${s.dur||50} min &nbsp;|&nbsp; E.E.: ${s.estado||'\u2014'}/10</div>
+        <div class="ses-header">Sesi\u00f3n #${s.num} &mdash; ${esc(s.fecha)} &nbsp;|&nbsp; ${s.dur||50} min &nbsp;|&nbsp; E.E.: ${s.estado||'\u2014'}/10${s.tipo&&s.tipo!=='sesion'?' &nbsp;|&nbsp; '+esc(s.tipo):''}</div>
+        ${s.planSesion?`<p><strong>Plan previsto para la sesi\u00f3n:</strong> ${esc(s.planSesion)}</p>`:''}
+        ${(s.humores&&s.humores.length)?`<p><strong>Humor predominante:</strong> ${s.humores.map(esc).join(', ')}</p>`:''}
+        ${s.eventos?`<p><strong>Eventos relevantes:</strong> ${esc(s.eventos)}</p>`:''}
+        ${s.tareaRevision?`<p><strong>Revisi\u00f3n de tarea anterior:</strong> ${esc(s.tareaRevision)}${s.dificultadesTarea?' \u2014 '+esc(s.dificultadesTarea):''}</p>`:''}
         ${s.temas?`<p><strong>Temas:</strong> ${esc(s.temas)}</p>`:''}
+        ${(s.tecnicas&&s.tecnicas.length)?`<p><strong>T\u00e9cnicas aplicadas:</strong> ${s.tecnicas.map(esc).join(', ')}</p>`:''}
+        ${s.inter?`<p><strong>Intervenciones:</strong> ${esc(s.inter)}</p>`:''}
+        ${s.pensamiento?`<p><strong>Pensamiento trabajado:</strong> ${esc(s.pensamiento)}</p>`:''}
         ${s.avances?`<p><strong>Avances:</strong> ${esc(s.avances)}</p>`:''}
         ${s.tarea?`<p><strong>Tarea para casa:</strong> ${esc(s.tarea)}</p>`:''}
         ${s.acuerdos?`<p><strong>Acuerdos:</strong> ${esc(s.acuerdos)}</p>`:''}
+        ${(s.riesgos&&s.riesgos.length)?`<p><strong>Indicadores de riesgo:</strong> ${s.riesgos.map(esc).join(', ')}</p>`:''}
+        ${(s.recursos&&s.recursos.length)?`<p><strong>Recursos del paciente:</strong> ${s.recursos.map(esc).join(', ')}</p>`:''}
+        ${s.ajustes?`<p><strong>Ajustes al plan:</strong> ${esc(s.ajustes)}</p>`:''}
         ${(s.testsAplicados&&s.testsAplicados.length)?`<p><strong>Tests:</strong> ${s.testsAplicados.map(esc).join(', ')}</p>`:''}
+        ${s.notasPriv?`<p><strong>Notas confidenciales:</strong> ${esc(s.notasPriv)}</p>`:''}
       </div>`;
     });
   }
@@ -4020,18 +4219,6 @@ function exportarHistoriaClinica(pacId){
       <thead><tr><th>Fecha</th><th>Motivo</th></tr></thead><tbody>
       ${cancels.map(s=>`<tr><td>${esc(s.fecha)}</td><td>${esc(s.motivoCancelacion)}</td></tr>`).join('')}
       </tbody></table>`;
-  }
-
-  // Distorsiones cognitivas
-  let dcHtml = '';
-  if(an.distorsiones && Object.keys(an.distorsiones).length){
-    const dcActivas = Object.entries(an.distorsiones).filter(([k,v])=>v&&v.selected);
-    if(dcActivas.length){
-      dcHtml = `<h3 class="sec-title">🧠 Distorsiones Cognitivas</h3><ul style="margin-left:18px;line-height:1.9">
-        ${dcActivas.map(([k,v])=>`<li>${esc(k.replace(/_/g,' '))}${v.nivel?' \u2014 <em>'+esc(v.nivel)+'</em>':''}</li>`).join('')}
-      </ul>`;
-      if(an['dc-obs']) dcHtml += `<p><strong>Observaciones:</strong> ${esc(an['dc-obs'])}</p>`;
-    }
   }
 
   const html = `<!DOCTYPE html>
@@ -4136,25 +4323,11 @@ function exportarHistoriaClinica(pacId){
   ${(pac.dx||an.dx||plan.dx) ? `<h3 class="sec-title">🔬 Diagn\u00f3stico (CIE-11)</h3>
   <div style="background:#fdf5f7;border-left:3px solid #cd8e9d;border-radius:0 8px 8px 0;padding:10px 14px;font-size:.85rem">${esc(pac.dx||an.dx||plan.dx)}</div>` : ''}
 
-  <!-- ANAMNESIS CLAVE -->
-  ${(an.med||an.antPersonales||an.antFamiliares||an.redApoyo) ? `<h3 class="sec-title">📄 Datos Cl\u00ednicos</h3>
-  <table class="info-table">
-    ${fila('Medicaci\u00f3n actual', an.med)}
-    ${fila('Antecedentes personales', an.antPersonales)}
-    ${fila('Antecedentes familiares', an.antFamiliares)}
-    ${fila('Red de apoyo', an.redApoyo)}
-  </table>` : ''}
+  <!-- ANAMNESIS COMPLETA -->
+  ${anamnesisHtml}
 
-  <!-- PLAN DE TRATAMIENTO -->
-  ${(plan.objetivo||plan.estrategia) ? `<h3 class="sec-title">🗺\ufe0f Plan de Tratamiento</h3>
-  <table class="info-table">
-    ${fila('Objetivo terap\u00e9utico', plan.objetivo)}
-    ${fila('Enfoque/estrategia', plan.estrategia)}
-    ${fila('Duraci\u00f3n estimada', plan.duracion)}
-  </table>` : ''}
-
-  <!-- DISTORSIONES COGNITIVAS -->
-  ${dcHtml}
+  <!-- PLAN DE TRATAMIENTO COMPLETO -->
+  ${planHtml}
 
   <!-- SESIONES -->
   ${sesHtml}
