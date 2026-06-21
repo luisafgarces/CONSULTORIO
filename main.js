@@ -6717,11 +6717,23 @@ const HAB_CATEGORIAS = [
 var _habDocActual = null; // { catIdx, docId } del documento que se está editando en el modal
 var _habDataCache = {};
 
-function habGetData(){ return DB.get('habilitacion_documentos') || {}; }
-function habGuardarData(data){ DB.set('habilitacion_documentos', data); }
+// Carga todos los documentos de habilitación individuales (cada uno
+// guardado por separado como 'habilitacion_doc_{docId}') en un solo
+// objeto, indexado por docId, para que el resto del módulo lo use igual
+// que antes.
+function habCargarTodosLosDocumentos(){
+  var data = {};
+  HAB_CATEGORIAS.forEach(function(cat){
+    cat.docs.forEach(function(d){
+      var registro = DB.get('habilitacion_doc_'+d.id);
+      if(registro) data[d.id] = registro;
+    });
+  });
+  return data;
+}
 
 function habInit(){
-  _habDataCache = habGetData();
+  _habDataCache = habCargarTodosLosDocumentos();
   habRenderResumen();
   habRenderCategorias();
 }
@@ -6731,7 +6743,7 @@ function habRenderResumen(){
   HAB_CATEGORIAS.forEach(function(cat){
     cat.docs.forEach(function(d){
       total++;
-      if(_habDataCache[d.id] && _habDataCache[d.id].url) completos++;
+      if(_habDataCache[d.id] && _habDataCache[d.id].base64) completos++;
     });
   });
   var pct = total ? Math.round((completos/total)*100) : 0;
@@ -6754,7 +6766,7 @@ function habRenderCategorias(){
   cont.innerHTML = HAB_CATEGORIAS.map(function(cat, catIdx){
     var rows = cat.docs.map(function(d){
       var info = _habDataCache[d.id];
-      var cargado = info && info.url;
+      var cargado = info && info.base64;
       var vigenciaTxt = '';
       if(cargado && info.vigencia){
         var hoy = new Date(); hoy.setHours(0,0,0,0);
@@ -6781,7 +6793,7 @@ function habRenderCategorias(){
       </div>`;
     }).join('');
 
-    var catCompletos = cat.docs.filter(function(d){ return _habDataCache[d.id] && _habDataCache[d.id].url; }).length;
+    var catCompletos = cat.docs.filter(function(d){ return _habDataCache[d.id] && _habDataCache[d.id].base64; }).length;
     return `
     <div class="card" style="margin-bottom:14px">
       <div class="sec-title" style="display:flex;justify-content:space-between;align-items:center">
@@ -6804,10 +6816,11 @@ function habAbrirModal(catIdx, docId){
   document.getElementById('hab-doc-progreso').style.display = 'none';
 
   var info = _habDataCache[docId];
-  if(info && info.url){
+  if(info && info.base64){
     document.getElementById('hab-doc-actual').style.display = 'block';
     document.getElementById('hab-doc-actual-nombre').textContent = info.nombreArchivo || 'Archivo cargado';
-    document.getElementById('hab-doc-actual-link').href = info.url;
+    document.getElementById('hab-doc-actual-link').href = info.base64;
+    document.getElementById('hab-doc-actual-link').setAttribute('download', info.nombreArchivo || 'documento');
     document.getElementById('hab-doc-vigencia').value = info.vigencia || '';
     document.getElementById('hab-doc-notas').value = info.notas || '';
   } else {
@@ -6824,29 +6837,35 @@ function habCerrarModal(){
   _habDocActual = null;
 }
 
+// Tamaño máximo por archivo. Firestore limita cada documento a 1MB; el
+// base64 añade ~33% de overhead sobre el tamaño original del archivo, así
+// que el límite real de archivo original queda en torno a 700KB para
+// dejar margen a los demás campos (notas, fechas, etc.).
+const HAB_MAX_TAMANO_BYTES = 700 * 1024;
+
 function habGuardarDocumento(){
   if(!_habDocActual) return;
-  if(!window._firebaseStorage){
-    toast('⚠️ Necesitas conexión a internet para subir archivos');
-    return;
-  }
   var docId = _habDocActual.docId;
   var fileInput = document.getElementById('hab-doc-input');
   var vigencia = document.getElementById('hab-doc-vigencia').value;
   var notas = document.getElementById('hab-doc-notas').value;
   var file = fileInput.files[0];
 
-  function guardarMetadatos(url, nombreArchivo){
-    var data = habGetData();
-    data[docId] = {
-      url: url || (data[docId]&&data[docId].url) || '',
-      nombreArchivo: nombreArchivo || (data[docId]&&data[docId].nombreArchivo) || '',
+  function guardarMetadatos(base64, nombreArchivo, tipoArchivo){
+    var existente = _habDataCache[docId] || {};
+    var registro = {
+      base64: base64 || existente.base64 || '',
+      nombreArchivo: nombreArchivo || existente.nombreArchivo || '',
+      tipoArchivo: tipoArchivo || existente.tipoArchivo || '',
       vigencia: vigencia,
       notas: notas,
       actualizado: new Date().toISOString()
     };
-    habGuardarData(data);
-    _habDataCache = data;
+    // Cada documento de habilitación se guarda aparte (no todos juntos en
+    // un solo documento), para que cada uno tenga su propio límite de
+    // 1MB de Firestore, en vez de competir entre los 39 por un solo límite.
+    DB.set('habilitacion_doc_'+docId, registro);
+    _habDataCache[docId] = registro;
     habRenderResumen();
     habRenderCategorias();
     habCerrarModal();
@@ -6855,74 +6874,48 @@ function habGuardarDocumento(){
 
   if(!file){
     // Solo se actualizan vigencia/notas, sin subir archivo nuevo
-    if(!_habDataCache[docId] || !_habDataCache[docId].url){
+    if(!_habDataCache[docId] || !_habDataCache[docId].base64){
       toast('⚠️ Selecciona un archivo para subir');
       return;
     }
-    guardarMetadatos(null, null);
+    guardarMetadatos(null, null, null);
     return;
   }
 
-  // Validar tamaño (máximo 10MB, razonable para documentos escaneados)
-  if(file.size > 10*1024*1024){
-    toast('⚠️ El archivo es muy grande (máx. 10MB)');
+  if(file.size > HAB_MAX_TAMANO_BYTES){
+    var tamanoMB = (file.size/1024/1024).toFixed(1);
+    toast('⚠️ El archivo pesa '+tamanoMB+'MB, el máximo permitido es ~0.7MB. Intenta comprimirlo o escanearlo en menor resolución.');
     return;
   }
 
   document.getElementById('hab-doc-progreso').style.display = 'block';
   var barra = document.getElementById('hab-doc-progreso-barra');
-  barra.style.width = '0%';
+  barra.style.width = '30%';
 
-  var ext = file.name.split('.').pop();
-  var pathRef = window._firebaseStorage.ref('habilitacion/' + docId + '_' + Date.now() + '.' + ext);
-  var uploadTask = pathRef.put(file);
-
-  uploadTask.on('state_changed',
-    function(snapshot){
-      var pct = Math.round((snapshot.bytesTransferred / snapshot.totalBytes) * 100);
-      barra.style.width = pct + '%';
-    },
-    function(error){
-      console.error('Error subiendo documento:', error);
-      toast('⚠️ Error al subir el archivo. Intenta de nuevo.');
-      document.getElementById('hab-doc-progreso').style.display = 'none';
-    },
-    function(){
-      uploadTask.snapshot.ref.getDownloadURL().then(function(url){
-        guardarMetadatos(url, file.name);
-      });
-    }
-  );
+  var reader = new FileReader();
+  reader.onload = function(e){
+    barra.style.width = '80%';
+    var base64 = e.target.result; // incluye el prefijo data:tipo;base64,...
+    guardarMetadatos(base64, file.name, file.type);
+    document.getElementById('hab-doc-progreso').style.display = 'none';
+  };
+  reader.onerror = function(){
+    console.error('Error leyendo el archivo');
+    toast('⚠️ Error al leer el archivo. Intenta de nuevo.');
+    document.getElementById('hab-doc-progreso').style.display = 'none';
+  };
+  reader.readAsDataURL(file);
 }
 
 function habEliminarDocumento(){
   if(!_habDocActual) return;
   if(!confirm('¿Eliminar este documento? Tendrás que volver a subirlo si lo necesitas después.')) return;
   var docId = _habDocActual.docId;
-  var data = habGetData();
-  var info = data[docId];
 
-  function borrarMetadatos(){
-    delete data[docId];
-    habGuardarData(data);
-    _habDataCache = data;
-    habRenderResumen();
-    habRenderCategorias();
-    habCerrarModal();
-    toast('Documento eliminado');
-  }
-
-  if(info && info.url && window._firebaseStorage){
-    // Intentar borrar el archivo real de Storage; si falla (por ejemplo,
-    // ya no existe), igual limpiamos los metadatos para no dejar un
-    // registro huérfano apuntando a un archivo inexistente.
-    try{
-      var ref = window._firebaseStorage.refFromURL(info.url);
-      ref.delete().then(borrarMetadatos).catch(borrarMetadatos);
-    } catch(e){
-      borrarMetadatos();
-    }
-  } else {
-    borrarMetadatos();
-  }
+  DB.set('habilitacion_doc_'+docId, null);
+  delete _habDataCache[docId];
+  habRenderResumen();
+  habRenderCategorias();
+  habCerrarModal();
+  toast('Documento eliminado');
 }

@@ -1628,8 +1628,9 @@ const DB = {
     </div>
 
     <div class="fg">
-      <label class="lbl">Subir / reemplazar archivo (PDF o imagen)</label>
+      <label class="lbl">Subir / reemplazar archivo (PDF o imagen, máx. ~0.7 MB)</label>
       <input type="file" id="hab-doc-input" accept=".pdf,.jpg,.jpeg,.png">
+      <p style="font-size:.72rem;color:#888;margin-top:4px">Si el archivo es muy pesado, escanéalo o fotografíalo en menor resolución, o comprime el PDF antes de subirlo.</p>
     </div>
     <div class="fg">
       <label class="lbl">Fecha de vigencia (opcional, si aplica)</label>
@@ -2051,7 +2052,6 @@ const DB = {
 <!-- Firebase cargado al final del body para garantizar que esté disponible -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-storage-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script>
 // ===================== ROLES Y PERMISOS =====================
@@ -2120,7 +2120,6 @@ function aplicarPermisosFinanzas(){
   try {
     firebase.initializeApp(FIREBASE_CONFIG);
     _firebaseDB = firebase.firestore();
-    window._firebaseStorage = firebase.storage();
     console.log("Firebase conectado correctamente");
 
     // ── Autenticación con Google ──
