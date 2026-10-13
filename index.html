@@ -96,10 +96,14 @@ const DB = {
   <div style="background:white;border-radius:16px;padding:40px;max-width:380px;width:90%;box-shadow:0 8px 32px rgba(100,48,0,0.15);text-align:center;">
     <div style="font-family:'Playfair Display',serif;font-size:1.5rem;color:#643000;font-weight:700;margin-bottom:8px;">Suite Clínica</div>
     <p style="color:#7a5a40;margin-bottom:24px;font-size:.9rem;">Inicia sesión para acceder a tus pacientes</p>
-    <button onclick="iniciarSesionGoogle()" style="display:flex;align-items:center;justify-content:center;gap:10px;width:100%;padding:12px;border:1.5px solid #cd8e9d;border-radius:8px;background:white;cursor:pointer;font-size:.95rem;font-weight:600;color:#643000;">
-      <svg width="20" height="20" viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611,20.083H42V20H24v8h11.303c-1.649,4.657-6.08,8-11.303,8c-6.627,0-12-5.373-12-12c0-6.627,5.373-12,12-12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C12.955,4,4,12.955,4,24c0,11.045,8.955,20,20,20c11.045,0,20-8.955,20-20C44,22.659,43.862,21.35,43.611,20.083z"/><path fill="#FF3D00" d="M6.306,14.691l6.571,4.819C14.655,15.108,18.961,12,24,12c3.059,0,5.842,1.154,7.961,3.039l5.657-5.657C34.046,6.053,29.268,4,24,4C16.318,4,9.656,8.337,6.306,14.691z"/><path fill="#4CAF50" d="M24,44c5.166,0,9.86-1.977,13.409-5.192l-6.19-5.238C29.211,35.091,26.715,36,24,36c-5.202,0-9.619-3.317-11.283-7.946l-6.522,5.025C9.505,39.556,16.227,44,24,44z"/><path fill="#1976D2" d="M43.611,20.083H42V20H24v8h11.303c-0.792,2.237-2.231,4.166-4.087,5.571c0.001-0.001,0.002-0.001,0.003-0.002l6.19,5.238C36.971,39.205,44,34,44,24C44,22.659,43.862,21.35,43.611,20.083z"/></svg>
-      Iniciar sesión con Google
-    </button>
+    <form onsubmit="iniciarSesion(event)" autocomplete="on" style="text-align:left;">
+      <label for="login-email" style="font-size:.8rem;color:#643000;font-weight:600;">Usuario (correo)</label>
+      <input id="login-email" type="email" autocomplete="username" required style="width:100%;padding:11px;margin:4px 0 14px;border:1.5px solid #cd8e9d;border-radius:8px;font-size:.95rem;box-sizing:border-box;">
+      <label for="login-pass" style="font-size:.8rem;color:#643000;font-weight:600;">Contraseña</label>
+      <input id="login-pass" type="password" autocomplete="current-password" required style="width:100%;padding:11px;margin:4px 0 18px;border:1.5px solid #cd8e9d;border-radius:8px;font-size:.95rem;box-sizing:border-box;">
+      <button type="submit" id="login-btn" style="width:100%;padding:12px;border:none;border-radius:8px;background:#cd8e9d;color:white;cursor:pointer;font-size:.95rem;font-weight:700;">Entrar</button>
+      <a href="#" onclick="recuperarClave();return false;" style="display:block;text-align:center;margin-top:14px;font-size:.78rem;color:#a0536a;">Olvidé mi contraseña</a>
+    </form>
     <p id="login-error" style="color:#e57373;font-size:.8rem;margin-top:14px;display:none;"></p>
   </div>
 </div>
@@ -1570,10 +1574,10 @@ const DB = {
   <div class="card" style="margin-bottom:20px">
     <div class="sec-title">➕ Agregar usuario</div>
     <p style="font-size:.82rem;color:var(--strong);margin-bottom:14px">
-      La persona debe iniciar sesión con este correo de Google exacto. No necesitas crearle una contraseña por separado: usará su propia cuenta de Google, y este sistema controla qué puede ver una vez entra.
+      La persona entra con este correo y una contraseña. Primero créale el usuario y la contraseña en Firebase (Authentication → Users → Add user) con este mismo correo; este sistema controla qué puede ver una vez entra.
     </p>
     <div class="row col3">
-      <div class="fg"><label class="lbl">Correo de Google</label><input type="email" id="usr-nuevo-email" placeholder="persona@gmail.com"></div>
+      <div class="fg"><label class="lbl">Correo (usuario)</label><input type="email" id="usr-nuevo-email" placeholder="persona@gmail.com"></div>
       <div class="fg"><label class="lbl">Nombre (para identificarlo en la lista)</label><input type="text" id="usr-nuevo-nombre" placeholder="Ej: Juan Pérez"></div>
       <div class="fg"><label class="lbl">Rol</label>
         <select id="usr-nuevo-rol">
@@ -2122,19 +2126,45 @@ function aplicarPermisosFinanzas(){
     _firebaseDB = firebase.firestore();
     console.log("Firebase conectado correctamente");
 
-    // ── Autenticación con Google ──
+    // ── Autenticación con correo y contraseña ──
     var _auth = firebase.auth();
+    // NONE: la sesión no se guarda; al abrir o recargar la app siempre pide usuario y contraseña.
+    _auth.setPersistence(firebase.auth.Auth.Persistence.NONE).catch(function(e){ console.warn('Persistencia:', e); });
 
-    window.iniciarSesionGoogle = function(){
-      var provider = new firebase.auth.GoogleAuthProvider();
+    window.iniciarSesion = function(ev){
+      if(ev) ev.preventDefault();
       var errEl = document.getElementById('login-error');
+      var btn = document.getElementById('login-btn');
+      var email = document.getElementById('login-email').value.trim();
+      var pass = document.getElementById('login-pass').value;
       if(errEl) errEl.style.display='none';
-      _auth.signInWithPopup(provider).catch(function(err){
-        console.error("Error de login:", err);
-        if(errEl){
-          errEl.textContent = "No se pudo iniciar sesión. Intenta de nuevo.";
-          errEl.style.display='block';
-        }
+      if(btn) btn.disabled = true;
+      _auth.signInWithEmailAndPassword(email, pass)
+        .then(function(){ document.getElementById('login-pass').value=''; })
+        .catch(function(err){
+          console.error("Error de login:", err);
+          var bloqueado = err && err.code === 'auth/too-many-requests';
+          if(errEl){
+            errEl.textContent = bloqueado
+              ? "Demasiados intentos. Espera unos minutos e intenta de nuevo."
+              : "Usuario o contraseña incorrectos.";
+            errEl.style.display='block';
+          }
+        })
+        .then(function(){ if(btn) btn.disabled = false; });
+    };
+
+    window.recuperarClave = function(){
+      var errEl = document.getElementById('login-error');
+      var email = document.getElementById('login-email').value.trim();
+      if(!email){
+        if(errEl){ errEl.textContent = "Escribe tu correo arriba y vuelve a tocar 'Olvidé mi contraseña'."; errEl.style.display='block'; }
+        return;
+      }
+      _auth.sendPasswordResetEmail(email).then(function(){
+        if(errEl){ errEl.textContent = "Si el correo está registrado, te enviamos un enlace para cambiar la contraseña."; errEl.style.display='block'; }
+      }).catch(function(){
+        if(errEl){ errEl.textContent = "No se pudo enviar el correo. Intenta de nuevo."; errEl.style.display='block'; }
       });
     };
 
