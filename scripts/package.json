@@ -1,0 +1,9 @@
+{
+  "name": "recordatorios-suite-clinica",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Envía notificaciones push de la agenda (sin datos de pacientes en el texto).",
+  "dependencies": {
+    "firebase-admin": "^12.7.0"
+  }
+}
