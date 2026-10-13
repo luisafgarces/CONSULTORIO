@@ -97,8 +97,8 @@ const DB = {
     <div style="font-family:'Playfair Display',serif;font-size:1.5rem;color:#643000;font-weight:700;margin-bottom:8px;">Suite Clínica</div>
     <p style="color:#7a5a40;margin-bottom:24px;font-size:.9rem;">Inicia sesión para acceder a tus pacientes</p>
     <form onsubmit="iniciarSesion(event)" autocomplete="on" style="text-align:left;">
-      <label for="login-email" style="font-size:.8rem;color:#643000;font-weight:600;">Usuario (correo)</label>
-      <input id="login-email" type="email" autocomplete="username" required style="width:100%;padding:11px;margin:4px 0 14px;border:1.5px solid #cd8e9d;border-radius:8px;font-size:.95rem;box-sizing:border-box;">
+      <label for="login-email" style="font-size:.8rem;color:#643000;font-weight:600;">Usuario</label>
+      <input id="login-email" type="text" autocomplete="username" autocapitalize="none" autocorrect="off" spellcheck="false" required style="width:100%;padding:11px;margin:4px 0 14px;border:1.5px solid #cd8e9d;border-radius:8px;font-size:.95rem;box-sizing:border-box;">
       <label for="login-pass" style="font-size:.8rem;color:#643000;font-weight:600;">Contraseña</label>
       <input id="login-pass" type="password" autocomplete="current-password" required style="width:100%;padding:11px;margin:4px 0 18px;border:1.5px solid #cd8e9d;border-radius:8px;font-size:.95rem;box-sizing:border-box;">
       <button type="submit" id="login-btn" style="width:100%;padding:12px;border:none;border-radius:8px;background:#cd8e9d;color:white;cursor:pointer;font-size:.95rem;font-weight:700;">Entrar</button>
@@ -2131,13 +2131,24 @@ function aplicarPermisosFinanzas(){
     // NONE: la sesión no se guarda; al abrir o recargar la app siempre pide usuario y contraseña.
     _auth.setPersistence(firebase.auth.Auth.Persistence.NONE).catch(function(e){ console.warn('Persistencia:', e); });
 
+    // Usuario → correo de la cuenta en Firebase. El usuario se escribe en minúsculas.
+    var USUARIOS_LOGIN = { 'lf.consultorio': 'luisa.vida2026@gmail.com' };
+    function correoDeUsuario(u){
+      u = (u || '').trim().toLowerCase();
+      return Object.prototype.hasOwnProperty.call(USUARIOS_LOGIN, u) ? USUARIOS_LOGIN[u] : null;
+    }
+
     window.iniciarSesion = function(ev){
       if(ev) ev.preventDefault();
       var errEl = document.getElementById('login-error');
       var btn = document.getElementById('login-btn');
-      var email = document.getElementById('login-email').value.trim();
+      var email = correoDeUsuario(document.getElementById('login-email').value);
       var pass = document.getElementById('login-pass').value;
       if(errEl) errEl.style.display='none';
+      if(!email){
+        if(errEl){ errEl.textContent = "Usuario o contraseña incorrectos."; errEl.style.display='block'; }
+        return;
+      }
       if(btn) btn.disabled = true;
       _auth.signInWithEmailAndPassword(email, pass)
         .then(function(){ document.getElementById('login-pass').value=''; })
@@ -2156,13 +2167,13 @@ function aplicarPermisosFinanzas(){
 
     window.recuperarClave = function(){
       var errEl = document.getElementById('login-error');
-      var email = document.getElementById('login-email').value.trim();
+      var email = correoDeUsuario(document.getElementById('login-email').value);
       if(!email){
-        if(errEl){ errEl.textContent = "Escribe tu correo arriba y vuelve a tocar 'Olvidé mi contraseña'."; errEl.style.display='block'; }
+        if(errEl){ errEl.textContent = "Escribe tu usuario arriba y vuelve a tocar 'Olvidé mi contraseña'."; errEl.style.display='block'; }
         return;
       }
       _auth.sendPasswordResetEmail(email).then(function(){
-        if(errEl){ errEl.textContent = "Si el correo está registrado, te enviamos un enlace para cambiar la contraseña."; errEl.style.display='block'; }
+        if(errEl){ errEl.textContent = "Te enviamos un enlace para cambiar la contraseña al correo de tu cuenta."; errEl.style.display='block'; }
       }).catch(function(){
         if(errEl){ errEl.textContent = "No se pudo enviar el correo. Intenta de nuevo."; errEl.style.display='block'; }
       });
