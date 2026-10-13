@@ -4,6 +4,10 @@
 <meta charset="UTF-8">
 <link rel="icon" type="image/png" href="icon-192.png">
 <link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Suite Clínica">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Suite Clínica | Luisa Fernanda Garcés García</title>
 <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=Lato:wght@300;400;700&display=swap" rel="stylesheet">
@@ -166,6 +170,7 @@ const DB = {
     <div style="margin-bottom:8px;font-size:0.65rem;color:var(--border)">Suite Clínica v1.0 · 2025</div>
     <div class="version-btns">
       <button id="sync-btn" onclick="sincronizarAhora()">🔄 Sincronizar</button>
+      <button class="btn" id="notif-btn" onclick="activarNotificaciones()" style="width:100%;margin-bottom:6px;font-size:0.72rem;padding:7px 10px">🔔 Activar notificaciones</button>
       <button class="btn" onclick="cerrarSesion()" style="width:100%;margin-bottom:6px;font-size:0.72rem;padding:7px 10px">🚪 Cerrar sesión</button>
       <button class="btn" onclick="exportarJSON()" style="width:100%;margin-bottom:6px;font-size:0.72rem;padding:7px 10px">⬇️ Exportar respaldo</button>
       <button class="btn" onclick="document.getElementById('import-input').click()" style="width:100%;font-size:0.72rem;padding:7px 10px">⬆️ Importar respaldo</button>
@@ -2057,6 +2062,7 @@ const DB = {
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-messaging-compat.js"></script>
 <script>
 // ===================== ROLES Y PERMISOS =====================
 // Rol actual de la persona logueada. null mientras no se ha verificado.
@@ -3288,6 +3294,91 @@ function fechaHoy(){
 }
 
 
+</script>
+
+<script>
+// ── Notificaciones push (este dispositivo) ──
+(function(){
+  // Clave pública de notificaciones web (Firebase → Configuración → Cloud Messaging → Certificados push web)
+  var VAPID_KEY = 'BFZQcgggLynuPZkSJJxz_55uAVZBw5-faAgpOBxLBDwi3xqUjYUT9KZphqjtAlrfw85PHiJMowGd_0U8iaXpLFk';
+  var SW_URL = 'firebase-messaging-sw.js';
+
+  function claveLista(){ return VAPID_KEY && VAPID_KEY.indexOf('PEGAR') !== 0; }
+  function soportado(){ return ('serviceWorker' in navigator) && ('Notification' in window) && ('PushManager' in window); }
+  function esIOS(){ return /iphone|ipad|ipod/i.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1); }
+  function instalada(){ return window.navigator.standalone === true || (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches); }
+  function plataforma(){
+    var ua = navigator.userAgent;
+    var os = /iphone/i.test(ua) ? 'iPhone' : /ipad/i.test(ua) ? 'iPad' : /android/i.test(ua) ? 'Android' : /windows/i.test(ua) ? 'Windows' : /mac/i.test(ua) ? 'Mac' : 'Otro';
+    return os + (instalada() ? ' (app instalada)' : ' (navegador)');
+  }
+  function etiqueta(txt){ var b = document.getElementById('notif-btn'); if(b) b.textContent = txt; }
+
+  function obtenerToken(){
+    return navigator.serviceWorker.register(SW_URL).then(function(reg){
+      return navigator.serviceWorker.ready.then(function(){
+        return firebase.messaging().getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: reg })
+          .then(function(token){ return { token: token, reg: reg }; });
+      });
+    });
+  }
+  function guardarToken(token){
+    var user = firebase.auth().currentUser;
+    if(!user || !token) return Promise.reject(new Error('Sin sesión o sin código de dispositivo'));
+    return firebase.firestore().collection('dispositivos_notificaciones').doc(token).set({
+      token: token,
+      email: (user.email || '').toLowerCase(),
+      plataforma: plataforma(),
+      actualizado: new Date().toISOString()
+    }, { merge: true });
+  }
+
+  window.activarNotificaciones = function(){
+    if(!soportado()){
+      alert(esIOS() && !instalada()
+        ? 'En iPhone/iPad las notificaciones solo funcionan con la app instalada:\n\n1. Abre esta página en Safari.\n2. Toca Compartir (el cuadrado con la flecha).\n3. Elige "Agregar a pantalla de inicio".\n4. Abre la app desde el ícono nuevo y vuelve a tocar "Activar notificaciones".'
+        : 'Este navegador no permite notificaciones. Prueba con Chrome, Edge o Safari actualizado.');
+      return;
+    }
+    if(esIOS() && !instalada()){
+      alert('Para recibir notificaciones en iPhone/iPad, primero instala la app:\n\n1. En Safari, toca Compartir (cuadrado con flecha).\n2. Elige "Agregar a pantalla de inicio".\n3. Abre la app desde el ícono nuevo y toca "Activar notificaciones".');
+      return;
+    }
+    if(!claveLista()){ alert('Falta configurar la clave de notificaciones (VAPID) en el código de la app.'); return; }
+    if(!firebase.auth().currentUser){ alert('Inicia sesión primero.'); return; }
+    etiqueta('⏳ Activando…');
+    // El permiso se pide aquí mismo, dentro del toque del botón (obligatorio en iPhone).
+    Notification.requestPermission().then(function(perm){
+      if(perm !== 'granted'){
+        etiqueta('🔔 Activar notificaciones');
+        alert('No diste permiso. Para activarlas, habilita las notificaciones de esta app en los ajustes del dispositivo o del navegador.');
+        return;
+      }
+      return obtenerToken().then(function(r){
+        return guardarToken(r.token).then(function(){
+          etiqueta('🔔 Notificaciones activas ✓');
+          try { r.reg.showNotification('Suite Clínica', { body: 'Las notificaciones quedaron activas en este dispositivo ✅', icon: 'icon-192.png' }); } catch(e){}
+        });
+      });
+    }).catch(function(err){
+      console.error('Notificaciones:', err);
+      etiqueta('🔔 Activar notificaciones');
+      alert('No se pudieron activar las notificaciones. Detalle: ' + ((err && err.message) || err));
+    });
+  };
+
+  // Cada vez que inicias sesión en un dispositivo que ya dio permiso, se refresca su registro en silencio.
+  try {
+    firebase.auth().onAuthStateChanged(function(user){
+      if(!user || !soportado() || !claveLista()) return;
+      if(Notification.permission === 'granted'){
+        etiqueta('🔔 Notificaciones activas ✓');
+        obtenerToken().then(function(r){ return guardarToken(r.token); })
+          .catch(function(e){ console.warn('Refresco de notificaciones:', e); });
+      }
+    });
+  } catch(e){ console.warn('Notificaciones no disponibles:', e); }
+})();
 </script>
 
 <!-- PDF VIEWER MODAL -->
