@@ -1,0 +1,58 @@
+name: Recordatorios de agenda
+
+on:
+  schedule:
+    # Colombia es UTC-5. GitHub corre en UTC y puede atrasarse unos minutos.
+    - cron: '0 23 * * *'    # 6:00 pm  -> aviso de MAÑANA
+    - cron: '30 23 * * *'   # 6:30 pm  -> reintento (no duplica)
+    - cron: '30 11 * * *'   # 6:30 am  -> resumen de HOY
+    - cron: '0 12 * * *'    # 7:00 am  -> reintento (no duplica)
+  workflow_dispatch:
+    inputs:
+      modo:
+        description: 'anterior = citas de mañana, hoy = citas de hoy'
+        default: 'anterior'
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: recordatorios
+  cancel-in-progress: false
+
+jobs:
+  enviar:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar dependencias
+        working-directory: scripts
+        run: npm install --no-audit --no-fund
+
+      - name: Definir modo
+        id: modo
+        run: |
+          case "${{ github.event.schedule }}" in
+            "0 23 * * *"|"30 23 * * *") echo "valor=anterior" >> "$GITHUB_OUTPUT" ;;
+            "30 11 * * *"|"0 12 * * *") echo "valor=hoy" >> "$GITHUB_OUTPUT" ;;
+            *) echo "valor=${{ github.event.inputs.modo || 'anterior' }}" >> "$GITHUB_OUTPUT" ;;
+          esac
+
+      - name: Enviar recordatorios
+        working-directory: scripts
+        env:
+          MODO: ${{ steps.modo.outputs.valor }}
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: node enviar-recordatorios.js
+
+      - name: Mantener activo el flujo
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/recordatorios.yml/enable" || true
