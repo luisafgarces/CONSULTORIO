@@ -2695,7 +2695,7 @@ function agAutocompletarTitulo(){
   document.getElementById('ag-nuevo-titulo').value = 'Sesi\u00f3n #'+numSesion+' - '+pac.nombre;
 }
 
-// Calcula automáticamente la hora de fin sumando 45 minutos a la hora de
+// Calcula automáticamente la hora de fin sumando 50 minutos a la hora de
 // inicio. Solo lo hace si el campo "fin" está vacío o si el usuario no lo
 // ha editado manualmente todavía (para no pisar un valor que ya ajustó).
 function agAutocompletarFin(){
@@ -2705,7 +2705,7 @@ function agAutocompletarFin(){
   // Si el usuario ya tocó manualmente el campo "fin", no lo sobreescribimos.
   if(finEl.dataset.editadoManual === '1') return;
   var inicio = new Date(inicioEl.value);
-  var fin = new Date(inicio.getTime() + 45*60*1000);
+  var fin = new Date(inicio.getTime() + 50*60*1000);
   // Formato YYYY-MM-DDTHH:MM requerido por <input type="datetime-local">
   var pad = function(n){ return String(n).padStart(2,'0'); };
   finEl.value = fin.getFullYear()+'-'+pad(fin.getMonth()+1)+'-'+pad(fin.getDate())+'T'+pad(fin.getHours())+':'+pad(fin.getMinutes());
