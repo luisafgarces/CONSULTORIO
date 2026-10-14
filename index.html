@@ -1027,6 +1027,7 @@ const DB = {
     <button class="ag-tab active" data-tab="hoy" onclick="agSwitchTab('hoy',this)">Hoy</button>
     <button class="ag-tab" data-tab="semana" onclick="agSwitchTab('semana',this)">📅 Semana</button>
     <button class="ag-tab" data-tab="mes" onclick="agSwitchTab('mes',this)">🗓 Mes</button>
+    <button class="ag-tab" data-tab="horario" onclick="agSwitchTab('horario',this)">🕒 Horario</button>
     <button class="ag-tab" id="ag-tab-cumple" data-tab="cumpleanos" onclick="agSwitchTab('cumpleanos',this)" style="display:flex;align-items:center;gap:6px">🎂 Cumpleaños <span id="ag-badge-cumple" style="display:none;background:#cd8e9d;color:#fff;border-radius:10px;font-size:.67rem;padding:1px 7px;font-weight:700;line-height:1.6"></span></button>
   </div>
   <div class="card" id="ag-nav-card" style="padding:14px 20px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
@@ -2226,6 +2227,12 @@ function aplicarPermisosFinanzas(){
               goPage('dashboard');
             }
           }
+          // Acceso directo "Agenda": si se abrió con #agenda, ir directo a la agenda.
+          try {
+            if(location.hash === '#agenda' && typeof goPage === 'function' && window.tienePermiso('agenda')){
+              goPage('agenda');
+            }
+          } catch(e){}
           // Sincronizar datos al conectar
           DB.loadAll().then(function(ok){
             if(!ok) return;
