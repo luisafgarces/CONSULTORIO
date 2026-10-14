@@ -2349,7 +2349,7 @@ function renderDashboard(){
   // Citas del día siguiente en el dashboard
   var mananaD = new Date(); mananaD.setDate(mananaD.getDate()+1);
   var citasMananaD = agEventos.filter(function(e){
-    if(e.tipo==='admin') return false;
+    if(e.tipo==='admin' || !agEsConsultorio(e)) return false;
     var d = new Date(e.inicio);
     return d.getFullYear()===mananaD.getFullYear() && d.getMonth()===mananaD.getMonth() && d.getDate()===mananaD.getDate();
   });
@@ -2424,8 +2424,10 @@ function agFechaLocalISO(d){
 function agMismoDia(d1,d2){ return d1.getFullYear()===d2.getFullYear()&&d1.getMonth()===d2.getMonth()&&d1.getDate()===d2.getDate(); }
 
 function renderAgenda(){
+  if(typeof agPoblarCalSelects==='function') agPoblarCalSelects();
   if(agTabActual==='semana'){ agRenderSemana(); return; }
   if(agTabActual==='mes'){ agRenderMes(); return; }
+  if(agTabActual==='horario'){ agRenderHorario(); return; }
   var fechaRef = agGetFecha(agDiaOffset);
   var hoy = new Date(); var manana = agGetFecha(1);
   var prefijo = agMismoDia(fechaRef,hoy)?'Hoy \u00b7 ':agMismoDia(fechaRef,manana)?'Ma\u00f1ana \u00b7 ':'';
@@ -2502,6 +2504,451 @@ function agRenderMes(){
   html+='</div>';
   html+='<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:10px;font-size:.75rem;align-items:center"><span style="display:flex;align-items:center;gap:4px"><span style="background:#cd8e9d;border-radius:4px;width:12px;height:12px;display:inline-block"></span>Presencial</span><span style="display:flex;align-items:center;gap:4px"><span style="background:#a8c7d8;border-radius:4px;width:12px;height:12px;display:inline-block"></span>Virtual</span><span style="display:flex;align-items:center;gap:4px"><span style="background:#b8b8d0;border-radius:4px;width:12px;height:12px;display:inline-block"></span>Administrativo</span></div>';
   c.innerHTML = html;
+}
+
+// ---- Vista "Horario": calendario estilo Google Calendar ------------------
+// Vista de las 24 horas con varios calendarios (Consultorio, Personal,
+// CONMOVILIDAD y los que se creen). Los calendarios se guardan en
+// 'agenda_calendarios'; cada cita lleva el campo opcional `calendario`
+// (si no lo tiene, es del calendario "consultorio").
+var AG_PX_HORA = 48;
+var AG_CAL_DEFECTO = [
+  {id:'consultorio',  nombre:'Consultorio',  color:'#cd8e9d'},
+  {id:'personal',     nombre:'Personal',     color:'#7986cb'},
+  {id:'conmovilidad', nombre:'CONMOVILIDAD', color:'#33b679'}
+];
+var AG_CAL_COLORES = ['#cd8e9d','#e67c73','#f4511e','#f6bf26','#33b679','#039be5','#7986cb','#8e24aa','#616161'];
+var agGView = (window.innerWidth < 700) ? 'dia' : 'semana';
+var agGFecha = (function(){ var d=new Date(); d.setHours(0,0,0,0); return d; })();
+
+function agEsc(s){ return String(s==null?'':s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function agPad2(n){ return String(n).padStart(2,'0'); }
+// Las citas de pacientes son las del calendario "consultorio" (o sin calendario).
+function agEsConsultorio(e){ return !e.calendario || e.calendario==='consultorio'; }
+
+function agCalendarios(){
+  var l = null;
+  try { l = DB.get('agenda_calendarios'); } catch(e){}
+  if(!Array.isArray(l) || !l.length) return AG_CAL_DEFECTO.map(function(c){ return {id:c.id,nombre:c.nombre,color:c.color}; });
+  return l;
+}
+function agGuardarCalendarios(l){ DB.set('agenda_calendarios', l); }
+function agCalPorId(id){
+  var l = agCalendarios();
+  for(var i=0;i<l.length;i++){ if(l[i].id===id) return l[i]; }
+  for(var j=0;j<l.length;j++){ if(l[j].id==='consultorio') return l[j]; }
+  return l[0];
+}
+function agEventoCalId(e){ return e.calendario || 'consultorio'; }
+function agCalOcultos(){ try{ return JSON.parse(localStorage.getItem('ag_cal_ocultos')||'[]'); }catch(e){ return []; } }
+function agCalToggle(id){
+  var o = agCalOcultos(); var i = o.indexOf(id);
+  if(i<0) o.push(id); else o.splice(i,1);
+  try{ localStorage.setItem('ag_cal_ocultos', JSON.stringify(o)); }catch(e){}
+  renderAgenda();
+}
+function agEventosVisibles(){
+  var o = agCalOcultos();
+  return agEventos.filter(function(e){ return o.indexOf(agEventoCalId(e))<0; });
+}
+// Llena los selectores de calendario del formulario y de la edición
+function agPoblarCalSelects(){
+  var l = agCalendarios();
+  ['ag-nuevo-cal','ag-edit-cal'].forEach(function(sid){
+    var s = document.getElementById(sid); if(!s) return;
+    var v = s.value;
+    s.innerHTML = l.map(function(c){ return '<option value="'+agEsc(c.id)+'">'+agEsc(c.nombre)+'</option>'; }).join('');
+    if(v && l.some(function(c){ return c.id===v; })) s.value = v;
+  });
+}
+
+function agInyectarEstiloG(){
+  if(document.getElementById('agg-style')) return;
+  var st = document.createElement('style'); st.id = 'agg-style';
+  st.textContent = `
+.agg-wrap{display:flex;gap:18px;align-items:flex-start;font-family:'Lato',Roboto,Arial,sans-serif}
+.agg-side{width:216px;flex-shrink:0}
+.agg-main{flex:1;min-width:0}
+@media(max-width:820px){.agg-wrap{flex-direction:column;gap:10px}.agg-side{width:100%;order:2}.agg-mini{display:none}.agg-crear{display:none}.agg-crear-m{display:inline-block!important}}
+.agg-crear{display:flex;align-items:center;gap:8px;background:#fff;border:1px solid #dadce0;border-radius:24px;padding:12px 22px;font-size:.92rem;font-weight:600;color:#3c4043;cursor:pointer;box-shadow:0 1px 3px rgba(60,64,67,.3);margin-bottom:16px}
+.agg-crear:hover{box-shadow:0 2px 6px rgba(60,64,67,.35);background:#f8f9fa}
+.agg-mini{margin-bottom:14px}
+.agg-mini-head{display:flex;justify-content:space-between;align-items:center;font-size:.85rem;font-weight:600;color:#3c4043;margin-bottom:4px}
+.agg-mini-grid{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;font-size:.72rem}
+.agg-mini-dow{color:#70757a;padding:3px 0}
+.agg-mini-d{border-radius:50%;cursor:pointer;color:#3c4043;aspect-ratio:1;display:flex;align-items:center;justify-content:center}
+.agg-mini-d:hover{background:#f1f3f4}
+.agg-mini-d.hoy{background:#1a73e8;color:#fff}
+.agg-mini-d.sel:not(.hoy){background:#e8f0fe;color:#1a73e8;font-weight:700}
+.agg-mini-btn{border:none;background:none;cursor:pointer;color:#5f6368;font-size:1rem;padding:2px 7px;border-radius:50%}
+.agg-mini-btn:hover{background:#f1f3f4}
+.agg-cal-tit{font-size:.8rem;font-weight:600;color:#3c4043;margin:6px 0 4px}
+.agg-cal-item{display:flex;align-items:center;justify-content:space-between;font-size:.85rem;color:#3c4043;padding:2px 0}
+.agg-cal-item label{display:flex;align-items:center;gap:8px;cursor:pointer;flex:1;min-width:0}
+.agg-cal-item span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.agg-link{border:none;background:none;color:#1a73e8;cursor:pointer;font-size:.82rem;padding:6px 0}
+.agg-toolbar{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+.agg-btn{border:1px solid #dadce0;background:#fff;border-radius:18px;padding:6px 16px;font-size:.85rem;color:#3c4043;cursor:pointer}
+.agg-btn:hover{background:#f1f3f4}
+.agg-btn.act{background:#e8f0fe;color:#1a73e8;border-color:#d2e3fc;font-weight:600}
+.agg-icon{border:none;background:none;font-size:1.3rem;color:#5f6368;cursor:pointer;width:34px;height:34px;border-radius:50%}
+.agg-icon:hover{background:#f1f3f4}
+.agg-title{font-size:1.2rem;color:#3c4043;margin:0 8px}
+.agg-seg{display:flex;gap:4px}
+.agg-scroll{max-height:74vh;overflow:auto;border:1px solid #dadce0;border-radius:8px;background:#fff}
+.agg-head{position:sticky;top:0;z-index:5;background:#fff;display:grid;border-bottom:1px solid #dadce0}
+.agg-dh{text-align:center;padding:6px 0 4px;border-left:1px solid #e8eaed}
+.agg-dow{font-size:.68rem;font-weight:600;color:#70757a;letter-spacing:.5px}
+.agg-dow.hoy{color:#1a73e8}
+.agg-dnum{display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:50%;font-size:1.3rem;color:#3c4043;cursor:pointer;margin-top:2px}
+.agg-dnum:hover{background:#f1f3f4}
+.agg-dnum.hoy{background:#1a73e8;color:#fff}
+.agg-body{display:grid;position:relative}
+.agg-gutter{position:relative}
+.agg-hl{position:absolute;right:8px;font-size:.66rem;color:#70757a;white-space:nowrap}
+.agg-col{position:relative;border-left:1px solid #e8eaed;cursor:pointer;background-image:repeating-linear-gradient(to bottom,#e8eaed 0,#e8eaed 1px,transparent 1px,transparent ${AG_PX_HORA}px)}
+.agg-ev{position:absolute;border-radius:6px;padding:2px 6px;color:#fff;font-size:.72rem;line-height:1.25;overflow:hidden;box-sizing:border-box;cursor:pointer;border:1px solid rgba(255,255,255,.7);box-shadow:0 1px 2px rgba(0,0,0,.15)}
+.agg-ev b{font-weight:700}
+.agg-now{position:absolute;left:0;right:0;border-top:2px solid #ea4335;pointer-events:none;z-index:3}
+.agg-now::before{content:'';position:absolute;left:-6px;top:-6px;width:10px;height:10px;border-radius:50%;background:#ea4335}
+.agg-mes-head{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;font-size:.68rem;font-weight:600;color:#70757a;padding:6px 0;border:1px solid #dadce0;border-bottom:none;border-radius:8px 8px 0 0;background:#fff}
+.agg-mes{display:grid;grid-template-columns:repeat(7,1fr);border:1px solid #dadce0;border-radius:0 0 8px 8px;background:#fff}
+.agg-mc{min-height:92px;border-top:1px solid #e8eaed;border-left:1px solid #e8eaed;padding:3px;cursor:pointer;overflow:hidden;min-width:0}
+.agg-mc:nth-child(7n+1){border-left:none}
+.agg-mc.fuera{background:#f8f9fa;cursor:default}
+.agg-mn{font-size:.78rem;color:#3c4043;width:24px;height:24px;display:flex;align-items:center;justify-content:center;border-radius:50%;margin:0 auto 2px}
+.agg-mn.hoy{background:#1a73e8;color:#fff}
+.agg-chip{color:#fff;border-radius:4px;font-size:.66rem;padding:1px 4px;margin-bottom:2px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer}
+.agg-mas{font-size:.66rem;color:#5f6368;padding-left:4px}
+.agg-modal-bg{position:fixed;inset:0;background:rgba(32,33,36,.35);z-index:9000;display:flex;align-items:center;justify-content:center;padding:12px}
+.agg-modal{background:#fff;border-radius:12px;padding:22px 24px;width:100%;max-width:460px;max-height:92vh;overflow:auto;box-shadow:0 8px 28px rgba(0,0,0,.28);font-family:'Lato',Roboto,Arial,sans-serif}
+.agg-in-titulo{width:100%;border:none;border-bottom:2px solid #dadce0;font-size:1.3rem;padding:6px 2px;margin-bottom:14px;outline:none;box-sizing:border-box}
+.agg-in-titulo:focus{border-bottom-color:#1a73e8}
+.agg-f{margin-bottom:10px}
+.agg-f label{display:block;font-size:.72rem;color:#5f6368;margin-bottom:3px}
+.agg-f input,.agg-f select,.agg-f textarea{width:100%;box-sizing:border-box;border:1px solid #dadce0;border-radius:6px;padding:8px;font-size:.88rem;font-family:inherit}
+.agg-2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.agg-acc{display:flex;justify-content:flex-end;gap:8px;margin-top:14px}
+.agg-pri{background:#1a73e8;color:#fff;border:none;border-radius:6px;padding:9px 20px;font-weight:600;cursor:pointer}
+.agg-sec{background:none;border:none;color:#5f6368;padding:9px 14px;cursor:pointer}
+.agg-del{background:none;border:none;color:#d93025;padding:9px 14px;cursor:pointer;margin-right:auto}
+.agg-sw{display:flex;gap:8px;flex-wrap:wrap}
+.agg-sw span{width:26px;height:26px;border-radius:50%;cursor:pointer;border:3px solid transparent;box-sizing:border-box}
+.agg-sw span.sel{border-color:#3c4043}
+`;
+  document.head.appendChild(st);
+}
+
+function agGLunes(){
+  var f = agGFecha; var dow = f.getDay();
+  var l = new Date(f); l.setDate(f.getDate() - (dow===0?6:dow-1)); l.setHours(0,0,0,0);
+  return l;
+}
+function agGCap(s){ return s.charAt(0).toUpperCase()+s.slice(1); }
+function agGTitulo(){
+  var f = agGFecha;
+  if(agGView==='mes') return agGCap(agMeses[f.getMonth()])+' '+f.getFullYear();
+  if(agGView==='dia') return agGCap(agDias[f.getDay()])+', '+f.getDate()+' de '+agMeses[f.getMonth()]+' de '+f.getFullYear();
+  var l = agGLunes(); var d = new Date(l); d.setDate(l.getDate()+6);
+  if(l.getMonth()===d.getMonth()) return agGCap(agMeses[l.getMonth()])+' '+l.getFullYear();
+  return agGCap(agMeses[l.getMonth()].slice(0,3))+' – '+agMeses[d.getMonth()].slice(0,3)+' '+d.getFullYear();
+}
+
+// ---- Navegación ----
+function agGHoy(){ agGFecha = new Date(); agGFecha.setHours(0,0,0,0); renderAgenda(); }
+function agGMover(dir){
+  var d = new Date(agGFecha);
+  if(agGView==='mes') d.setMonth(d.getMonth()+dir, 1);
+  else d.setDate(d.getDate() + dir*(agGView==='semana'?7:1));
+  agGFecha = d; renderAgenda();
+}
+function agGMoverMes(dir){ agGFecha = new Date(agGFecha.getFullYear(), agGFecha.getMonth()+dir, 1); renderAgenda(); }
+function agGVista(v){ agGView = v; renderAgenda(); }
+function agGIrFecha(y,m,d){ agGFecha = new Date(y,m,d); renderAgenda(); }
+function agGIrDia(y,m,d){ agGFecha = new Date(y,m,d); agGView = 'dia'; renderAgenda(); }
+
+// ---- Dibujo ----
+function agRenderHorario(){
+  agInyectarEstiloG();
+  agPoblarCalSelects();
+  var nav = document.getElementById('ag-nav-card'); if(nav) nav.style.display = 'none';
+  var form = document.getElementById('ag-form-card'); if(form) form.style.display = 'none';
+  var cont = document.getElementById('ag-container');
+  var prev = cont.querySelector('.agg-scroll');
+  var scrollPrev = prev ? prev.scrollTop : null;
+  cont.innerHTML = '<div class="agg-wrap">'+agGSidebar()+'<div class="agg-main">'+agGToolbar()+(agGView==='mes'?agGMes():agGGrid())+'</div></div>';
+  var sc = cont.querySelector('.agg-scroll');
+  if(sc){
+    if(scrollPrev!==null) sc.scrollTop = scrollPrev;
+    else sc.scrollTop = Math.max(0, (new Date().getHours()-1)*AG_PX_HORA);
+  }
+}
+
+function agGSidebar(){
+  var cals = agCalendarios(); var oc = agCalOcultos();
+  var h = '<div class="agg-side"><button class="agg-crear" onclick="agGAbrirModal()">＋ Crear</button>';
+  h += agGMini();
+  h += '<div class="agg-cal-tit">Mis calendarios</div>';
+  cals.forEach(function(c){
+    var on = oc.indexOf(c.id)<0;
+    h += '<div class="agg-cal-item"><label><input type="checkbox" '+(on?'checked':'')+' onchange="agCalToggle(\''+agEsc(c.id)+'\')" style="accent-color:'+agEsc(c.color)+'"><span>'+agEsc(c.nombre)+'</span></label>'
+      + '<button class="agg-mini-btn" title="Editar calendario" onclick="agGAbrirCalModal(\''+agEsc(c.id)+'\')">✎</button></div>';
+  });
+  h += '<button class="agg-link" onclick="agGAbrirCalModal()">＋ Nuevo calendario</button></div>';
+  return h;
+}
+
+function agGMini(){
+  var f = agGFecha; var y = f.getFullYear(), m = f.getMonth(); var hoy = new Date();
+  var h = '<div class="agg-mini"><div class="agg-mini-head"><span>'+agGCap(agMeses[m])+' '+y+'</span><span><button class="agg-mini-btn" onclick="agGMoverMes(-1)">‹</button><button class="agg-mini-btn" onclick="agGMoverMes(1)">›</button></span></div><div class="agg-mini-grid">';
+  ['L','M','M','J','V','S','D'].forEach(function(l){ h += '<div class="agg-mini-dow">'+l+'</div>'; });
+  var primer = new Date(y,m,1).getDay(); var off = primer===0?6:primer-1;
+  for(var i=0;i<off;i++) h += '<div></div>';
+  var dias = new Date(y,m+1,0).getDate();
+  for(var d=1; d<=dias; d++){
+    var fecha = new Date(y,m,d);
+    var cls = 'agg-mini-d'+(agMismoDia(fecha,hoy)?' hoy':'')+(agMismoDia(fecha,f)?' sel':'');
+    h += '<div class="'+cls+'" onclick="agGIrFecha('+y+','+m+','+d+')">'+d+'</div>';
+  }
+  return h + '</div></div>';
+}
+
+function agGToolbar(){
+  var v = agGView;
+  return '<div class="agg-toolbar"><button class="agg-btn agg-crear-m" style="display:none" onclick="agGAbrirModal()">\uff0b Crear</button><button class="agg-btn" onclick="agGHoy()">Hoy</button>'
+    + '<button class="agg-icon" onclick="agGMover(-1)" title="Anterior">‹</button><button class="agg-icon" onclick="agGMover(1)" title="Siguiente">›</button>'
+    + '<div class="agg-title">'+agEsc(agGTitulo())+'</div><div style="flex:1"></div>'
+    + '<div class="agg-seg">'+[['dia','Día'],['semana','Semana'],['mes','Mes']].map(function(p){
+        return '<button class="agg-btn'+(v===p[0]?' act':'')+'" onclick="agGVista(\''+p[0]+'\')">'+p[1]+'</button>';
+      }).join('')+'</div></div>';
+}
+
+// Reparte el ancho de las citas que se cruzan en el mismo día
+function agGColocar(evs){
+  var placed = [], cols = [], cluster = [], clusterEnd = 0;
+  var flush = function(){
+    var n = cols.length || 1;
+    cluster.forEach(function(it){ it.n = n; placed.push(it); });
+    cols = []; cluster = []; clusterEnd = 0;
+  };
+  evs.forEach(function(e){
+    var ini = new Date(e.inicio);
+    var fin = e.fin ? new Date(e.fin) : null;
+    if(!fin || isNaN(fin) || fin<=ini) fin = new Date(ini.getTime()+50*60*1000);
+    var s = ini.getHours()*60+ini.getMinutes();
+    var f = agMismoDia(fin,ini) ? fin.getHours()*60+fin.getMinutes() : 24*60;
+    if(f < s+20) f = s+20;
+    if(cluster.length && s >= clusterEnd) flush();
+    var idx = -1;
+    for(var k=0;k<cols.length;k++){ if(cols[k] <= s){ idx = k; break; } }
+    if(idx<0){ idx = cols.length; cols.push(f); } else { cols[idx] = f; }
+    cluster.push({e:e,s:s,f:f,col:idx});
+    if(f > clusterEnd) clusterEnd = f;
+  });
+  flush();
+  return placed;
+}
+
+function agGGrid(){
+  var dias = [];
+  if(agGView==='dia') dias = [new Date(agGFecha)];
+  else { var l = agGLunes(); for(var i=0;i<7;i++){ var dd = new Date(l); dd.setDate(l.getDate()+i); dias.push(dd); } }
+  var n = dias.length, totalH = 24*AG_PX_HORA, hoy = new Date(), vis = agEventosVisibles();
+  var nom = ['DOM','LUN','MAR','MIÉ','JUE','VIE','SÁB'];
+  var tpl = '56px repeat('+n+',minmax(0,1fr))';
+  var h = '<div class="agg-scroll"><div style="'+(n>1?'min-width:640px':'')+'">';
+  h += '<div class="agg-head" style="grid-template-columns:'+tpl+'"><div></div>';
+  dias.forEach(function(d){
+    var eh = agMismoDia(d,hoy);
+    h += '<div class="agg-dh"><div class="agg-dow'+(eh?' hoy':'')+'">'+nom[d.getDay()]+'</div><div class="agg-dnum'+(eh?' hoy':'')+'" onclick="agGIrDia('+d.getFullYear()+','+d.getMonth()+','+d.getDate()+')">'+d.getDate()+'</div></div>';
+  });
+  h += '</div><div class="agg-body" style="grid-template-columns:'+tpl+';height:'+totalH+'px"><div class="agg-gutter">';
+  for(var hr=1; hr<24; hr++){
+    var h12 = hr%12===0 ? 12 : hr%12;
+    h += '<div class="agg-hl" style="top:'+(hr*AG_PX_HORA-7)+'px">'+h12+' '+(hr<12?'a. m.':'p. m.')+'</div>';
+  }
+  h += '</div>';
+  dias.forEach(function(d){
+    var ymd = d.getFullYear()+'-'+agPad2(d.getMonth()+1)+'-'+agPad2(d.getDate());
+    var evs = vis.filter(function(e){ return agMismoDia(new Date(e.inicio), d); });
+    evs.sort(function(a,b){ return new Date(a.inicio)-new Date(b.inicio); });
+    h += '<div class="agg-col" onclick="agGClickCol(event,\''+ymd+'\')">';
+    agGColocar(evs).forEach(function(it){
+      var top = it.s*AG_PX_HORA/60, hgt = (it.f-it.s)*AG_PX_HORA/60, w = 100/it.n;
+      var color = agCalPorId(agEventoCalId(it.e)).color;
+      var tit = (it.e.tipo==='virtual'?'📹 ':'')+agEsc(it.e.titulo);
+      var hora = agEsc(agFormatHora(it.e.inicio));
+      var cuerpo = hgt < 34 ? '<b>'+tit+'</b>, '+hora : '<b>'+tit+'</b><div>'+hora+' – '+agEsc(agFormatHora(it.e.fin||it.e.inicio))+'</div>';
+      h += '<div class="agg-ev" onclick="event.stopPropagation();agEditarEvento(\''+agEsc(it.e.id)+'\')" title="'+agEsc(it.e.titulo)+'" style="top:'+top+'px;height:'+Math.max(hgt-1,16)+'px;left:calc('+(it.col*w)+'% + 1px);width:calc('+w+'% - 3px);background:'+agEsc(color)+'">'+cuerpo+'</div>';
+    });
+    if(agMismoDia(d,hoy)){
+      h += '<div class="agg-now" style="top:'+((hoy.getHours()*60+hoy.getMinutes())*AG_PX_HORA/60)+'px"></div>';
+    }
+    h += '</div>';
+  });
+  return h + '</div></div></div>';
+}
+
+function agGMes(){
+  var f = agGFecha, y = f.getFullYear(), m = f.getMonth(), hoy = new Date(), vis = agEventosVisibles();
+  var primer = new Date(y,m,1).getDay(); var off = primer===0?6:primer-1;
+  var dias = new Date(y,m+1,0).getDate();
+  var celdas = Math.ceil((off+dias)/7)*7;
+  var h = '<div class="agg-mes-head">'+['LUN','MAR','MIÉ','JUE','VIE','SÁB','DOM'].map(function(d){ return '<div>'+d+'</div>'; }).join('')+'</div><div class="agg-mes">';
+  for(var i=0;i<celdas;i++){
+    var dn = i-off+1;
+    if(dn<1 || dn>dias){ h += '<div class="agg-mc fuera"></div>'; continue; }
+    var fecha = new Date(y,m,dn);
+    var evs = vis.filter(function(e){ return agMismoDia(new Date(e.inicio), fecha); });
+    evs.sort(function(a,b){ return new Date(a.inicio)-new Date(b.inicio); });
+    h += '<div class="agg-mc" onclick="agGIrDia('+y+','+m+','+dn+')"><div class="agg-mn'+(agMismoDia(fecha,hoy)?' hoy':'')+'">'+dn+'</div>';
+    evs.slice(0,3).forEach(function(e){
+      var color = agCalPorId(agEventoCalId(e)).color;
+      h += '<div class="agg-chip" style="background:'+agEsc(color)+'" onclick="event.stopPropagation();agEditarEvento(\''+agEsc(e.id)+'\')" title="'+agEsc(e.titulo)+'"><b>'+agEsc(agFormatHora(e.inicio))+'</b> '+agEsc(e.titulo)+'</div>';
+    });
+    if(evs.length>3) h += '<div class="agg-mas">+'+(evs.length-3)+' más</div>';
+    h += '</div>';
+  }
+  return h + '</div>';
+}
+
+// Tocar un espacio vacío del calendario abre la ventana de nueva cita a esa hora
+function agGClickCol(ev, ymd){
+  var r = ev.currentTarget.getBoundingClientRect();
+  var y = ev.clientY - r.top;
+  var mins = Math.floor((y/AG_PX_HORA)*2)*30;
+  if(mins < 0) mins = 0;
+  if(mins > 23*60+30) mins = 23*60+30;
+  agGAbrirModal(ymd+'T'+agPad2(Math.floor(mins/60))+':'+agPad2(mins%60));
+}
+
+// ---- Ventana "Nueva cita" ----
+function agGCerrarModal(){ var m = document.getElementById('agg-modal'); if(m) m.remove(); }
+
+function agGAbrirModal(inicioISO){
+  agGCerrarModal();
+  if(!inicioISO){
+    var a = new Date(); a.setSeconds(0,0);
+    if(a.getMinutes()<30) a.setMinutes(30); else { a.setMinutes(0); a.setHours(a.getHours()+1); }
+    inicioISO = agFechaLocalISO(a);
+  }
+  var cals = agCalendarios();
+  var pacOpts = (document.getElementById('ag-nuevo-pac')||{}).innerHTML || '<option value="">— Sin paciente —</option>';
+  var m = document.createElement('div'); m.id = 'agg-modal'; m.className = 'agg-modal-bg';
+  m.onclick = function(e){ if(e.target===m) agGCerrarModal(); };
+  m.innerHTML = '<div class="agg-modal">'
+    + '<input id="aggm-titulo" class="agg-in-titulo" placeholder="Añade un título">'
+    + '<div class="agg-2"><div class="agg-f"><label>Inicio</label><input type="datetime-local" id="aggm-inicio" onchange="agGModalInicio()"></div>'
+    + '<div class="agg-f"><label>Fin</label><input type="datetime-local" id="aggm-fin" oninput="this.dataset.manual=\'1\'"></div></div>'
+    + '<div class="agg-2"><div class="agg-f"><label>Calendario</label><select id="aggm-cal" onchange="agGModalCal()">'
+    + cals.map(function(c){ return '<option value="'+agEsc(c.id)+'">'+agEsc(c.nombre)+'</option>'; }).join('')+'</select></div>'
+    + '<div class="agg-f"><label>Tipo</label><select id="aggm-tipo"><option value="virtual">Virtual</option><option value="presencial">Presencial</option><option value="admin">Administrativo</option></select></div></div>'
+    + '<div class="agg-f" id="aggm-pac-wrap"><label>Paciente (opcional)</label><select id="aggm-pac" onchange="agGModalPac()">'+pacOpts+'</select></div>'
+    + '<div class="agg-2"><div class="agg-f"><label>Se repite</label><select id="aggm-rep" onchange="document.getElementById(\'aggm-hasta-wrap\').style.display=this.value?\'\':\'none\'"><option value="">No se repite</option><option value="semanal">Cada semana</option><option value="quincenal">Cada 2 semanas</option><option value="mensual">Cada mes</option></select></div>'
+    + '<div class="agg-f" id="aggm-hasta-wrap" style="display:none"><label>Repetir hasta</label><input type="date" id="aggm-hasta"></div></div>'
+    + '<div class="agg-f"><label>Descripción</label><textarea id="aggm-desc" rows="2"></textarea></div>'
+    + '<div class="agg-acc"><button class="agg-sec" onclick="agGCerrarModal()">Cancelar</button><button class="agg-pri" onclick="agGGuardarModal()">Guardar</button></div>'
+    + '</div>';
+  document.body.appendChild(m);
+  document.getElementById('aggm-inicio').value = inicioISO;
+  agGModalInicio();
+  // Calendario inicial: el primero visible (normalmente Consultorio)
+  var oc = agCalOcultos();
+  var primero = cals.filter(function(c){ return oc.indexOf(c.id)<0; })[0] || cals[0];
+  document.getElementById('aggm-cal').value = primero.id;
+  agGModalCal();
+  setTimeout(function(){ var t = document.getElementById('aggm-titulo'); if(t) t.focus(); }, 50);
+}
+function agGModalInicio(){
+  var ini = document.getElementById('aggm-inicio'), fin = document.getElementById('aggm-fin');
+  if(!ini.value || fin.dataset.manual==='1') return;
+  var d = new Date(new Date(ini.value).getTime() + 50*60*1000);
+  fin.value = agFechaLocalISO(d);
+}
+// Los pacientes solo aplican al calendario Consultorio
+function agGModalCal(){
+  var cal = document.getElementById('aggm-cal').value;
+  var esCons = (cal==='consultorio');
+  document.getElementById('aggm-pac-wrap').style.display = esCons ? '' : 'none';
+  if(!esCons){ document.getElementById('aggm-pac').value = ''; document.getElementById('aggm-tipo').value = 'admin'; }
+  else if(document.getElementById('aggm-tipo').value==='admin'){ document.getElementById('aggm-tipo').value = 'virtual'; }
+}
+function agGModalPac(){
+  var pid = document.getElementById('aggm-pac').value;
+  if(!pid) return;
+  document.getElementById('ag-nuevo-pac').value = pid;
+  agAutocompletarTitulo();
+  document.getElementById('aggm-titulo').value = document.getElementById('ag-nuevo-titulo').value;
+}
+function agGGuardarModal(){
+  var $ = function(id){ return document.getElementById(id); };
+  var titulo = $('aggm-titulo').value.trim(), ini = $('aggm-inicio').value, fin = $('aggm-fin').value;
+  var rep = $('aggm-rep').value, hasta = $('aggm-hasta').value;
+  if(!titulo || !ini){ toast('Ingresa título y fecha de inicio'); return; }
+  if(fin && new Date(fin) <= new Date(ini)){ toast('La hora de fin debe ser después del inicio'); return; }
+  if(rep && !hasta){ toast('Indica hasta qué fecha se repite'); return; }
+  var cal = $('aggm-cal').value;
+  // Se vuelcan los datos al formulario original y se reutiliza su lógica
+  // de guardado (con la ventana de confirmación de fecha y hora).
+  $('ag-nuevo-cal').value = cal;
+  $('ag-nuevo-pac').value = (cal==='consultorio') ? $('aggm-pac').value : '';
+  $('ag-nuevo-titulo').value = titulo;
+  $('ag-nuevo-tipo').value = $('aggm-tipo').value;
+  $('ag-nuevo-inicio').value = ini;
+  $('ag-nuevo-fin').value = fin || '';
+  $('ag-nuevo-fin').dataset.editadoManual = '1';
+  $('ag-nuevo-desc').value = $('aggm-desc').value;
+  $('ag-nuevo-repetir').value = rep;
+  $('ag-nuevo-rep-hasta').value = hasta || '';
+  agGCerrarModal();
+  agAgregarEvento();
+}
+
+// ---- Ventana de calendarios (crear / editar / eliminar) ----
+function agGAbrirCalModal(id){
+  agGCerrarModal();
+  var cals = agCalendarios();
+  var c = id ? cals.filter(function(x){ return x.id===id; })[0] : null;
+  var color = c ? c.color : AG_CAL_COLORES[cals.length % AG_CAL_COLORES.length];
+  var m = document.createElement('div'); m.id = 'agg-modal'; m.className = 'agg-modal-bg';
+  m.onclick = function(e){ if(e.target===m) agGCerrarModal(); };
+  m.innerHTML = '<div class="agg-modal" style="max-width:380px"><div style="font-size:1.1rem;margin-bottom:12px;color:#3c4043">'+(c?'Editar calendario':'Nuevo calendario')+'</div>'
+    + '<div class="agg-f"><label>Nombre</label><input id="aggc-nombre" value="'+agEsc(c?c.nombre:'')+'" placeholder="Ej: Familia"></div>'
+    + '<div class="agg-f"><label>Color</label><div class="agg-sw" id="aggc-sw" data-color="'+agEsc(color)+'">'
+    + AG_CAL_COLORES.map(function(k){ return '<span style="background:'+k+'" class="'+(k===color?'sel':'')+'" onclick="agGElegirColor(this,\''+k+'\')"></span>'; }).join('')+'</div></div>'
+    + '<div class="agg-acc">'+((c && c.id!=='consultorio')?'<button class="agg-del" onclick="agGEliminarCal(\''+agEsc(c.id)+'\')">Eliminar</button>':'')
+    + '<button class="agg-sec" onclick="agGCerrarModal()">Cancelar</button><button class="agg-pri" onclick="agGGuardarCal(\''+(c?agEsc(c.id):'')+'\')">Guardar</button></div></div>';
+  document.body.appendChild(m);
+  setTimeout(function(){ var t = document.getElementById('aggc-nombre'); if(t) t.focus(); }, 50);
+}
+function agGElegirColor(el, color){
+  var sw = document.getElementById('aggc-sw'); sw.dataset.color = color;
+  Array.prototype.forEach.call(sw.children, function(s){ s.classList.remove('sel'); });
+  el.classList.add('sel');
+}
+function agGGuardarCal(id){
+  var nombre = document.getElementById('aggc-nombre').value.trim();
+  var color = document.getElementById('aggc-sw').dataset.color;
+  if(!nombre){ toast('Escribe un nombre para el calendario'); return; }
+  var cals = agCalendarios().map(function(c){ return {id:c.id,nombre:c.nombre,color:c.color}; });
+  if(id){
+    cals.forEach(function(c){ if(c.id===id){ c.nombre = nombre; c.color = color; } });
+  } else {
+    cals.push({id:'cal_'+Date.now(), nombre:nombre, color:color});
+  }
+  agGuardarCalendarios(cals);
+  agGCerrarModal(); renderAgenda();
+  toast('Calendario guardado ✓');
+}
+function agGEliminarCal(id){
+  if(id==='consultorio'){ toast('El calendario Consultorio no se puede eliminar'); return; }
+  var usados = agEventos.filter(function(e){ return agEventoCalId(e)===id; }).length;
+  if(usados){ toast('Este calendario tiene '+usados+' evento(s). Muévelos a otro calendario antes de eliminarlo'); return; }
+  if(!confirm('¿Eliminar este calendario?')) return;
+  var cals = agCalendarios().filter(function(c){ return c.id!==id; });
+  agGuardarCalendarios(cals);
+  agGCerrarModal(); renderAgenda();
+  toast('Calendario eliminado');
 }
 
 function agIrAFechaMes(anio, mes, dia){
@@ -2680,7 +3127,7 @@ function agSwitchTab(tab,el){
   if(esCumple){ agRenderCumpleanos(); } else { renderAgenda(); }
 }
 function agCambiarDia(dir){
-  if(agTabActual==='semana'){ agSemanaOffset+=dir; renderAgenda(); return; }
+  if(agTabActual==='semana' || agTabActual==='horario'){ agSemanaOffset+=dir; renderAgenda(); return; }
   if(agTabActual==='mes'){ agMesOffset+=dir; renderAgenda(); return; }
   agDiaOffset+=dir; renderAgenda();
 }
@@ -2765,7 +3212,8 @@ function agAgregarEvento(){
       inicio: agFechaLocalISO(ini),
       fin: agFechaLocalISO(finEv),
       tipo, descripcion: desc,
-      pacienteId: pacId || null
+      pacienteId: pacId || null,
+      calendario: (document.getElementById('ag-nuevo-cal')||{}).value || 'consultorio'
     });
     iter++;
   } while(repetir && new Date(fechaInicio.getTime() + iter*intervaloDias*24*60*60*1000) <= limite);
@@ -2833,6 +3281,7 @@ function agGuardarEventosConfirmados(nuevosEventos){
   document.getElementById('ag-nuevo-repetir').value='';
   document.getElementById('ag-nuevo-rep-dias').value='';
   document.getElementById('ag-nuevo-rep-hasta').value='';
+  var calSelNuevo = document.getElementById('ag-nuevo-cal'); if(calSelNuevo) calSelNuevo.value='consultorio';
   agToggleRepetir();
   renderAgenda();
   toast(nuevosEventos.length>1 ? (nuevosEventos.length+' eventos guardados \u2713') : 'Evento guardado \u2713');
@@ -2885,6 +3334,8 @@ function agEditarEvento(id){
   document.getElementById('ag-edit-fin').value = e.fin ? e.fin.slice(0,16) : '';
   document.getElementById('ag-edit-tipo').value = e.tipo||'presencial';
   document.getElementById('ag-edit-desc').value = e.descripcion||'';
+  agPoblarCalSelects();
+  var calSelEdit = document.getElementById('ag-edit-cal'); if(calSelEdit) calSelEdit.value = e.calendario||'consultorio';
   document.getElementById('ag-edit-overlay').classList.add('open');
 }
 
@@ -2899,7 +3350,8 @@ function agGuardarEdicion(){
   var tipo = document.getElementById('ag-edit-tipo').value;
   var desc = document.getElementById('ag-edit-desc').value;
 
-  agMostrarConfirmacionEdicion(idx, { titulo, inicio, fin, tipo, descripcion: desc });
+  var calEdit = (document.getElementById('ag-edit-cal')||{}).value || agEventos[idx].calendario || 'consultorio';
+  agMostrarConfirmacionEdicion(idx, { titulo, inicio, fin, tipo, descripcion: desc, calendario: calEdit });
 }
 
 // Igual que agMostrarConfirmacion, pero para edición de una cita existente.
@@ -2934,6 +3386,7 @@ function agMostrarConfirmacionEdicion(idx, datos){
     agEventos[idx].fin = datos.fin;
     agEventos[idx].tipo = datos.tipo;
     agEventos[idx].descripcion = datos.descripcion;
+    agEventos[idx].calendario = datos.calendario || agEventos[idx].calendario || 'consultorio';
     agGuardar(); renderAgenda();
     document.getElementById('ag-edit-overlay').classList.remove('open');
     toast('Cita actualizada \u2713');
@@ -5884,7 +6337,7 @@ function verificarCitasManana(){
   var manana = new Date();
   manana.setDate(manana.getDate() + 1);
   var citasManana = agEventos.filter(function(e){
-    if(e.tipo === 'admin') return false;
+    if(e.tipo === 'admin' || !agEsConsultorio(e)) return false;
     var d = new Date(e.inicio);
     return d.getFullYear()===manana.getFullYear() && d.getMonth()===manana.getMonth() && d.getDate()===manana.getDate();
   });

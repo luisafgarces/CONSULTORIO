@@ -1053,6 +1053,7 @@ const DB = {
         </select>
       </div>
     </div>
+    <div class="fg" style="margin-bottom:12px;max-width:320px"><label class="lbl">Calendario</label><select id="ag-nuevo-cal"></select></div>
     <div class="row col3">
       <div class="fg"><label class="lbl">Fecha y hora inicio</label><input type="datetime-local" id="ag-nuevo-inicio" onchange="agAutocompletarFin()"></div>
       <div class="fg"><label class="lbl">Hora fin</label><input type="datetime-local" id="ag-nuevo-fin" oninput="this.dataset.editadoManual='1'"></div>
@@ -1967,6 +1968,7 @@ const DB = {
         <option value="admin">Administrativo</option>
       </select>
     </div>
+    <div class="fg" style="margin-bottom:12px"><label class="lbl">Calendario</label><select id="ag-edit-cal"></select></div>
     <div class="fg" style="margin-bottom:16px"><label class="lbl">Descripción / Notas</label><textarea id="ag-edit-desc" rows="2"></textarea></div>
     <div class="btn-row">
       <button class="btn" onclick="document.getElementById('ag-edit-overlay').classList.remove('open')">Cancelar</button>
