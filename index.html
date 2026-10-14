@@ -92,6 +92,20 @@ const DB = {
 };
 </script>
 <link rel="stylesheet" href="css/style.css">
+<script>
+// Si se abre como acceso directo "Agenda" (?app=agenda o #agenda), la página se
+// presenta como una app aparte: otro manifest, otro ícono y otro nombre.
+(function(){
+  try {
+    if(location.hash === '#agenda' || /[?&]app=agenda(&|$)/.test(location.search)){
+      var m = document.querySelector('link[rel="manifest"]'); if(m) m.setAttribute('href','manifest-agenda.json');
+      var a = document.querySelector('link[rel="apple-touch-icon"]'); if(a) a.setAttribute('href','apple-touch-agenda.png');
+      var t = document.querySelector('meta[name="apple-mobile-web-app-title"]'); if(t) t.setAttribute('content','Agenda');
+      document.title = 'Agenda';
+    }
+  } catch(e){}
+})();
+</script>
 </head>
 <body>
 
@@ -2231,7 +2245,7 @@ function aplicarPermisosFinanzas(){
           }
           // Acceso directo "Agenda": si se abrió con #agenda, ir directo a la agenda.
           try {
-            if(location.hash === '#agenda' && typeof goPage === 'function' && window.tienePermiso('agenda')){
+            if((location.hash === '#agenda' || /[?&]app=agenda(&|$)/.test(location.search)) && typeof goPage === 'function' && window.tienePermiso('agenda')){
               goPage('agenda');
             }
           } catch(e){}

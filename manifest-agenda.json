@@ -2,7 +2,7 @@
   "name": "Agenda · Suite Clínica",
   "short_name": "Agenda",
   "id": "./agenda.html",
-  "start_url": "./agenda.html",
+  "start_url": "./index.html?app=agenda#agenda",
   "scope": "./",
   "display": "standalone",
   "background_color": "#fbf1e8",
