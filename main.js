@@ -2401,7 +2401,7 @@ function toast(msg){
 var agEventos = (function(){ try{ return JSON.parse(localStorage.getItem('agenda_eventos')||'[]'); }catch(e){return[];} })();
 function agGuardar(){ DB.set('agenda_eventos', agEventos); }
 
-var agTabActual = 'hoy';
+var agTabActual = 'horario';
 var agDiaOffset = 0;
 var agSemanaOffset = 0;
 var agMesOffset = 0;

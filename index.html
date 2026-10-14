@@ -1032,16 +1032,14 @@ const DB = {
     </div>
     <div style="display:flex;gap:8px;flex-wrap:wrap">
       <button class="btn" style="font-size:.78rem;padding:7px 16px;background:#fff8f0;border:1.5px solid #e8b87a;color:#a0536a" onclick="agAbrirRevision()">🔍 Revisar todas mis citas</button>
-      <button class="btn primary" style="font-size:.78rem;padding:7px 16px" onclick="document.getElementById('ics-input').click()">📥 Importar desde Google Calendar (.ics)</button>
-      <input type="file" id="ics-input" accept=".ics" style="display:none" onchange="importarICS(event)">
       <button class="btn danger" style="font-size:.78rem;padding:7px 16px" onclick="agLimpiarTodo()">🗑 Limpiar todos</button>
     </div>
   </div>
   <div class="ag-tab-nav">
-    <button class="ag-tab active" data-tab="hoy" onclick="agSwitchTab('hoy',this)">Hoy</button>
+    <button class="ag-tab active" data-tab="horario" onclick="agSwitchTab('horario',this)">📆 Calendario</button>
+    <button class="ag-tab" data-tab="hoy" onclick="agSwitchTab('hoy',this)">Hoy</button>
     <button class="ag-tab" data-tab="semana" onclick="agSwitchTab('semana',this)">📅 Semana</button>
     <button class="ag-tab" data-tab="mes" onclick="agSwitchTab('mes',this)">🗓 Mes</button>
-    <button class="ag-tab" data-tab="horario" onclick="agSwitchTab('horario',this)">🕒 Horario</button>
     <button class="ag-tab" id="ag-tab-cumple" data-tab="cumpleanos" onclick="agSwitchTab('cumpleanos',this)" style="display:flex;align-items:center;gap:6px">🎂 Cumpleaños <span id="ag-badge-cumple" style="display:none;background:#cd8e9d;color:#fff;border-radius:10px;font-size:.67rem;padding:1px 7px;font-weight:700;line-height:1.6"></span></button>
   </div>
   <div class="card" id="ag-nav-card" style="padding:14px 20px;margin-bottom:20px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px">
