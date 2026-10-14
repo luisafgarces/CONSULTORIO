@@ -1,0 +1,42 @@
+name: Alarmas de citas
+
+on:
+  schedule:
+    - cron: '*/10 11-23 * * *'
+    - cron: '*/10 0-3 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  actions: write
+
+concurrency:
+  group: alarmas
+  cancel-in-progress: false
+
+jobs:
+  alarmas:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Instalar dependencias
+        working-directory: scripts
+        run: npm install --no-audit --no-fund
+
+      - name: Enviar alarmas
+        working-directory: scripts
+        env:
+          MODO: alarmas
+          FIREBASE_SERVICE_ACCOUNT: ${{ secrets.FIREBASE_SERVICE_ACCOUNT }}
+        run: node enviar-recordatorios.js
+
+      - name: Mantener activo el flujo
+        if: always()
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh api -X PUT "repos/${{ github.repository }}/actions/workflows/alarmas.yml/enable" || true
