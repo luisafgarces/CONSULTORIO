@@ -2610,6 +2610,12 @@ function agInyectarEstiloG(){
 .agg-col{position:relative;border-left:1px solid #e8eaed;cursor:pointer;background-image:repeating-linear-gradient(to bottom,#e8eaed 0,#e8eaed 1px,transparent 1px,transparent ${AG_PX_HORA}px)}
 .agg-ev{position:absolute;border-radius:6px;padding:2px 6px;color:#fff;font-size:.72rem;line-height:1.25;overflow:hidden;box-sizing:border-box;cursor:pointer;border:1px solid rgba(255,255,255,.7);box-shadow:0 1px 2px rgba(0,0,0,.15)}
 .agg-ev b{font-weight:700}
+.agg-ev{cursor:grab}
+.agg-ev.arrastrando{z-index:30;opacity:.9;box-shadow:0 6px 16px rgba(0,0,0,.3);cursor:grabbing;transition:none}
+body.agg-dragging, body.agg-dragging *{user-select:none !important;-webkit-user-select:none !important;cursor:grabbing !important}
+.agg-dtip{position:fixed;z-index:10050;background:#3c4043;color:#fff;font-size:.74rem;padding:4px 9px;border-radius:6px;pointer-events:none;white-space:nowrap}
+.agg-undo{position:fixed;left:50%;bottom:22px;transform:translateX(-50%);z-index:10060;background:#323232;color:#fff;border-radius:8px;padding:10px 14px;font-size:.82rem;display:flex;gap:14px;align-items:center;box-shadow:0 4px 14px rgba(0,0,0,.3)}
+.agg-undo button{background:none;border:none;color:#8ab4f8;font-weight:700;cursor:pointer;font-size:.82rem}
 .agg-now{position:absolute;left:0;right:0;border-top:2px solid #ea4335;pointer-events:none;z-index:3}
 .agg-now::before{content:'';position:absolute;left:-6px;top:-6px;width:10px;height:10px;border-radius:50%;background:#ea4335}
 .agg-mes-head{display:grid;grid-template-columns:repeat(7,1fr);text-align:center;font-size:.68rem;font-weight:600;color:#70757a;padding:6px 0;border:1px solid #dadce0;border-bottom:none;border-radius:8px 8px 0 0;background:#fff}
@@ -2670,6 +2676,7 @@ function agGIrDia(y,m,d){ agGFecha = new Date(y,m,d); agGView = 'dia'; renderAge
 
 // ---- Dibujo ----
 function agRenderHorario(){
+  if(window._agDragActivo) return;
   agInyectarEstiloG();
   agPoblarCalSelects();
   var nav = document.getElementById('ag-nav-card'); if(nav) nav.style.display = 'none';
@@ -2773,14 +2780,14 @@ function agGGrid(){
     var ymd = d.getFullYear()+'-'+agPad2(d.getMonth()+1)+'-'+agPad2(d.getDate());
     var evs = vis.filter(function(e){ return agMismoDia(new Date(e.inicio), d); });
     evs.sort(function(a,b){ return new Date(a.inicio)-new Date(b.inicio); });
-    h += '<div class="agg-col" onclick="agGClickCol(event,\''+ymd+'\')">';
+    h += '<div class="agg-col" data-ymd="'+ymd+'" onclick="agGClickCol(event,\''+ymd+'\')">';
     agGColocar(evs).forEach(function(it){
       var top = it.s*AG_PX_HORA/60, hgt = (it.f-it.s)*AG_PX_HORA/60, w = 100/it.n;
       var color = agCalPorId(agEventoCalId(it.e)).color;
       var tit = (it.e.tipo==='virtual'?'📹 ':'')+agEsc(it.e.titulo);
       var hora = agEsc(agFormatHora(it.e.inicio));
       var cuerpo = hgt < 34 ? '<b>'+tit+'</b>, '+hora : '<b>'+tit+'</b><div>'+hora+' – '+agEsc(agFormatHora(it.e.fin||it.e.inicio))+'</div>';
-      h += '<div class="agg-ev" onclick="event.stopPropagation();agEditarEvento(\''+agEsc(it.e.id)+'\')" title="'+agEsc(it.e.titulo)+'" style="top:'+top+'px;height:'+Math.max(hgt-1,16)+'px;left:calc('+(it.col*w)+'% + 1px);width:calc('+w+'% - 3px);background:'+agEsc(color)+'">'+cuerpo+'</div>';
+      h += '<div class="agg-ev" data-id="'+agEsc(it.e.id)+'" onclick="event.stopPropagation();agEditarEvento(\''+agEsc(it.e.id)+'\')" title="'+agEsc(it.e.titulo)+'" style="top:'+top+'px;height:'+Math.max(hgt-1,16)+'px;left:calc('+(it.col*w)+'% + 1px);width:calc('+w+'% - 3px);background:'+agEsc(color)+'">'+cuerpo+'</div>';
     });
     if(agMismoDia(d,hoy)){
       h += '<div class="agg-now" style="top:'+((hoy.getHours()*60+hoy.getMinutes())*AG_PX_HORA/60)+'px"></div>';
@@ -2822,6 +2829,126 @@ function agGClickCol(ev, ymd){
   if(mins > 23*60+30) mins = 23*60+30;
   agGAbrirModal(ymd+'T'+agPad2(Math.floor(mins/60))+':'+agPad2(mins%60));
 }
+
+// ---- Arrastrar una cita para cambiarle la hora (o el día en la vista semana) ----
+// Ratón: se arrastra directamente. Pantalla táctil: mantén presionada la cita ~0,4 s y arrastra.
+var AG_SNAP_MIN = 15;
+(function(){
+  if(window._agDragInit) return; window._agDragInit = true;
+  var S = null, bloqueoClick = 0, lpTimer = null, scrollTimer = null;
+  function agDragLimpiar(){
+    clearTimeout(lpTimer); clearInterval(scrollTimer); lpTimer=null; scrollTimer=null;
+    document.body.classList.remove('agg-dragging');
+    var t=document.getElementById('agg-dtip'); if(t) t.remove();
+    if(S && S.el){ S.el.classList.remove('arrastrando'); S.el.style.transform=''; }
+    S=null; window._agDragActivo=false;
+  }
+  function colEn(x){
+    var cols=[].slice.call(document.querySelectorAll('.agg-col')); if(!cols.length) return null;
+    var elegido=cols[0];
+    cols.forEach(function(c){ var r=c.getBoundingClientRect(); if(x>=r.left) elegido=c; });
+    return elegido;
+  }
+  function calcular(cx,cy){
+    var sc=S.scroller, dy=(cy-S.y0)+(sc?sc.scrollTop-S.scroll0:0);
+    var mins=Math.round(dy/AG_PX_HORA*60/AG_SNAP_MIN)*AG_SNAP_MIN;
+    var nuevo=S.minIni+mins;
+    if(nuevo<0) nuevo=0; if(nuevo>24*60-S.dur) nuevo=24*60-S.dur;
+    var col=colEn(cx); if(!col) col=S.col0;
+    var cr=col.getBoundingClientRect(), c0=S.col0.getBoundingClientRect();
+    return {min:nuevo, col:col, dx:cr.left-c0.left, dyPx:(nuevo-S.minIni)*AG_PX_HORA/60 - 0};
+  }
+  function hh(min){ var h=Math.floor(min/60), mi=min%60; return (h%12===0?12:h%12)+':'+agPad2(mi)+' '+(h<12?'a. m.':'p. m.'); }
+  function mover(cx,cy){
+    var c=calcular(cx,cy); S.ult=c;
+    S.el.style.transform='translate('+c.dx+'px,'+c.dyPx+'px)';
+    var t=document.getElementById('agg-dtip');
+    if(!t){ t=document.createElement('div'); t.id='agg-dtip'; t.className='agg-dtip'; document.body.appendChild(t); }
+    t.textContent=hh(c.min)+' – '+hh(c.min+S.dur);
+    t.style.left=(cx+14)+'px'; t.style.top=(cy-34)+'px';
+  }
+  function activar(cx,cy){
+    if(!S||S.activo) return; S.activo=true; window._agDragActivo=true;
+    S.el.classList.add('arrastrando'); document.body.classList.add('agg-dragging');
+    clearInterval(scrollTimer);
+    scrollTimer=setInterval(function(){
+      if(!S||!S.activo||!S.scroller) return;
+      var r=S.scroller.getBoundingClientRect(), y=S.cy;
+      if(y<r.top+60) S.scroller.scrollTop-=14; else if(y>r.bottom-40) S.scroller.scrollTop+=14; else return;
+      mover(S.cx,S.cy);
+    },30);
+    mover(cx,cy);
+  }
+  function deshacer(id,ini,fin){
+    var e=agEventos.filter(function(x){return x.id===id;})[0]; if(!e) return;
+    e.inicio=ini; e.fin=fin; agGuardar(); window._agDragActivo=false; renderAgenda();
+    var u=document.getElementById('agg-undo'); if(u) u.remove();
+  }
+  function aviso(id,ini,fin,texto){
+    var u=document.getElementById('agg-undo'); if(u) u.remove();
+    u=document.createElement('div'); u.id='agg-undo'; u.className='agg-undo';
+    var s=document.createElement('span'); s.textContent=texto; u.appendChild(s);
+    var b=document.createElement('button'); b.type='button'; b.textContent='Deshacer';
+    b.onclick=function(){ deshacer(id,ini,fin); }; u.appendChild(b);
+    document.body.appendChild(u);
+    setTimeout(function(){ var x=document.getElementById('agg-undo'); if(x===u) u.remove(); },8000);
+  }
+  function soltar(){
+    var s=S; if(!s) return;
+    var activo=s.activo, c=s.ult;
+    agDragLimpiar();
+    if(!activo) return;
+    bloqueoClick=Date.now();
+    if(!c) return;
+    var e=agEventos.filter(function(x){return x.id===s.id;})[0]; if(!e) return;
+    var ymd=c.col.getAttribute('data-ymd'); if(!ymd) return;
+    var ini=ymd+'T'+agPad2(Math.floor(c.min/60))+':'+agPad2(c.min%60);
+    if(ini===s.iniOrig) return;                      // no cambió nada
+    var f=c.min+s.dur;
+    var fin=ymd+'T'+agPad2(Math.floor(f/60)%24)+':'+agPad2(f%60);
+    var finOrig=e.fin;
+    e.inicio=ini; e.fin=fin; agGuardar(); renderAgenda();
+    aviso(s.id,s.iniOrig,finOrig,'Cita movida a '+hh(c.min)+(ymd!==s.iniOrig.slice(0,10)?' · '+ymd.split('-').reverse().join('/'):''));
+  }
+  document.addEventListener('pointerdown',function(ev){
+    if(ev.button!==undefined && ev.button!==0) return;
+    var el=ev.target.closest && ev.target.closest('.agg-ev'); if(!el) return;
+    if(S) agDragLimpiar();
+    var id=el.getAttribute('data-id'); var e=agEventos.filter(function(x){return x.id===id;})[0]; if(!e) return;
+    var ini=new Date(e.inicio); if(isNaN(ini)) return;
+    var fin=e.fin ? new Date(e.fin) : null;
+    if(fin && !isNaN(fin) && !agMismoDia(ini,fin)) return;   // citas que cruzan de día: solo editar
+    var dur=(fin && !isNaN(fin)) ? Math.max(5,Math.round((fin-ini)/60000)) : 50;
+    var col=el.closest('.agg-col'); if(!col) return;
+    S={el:el,id:id,x0:ev.clientX,y0:ev.clientY,cx:ev.clientX,cy:ev.clientY,tipo:ev.pointerType,
+       minIni:ini.getHours()*60+ini.getMinutes(),dur:dur,iniOrig:e.inicio,col0:col,
+       scroller:el.closest('.agg-scroll'),activo:false,ult:null};
+    S.scroll0=S.scroller?S.scroller.scrollTop:0;
+    if(ev.pointerType!=='mouse'){
+      lpTimer=setTimeout(function(){ if(S && !S.activo){ if(navigator.vibrate) try{navigator.vibrate(15);}catch(x){} activar(S.cx,S.cy); } },400);
+    }
+  },true);
+  document.addEventListener('pointermove',function(ev){
+    if(!S) return;
+    S.cx=ev.clientX; S.cy=ev.clientY;
+    if(!S.activo){
+      var d=Math.hypot(ev.clientX-S.x0,ev.clientY-S.y0);
+      if(S.tipo==='mouse'){ if(d>4) activar(ev.clientX,ev.clientY); }
+      else if(d>8){ agDragLimpiar(); }                 // en táctil, moverse antes de 0,4 s = desplazar la pantalla
+      return;
+    }
+    ev.preventDefault();
+    mover(ev.clientX,ev.clientY);
+  },true);
+  document.addEventListener('pointerup',function(){ soltar(); },true);
+  document.addEventListener('pointercancel',function(){ if(S && S.activo){ agDragLimpiar(); } else if(S){ agDragLimpiar(); } },true);
+  document.addEventListener('touchmove',function(ev){ if(S && S.activo && ev.cancelable) ev.preventDefault(); },{passive:false,capture:true});
+  document.addEventListener('contextmenu',function(ev){ if(S && S.activo) ev.preventDefault(); },true);
+  // Evita que soltar la cita abra la edición o una cita nueva
+  document.addEventListener('click',function(ev){
+    if(Date.now()-bloqueoClick<400){ ev.stopPropagation(); ev.preventDefault(); }
+  },true);
+})();
 
 // ---- Ventana "Nueva cita" ----
 function agGCerrarModal(){ var m = document.getElementById('agg-modal'); if(m) m.remove(); }
