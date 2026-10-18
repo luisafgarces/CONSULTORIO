@@ -7597,16 +7597,27 @@ function sesBorrarTranscripcion(silencioso){
   if(!silencioso) toast('🗑 Transcripción borrada');
 }
 function _sesExtraerJSON(texto){
-  var i=texto.indexOf('{'); if(i<0) return null;
-  var depth=0, enStr=false, esc=false;
-  for(var k=i;k<texto.length;k++){
-    var c=texto[k];
-    if(enStr){ if(esc) esc=false; else if(c==='\\') esc=true; else if(c==='"') enStr=false; continue; }
-    if(c==='"') enStr=true;
-    else if(c==='{') depth++;
-    else if(c==='}'){ depth--; if(depth===0) return {json:texto.slice(i,k+1), resto:texto.slice(k+1)}; }
+  // Prueba cada llave de apertura hasta encontrar un bloque que sea JSON válido con los campos de la sesión.
+  var desde=0;
+  while(true){
+    var i=texto.indexOf('{',desde); if(i<0) return null;
+    var depth=0, enStr=false, esc=false, fin=-1;
+    for(var k=i;k<texto.length;k++){
+      var c=texto[k];
+      if(enStr){ if(esc) esc=false; else if(c==='\\') esc=true; else if(c==='"') enStr=false; continue; }
+      if(c==='"') enStr=true;
+      else if(c==='{') depth++;
+      else if(c==='}'){ depth--; if(depth===0){ fin=k; break; } }
+    }
+    if(fin>0){
+      var cand=texto.slice(i,fin+1);
+      try{
+        var obj=JSON.parse(cand);
+        if(obj && typeof obj==='object' && ('temas' in obj || 'eventos' in obj || 'tecnicas' in obj)) return {json:cand, obj:obj, resto:texto.slice(fin+1)};
+      }catch(e){}
+    }
+    desde=i+1;
   }
-  return null;
 }
 async function sesAnalizarTranscripcion(){
   var msg=document.getElementById('ses-import-msg'), retro=document.getElementById('ses-import-retro');
@@ -7624,7 +7635,7 @@ async function sesAnalizarTranscripcion(){
     var r=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST', signal:ctrl.signal,
       headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
-      body:JSON.stringify({model:SES_IA_MODELO,max_tokens:6000,messages:[{role:'user',content:_sesArmarPrompt(trans)}]})
+      body:JSON.stringify({model:SES_IA_MODELO,max_tokens:16000,messages:[{role:'user',content:_sesArmarPrompt(trans)}]})
     });
     if(!r.ok){
       var detalle=''; try{ var ej=await r.json(); detalle=(ej.error&&ej.error.message)||''; }catch(e){}
@@ -7637,8 +7648,16 @@ async function sesAnalizarTranscripcion(){
     var data=await r.json();
     var texto=(data.content||[]).map(function(b){return b.text||'';}).join('\n');
     var ex=_sesExtraerJSON(texto);
-    if(!ex){ err('La IA respondió, pero no en el formato esperado. Intenta de nuevo.'); return; }
-    var d; try{ d=JSON.parse(ex.json); }catch(e){ err('La respuesta venía incompleta. Intenta de nuevo.'); return; }
+    if(!ex){
+      var motivo = data.stop_reason==='max_tokens' ? 'La respuesta se cortó por ser muy larga.'
+                 : data.stop_reason==='refusal' ? 'La IA no quiso procesar este contenido.'
+                 : 'La IA respondió, pero no en el formato esperado.';
+      var vista=(texto||'(respuesta vacía)').slice(0,500).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+      msg.innerHTML='<span style="color:#c0392b">'+motivo+' Intenta de nuevo.</span>'
+        +'<details style="margin-top:6px"><summary style="cursor:pointer">Ver qué respondió la IA (motivo: '+(data.stop_reason||'?')+')</summary><pre style="white-space:pre-wrap;font-size:.7rem">'+vista+'</pre></details>';
+      return;
+    }
+    var d=ex.obj;
     _sesAplicarDatos(d);
     var fb=(ex.resto||'').replace(/```[a-z]*/gi,'').trim();
     if(fb && retro){ retro.style.display='block'; retro.textContent=fb; }
