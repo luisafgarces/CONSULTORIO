@@ -1,0 +1,14 @@
+{
+  "name": "Agenda · Suite Clínica",
+  "short_name": "Agenda",
+  "id": "./",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#fbf1e8",
+  "theme_color": "#cd8e9d",
+  "icons": [
+    {"src": "agenda-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "agenda-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"}
+  ]
+}
