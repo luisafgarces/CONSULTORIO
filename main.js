@@ -7432,7 +7432,38 @@ function _sesNorm(t){ return String(t==null?'':t).normalize('NFD').replace(/[̀-
 function _sesOpciones(sel){
   var v=[]; document.querySelectorAll(sel).forEach(function(c){ if(v.indexOf(c.value)<0) v.push(c.value); }); return v;
 }
+function _sesHistorialTexto(){
+  // Sesiones ya guardadas de la paciente seleccionada (sin su nombre), de la más antigua a la más reciente.
+  try{
+    var pid=document.getElementById('ses-sel-pac').value; if(!pid) return '';
+    var todas=(DB.get('sesiones_'+pid)||[]).filter(function(s){ return s && s.tipo!=='cancelacion' && s.id!==currentSesionId; });
+    todas.sort(function(a,b){ return String(a.fecha||'').localeCompare(String(b.fecha||'')); });
+    var ult=todas.slice(-8);
+    function cut(t,n){ t=String(t||'').replace(/\s+/g,' ').trim(); return t.length>n ? t.slice(0,n)+'…' : t; }
+    return ult.map(function(s){
+      var dc=Object.keys(s.dcSesion||{}).filter(function(k){return k!=='__no_aplica';}).map(function(k){
+        var d=DISTORSIONES.filter(function(x){return x.id===k;})[0]; return (d?d.name:k)+(s.dcSesion[k].nivel?' ('+s.dcSesion[k].nivel+')':'');
+      }).join(', ');
+      var L=['SESIÓN N° '+(s.num||'?')+' — '+(s.fecha||'sin fecha')+' — tipo: '+(s.tipo||'sesion')];
+      if(s.estado!=null && s.estado!=='') L.push('Estado emocional al inicio: '+s.estado+'/10');
+      if((s.humores||[]).length) L.push('Humor: '+s.humores.join(', '));
+      if(s.eventos) L.push('Eventos: '+cut(s.eventos,500));
+      if(s.temas) L.push('Temas: '+cut(s.temas,500));
+      if((s.tecnicas||[]).length) L.push('Técnicas: '+s.tecnicas.join(', '));
+      if(s.pensamiento) L.push('Pensamiento automático: '+cut(s.pensamiento,250));
+      if(dc) L.push('Distorsiones: '+dc);
+      if((s.riesgos||[]).length) L.push('Riesgos: '+s.riesgos.join(', '));
+      if((s.recursos||[]).length) L.push('Recursos: '+s.recursos.join(', '));
+      if(s.tarea) L.push('Tarea asignada: '+cut(s.tarea,300));
+      if(s.acuerdos) L.push('Acuerdos: '+cut(s.acuerdos,300));
+      if(s.ajustes) L.push('Ajustes terapéuticos: '+cut(s.ajustes,300));
+      if(s.notasPriv) L.push('Notas confidenciales: '+cut(s.notasPriv,700));
+      return L.join('\n');
+    }).join('\n\n');
+  }catch(e){ return ''; }
+}
 function _sesArmarPrompt(transcripcion){
+  var historial=_sesHistorialTexto();
   var tec=_sesOpciones('input[name=tecnica]');
   var tc=_sesOpciones('#ses-tareas-check input[type=checkbox]');
   var rie=_sesOpciones('input[name=riesgo]');
@@ -7458,7 +7489,7 @@ function _sesArmarPrompt(transcripcion){
 '- acuerdos: primera persona del plural, concreto ("Quedamos en vernos el [fecha]. Ahí revisaremos cómo te fue con…, cómo quedó…"). Si no hay fecha, no la inventes.',
 '- avances: SEGUNDA PERSONA dirigida al paciente usando SOLO su primer nombre al inicio ("[Nombre], en medio de…"), basada en fortalezas y logros observables, reconociendo decisiones tomadas desde el autocuidado. Sin diagnósticos.',
 '- ajustes: lenguaje clínico, tercera persona ("La paciente muestra…, mantiene…. Se sugiere continuar priorizando… antes de retomar…").',
-'- notasConfidenciales: solo para mí, tercera persona clínica, párrafos separados por tema (cuadro familiar/médico, avance del trabajo, riesgo e indagación de ideación, decisiones pendientes) y cierra SIEMPRE con una línea que empiece por "Plan:" con los seguimientos para la próxima sesión.',
+'- notasConfidenciales: solo para mí, tercera persona clínica, párrafos separados por tema (cuadro familiar/médico, avance del trabajo, comparación con sesiones anteriores, riesgo e indagación de ideación, decisiones pendientes). Cierra SIEMPRE con estos DOS bloques, en este orden y con estos títulos exactos: (1) "Valoración de mi intervención:" — evaluación OBJETIVA y honesta de lo que hice yo como terapeuta en esta transcripción, basada en evidencia concreta de lo que se dijo (qué funcionó, y qué mejorar: por ejemplo adherencia al plan y a la estructura TCC, calidad de las preguntas y del cuestionamiento guiado, equilibrio entre validar y reestructurar, oportunidades que dejé pasar, manejo del tiempo, indagación de riesgo, claridad de la tarea). No me halagues ni suavices: incluye siempre al menos dos aspectos concretos a mejorar con una sugerencia de cómo. Aclara que solo ves el texto, no el tono ni lo no verbal. (2) "Sugerencias para la próxima sesión:" — lista corta y concreta (objetivos, técnicas a priorizar, temas a retomar, riesgos a indagar, tarea a revisar), incluyendo el seguimiento pendiente (lo que antes iba en \"Plan:\").',
 '- Género y trato: infiere el género del paciente por la transcripción para concordar ("la paciente"/"el paciente"). Nunca uses el apellido ni datos de contacto.',
 '- Estructura de la PARTE 2 (retroalimentación para mí), siempre con estos 4 encabezados cortos: "Lo que salió bien", "Qué reforzar", "Riesgos a vigilar", "Para explorar la próxima sesión".',
 '',
@@ -7477,6 +7508,8 @@ function _sesArmarPrompt(transcripcion){
 '{"fecha":"AAAA-MM-DD","duracion":null,"tipo":"sesion","estado":null,"humores":[],"humorOtro":"","eventos":"","tareaRevision":"","dificultadesTarea":"","temas":"","tecnicas":[],"inter":"","pensamiento":"","distorsiones":[],"tareasCheck":[],"tarea":"","acuerdos":"","avances":"","riesgos":[],"recursos":[],"ajustes":"","tests":[],"notasConfidenciales":"","porCompletar":[]}',
 '',
 'Significado de cada campo: estado = estado emocional al inicio 1–10 (solo si el paciente lo dijo; si no, null); eventos = eventos relevantes desde la última sesión; inter = intervenciones y descripciones adicionales; pensamiento = pensamiento automático clave; tarea = tarea específica acordada; acuerdos = acuerdos y objetivos para la próxima sesión; avances = avances y observaciones (al paciente); ajustes = ajustes terapéuticos; notasConfidenciales = solo para mí, no va al resumen del paciente.',
+'',
+historial ? ('HISTORIAL DE SESIONES ANTERIORES DE ESTE PACIENTE (solo para contexto; úsalo para detectar progresos, retrocesos, patrones que se repiten, riesgos que cambian, tareas pendientes de sesiones previas y cosas importantes que conviene retomar; no copies su contenido en los campos de hoy). Refleja esa comparación en "avances" (solo logros y progreso, dirigido al paciente), en "ajustes" y en "notasConfidenciales" (aquí también retrocesos y alertas). Si el historial es insuficiente para comparar, dilo en lugar de suponer:\n\n'+historial+'\n') : 'HISTORIAL: no hay sesiones anteriores guardadas para este paciente; no hagas comparaciones.',
 '',
 'TRANSCRIPCIÓN:',
 transcripcion ? transcripcion : '[pega aquí la transcripción]'
@@ -7627,7 +7660,7 @@ async function sesAnalizarTranscripcion(){
   if(trans.length<200){ err('Pega primero la transcripción completa de la sesión.'); return; }
   var key=_sesClaveIA();
   if(!key){ err('Falta la clave de IA de este dispositivo. Toca “🔑 Clave de IA”.'); return; }
-  if(!confirm('Se enviará la transcripción a Anthropic para analizarla y llenar el formulario. Confirma que la paciente autorizó este uso y que quitaste su nombre completo y datos de contacto. ¿Continuar?')) return;
+  if(!confirm('Se enviará a Anthropic la transcripción y un resumen de las sesiones anteriores de esta paciente (sin su nombre) para analizarla y llenar el formulario. Confirma que la paciente autorizó este uso y que quitaste su nombre completo y datos de contacto. ¿Continuar?')) return;
   if(retro){ retro.style.display='none'; retro.textContent=''; }
   btn.disabled=true; var etq=btn.textContent; btn.textContent='⏳ Analizando… (puede tardar 1–2 min)'; msg.textContent='';
   var ctrl=new AbortController(); var to=setTimeout(function(){ ctrl.abort(); },180000);
