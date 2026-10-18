@@ -13,11 +13,35 @@ function fechaBogota(ahoraMs, dias) {
   return d.toISOString().slice(0, 10);
 }
 
-// Citas (no administrativas) de una fecha. `inicio` viene como hora local "YYYY-MM-DDTHH:MM[:SS]".
+// Citas (no administrativas, solo del calendario Consultorio) de una fecha. `inicio` viene como hora local "YYYY-MM-DDTHH:MM[:SS]".
 function citasDelDia(eventos, fecha) {
   return (Array.isArray(eventos) ? eventos : [])
-    .filter(e => e && typeof e.inicio === 'string' && e.tipo !== 'admin' && e.inicio.slice(0, 10) === fecha)
+    .filter(e => e && typeof e.inicio === 'string' && e.tipo !== 'admin' && (!e.calendario || e.calendario === 'consultorio') && e.inicio.slice(0, 10) === fecha)
     .sort((a, b) => a.inicio.localeCompare(b.inicio));
+}
+
+// Todos los eventos de una fecha (de cualquier calendario), ordenados por hora.
+function eventosDelDia(eventos, fecha) {
+  return (Array.isArray(eventos) ? eventos : [])
+    .filter(e => e && typeof e.inicio === 'string' && e.inicio.slice(0, 10) === fecha)
+    .sort((a, b) => a.inicio.localeCompare(b.inicio));
+}
+
+// Resumen de la mañana: la hora de cada evento del día. Por confidencialidad,
+// los eventos del calendario Consultorio salen como "Cita" (sin nombre del
+// paciente); los de otros calendarios (Personal, CONMOVILIDAD...) muestran su título.
+function etiquetaEvento(e) {
+  if (e.calendario && e.calendario !== 'consultorio') return String(e.titulo || 'Evento').slice(0, 40);
+  return e.tipo === 'admin' ? 'Evento' : 'Cita';
+}
+
+function armarMensajeAgendaHoy(eventos) {
+  const n = eventos.length;
+  if (!n) return null;
+  const MAX = 6;
+  const lineas = eventos.slice(0, MAX).map(e => horaTexto(e.inicio) + ' \u00b7 ' + etiquetaEvento(e));
+  if (n > MAX) lineas.push('\u2026 y ' + (n - MAX) + ' m\u00e1s');
+  return { titulo: 'Tu agenda de hoy', cuerpo: lineas.join('\n') };
 }
 
 function horaTexto(inicio) {
@@ -40,8 +64,113 @@ function armarMensaje(modo, citas) {
   return { titulo: 'Suite Clínica', cuerpo };
 }
 
+// ---- Alarmas por cita (MODO=alarmas) ----------------------------------------
+// Cada cita puede traer `alarma` = minutos antes del inicio (0 = sin alarma).
+// Si el campo no existe (citas viejas), las citas de pacientes del calendario
+// Consultorio tienen alarma de 30 min; las demás, ninguna.
+const ALARMA_DEFECTO_MIN = 30;
+
+function esCitaConsultorio(e) {
+  return e.tipo !== 'admin' && (!e.calendario || e.calendario === 'consultorio');
+}
+
+function alarmaMinutos(e) {
+  if (e.alarma === undefined || e.alarma === null) return esCitaConsultorio(e) ? ALARMA_DEFECTO_MIN : 0;
+  const n = Number(e.alarma);
+  return Number.isFinite(n) && n > 0 ? n : 0;
+}
+
+// "YYYY-MM-DDTHH:MM" en hora de Colombia -> milisegundos UTC
+function inicioUtcMs(inicio) {
+  const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(inicio || '');
+  if (!m) return null;
+  return Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4] - ZONA_OFFSET_HORAS, +m[5]);
+}
+
+// Citas cuya alarma ya debió sonar y que todavía no han empezado
+function alarmasPendientes(eventos, ahoraMs) {
+  return (Array.isArray(eventos) ? eventos : [])
+    .filter(e => e && typeof e.inicio === 'string')
+    .map(e => ({ e, ini: inicioUtcMs(e.inicio), min: alarmaMinutos(e) }))
+    .filter(x => x.ini !== null && x.min > 0 && (x.ini - x.min * 60000) <= ahoraMs && ahoraMs < x.ini)
+    .sort((a, b) => a.ini - b.ini);
+}
+
+function textoRestante(min) {
+  if (min >= 1440) return Math.round(min / 1440) + ' d\u00eda' + (Math.round(min / 1440) > 1 ? 's' : '');
+  if (min >= 60) { const h = Math.floor(min / 60), r = min % 60; return h + ' h' + (r ? ' ' + r + ' min' : ''); }
+  return min + ' min';
+}
+
+// Texto genérico: sin nombres de pacientes ni motivos.
+function mensajeAlarma(pend, ahoraMs) {
+  const n = pend.length, primero = pend[0];
+  const restante = Math.max(1, Math.round((primero.ini - ahoraMs) / 60000));
+  const todasCitas = pend.every(x => esCitaConsultorio(x.e));
+  const hora = horaTexto(primero.e.inicio);
+  let cuerpo;
+  if (n === 1) cuerpo = 'Tienes ' + (todasCitas ? 'una cita' : 'un evento') + ' en ' + textoRestante(restante) + ', a las ' + hora;
+  else cuerpo = 'Tienes ' + n + ' ' + (todasCitas ? 'citas' : 'eventos') + ' pr\u00f3ximos. ' + (todasCitas ? 'La primera' : 'El primero') + ' es a las ' + hora;
+  if (!cuerpo.endsWith('.')) cuerpo += '.';
+  return { titulo: 'Suite Cl\u00ednica', cuerpo };
+}
+
+function idMarcaAlarma(e) {
+  return 'alarma_' + String(e.id + '_' + e.inicio.slice(0, 16)).replace(/[^A-Za-z0-9_-]/g, '_');
+}
+
+async function mainAlarmas() {
+  const crudo = process.env.FIREBASE_SERVICE_ACCOUNT;
+  if (!crudo) throw new Error('Falta el secreto FIREBASE_SERVICE_ACCOUNT');
+  const admin = require('firebase-admin');
+  admin.initializeApp({ credential: admin.credential.cert(JSON.parse(crudo)) });
+  const db = admin.firestore();
+
+  const ahora = Date.now();
+  const doc = await db.collection('suitedata').doc('agenda_eventos').get();
+  const eventos = doc.exists ? doc.data().value : [];
+  const candidatas = alarmasPendientes(eventos, ahora);
+  if (!candidatas.length) { console.log('Sin alarmas pendientes.'); return; }
+
+  // Descarta las que ya se avisaron
+  const marcas = candidatas.map(x => db.collection('notificaciones_estado').doc(idMarcaAlarma(x.e)));
+  const existentes = await Promise.all(marcas.map(m => m.get()));
+  const pend = candidatas.filter((x, i) => !existentes[i].exists);
+  if (!pend.length) { console.log('Alarmas ya enviadas.'); return; }
+
+  const snap = await db.collection('dispositivos_notificaciones').get();
+  const tokens = snap.docs.map(d => d.id);
+  if (!tokens.length) { console.log('No hay dispositivos registrados.'); return; }
+
+  const msg = mensajeAlarma(pend, ahora);
+  const resp = await admin.messaging().sendEachForMulticast({
+    tokens,
+    notification: { title: msg.titulo, body: msg.cuerpo },
+    webpush: {
+      notification: { icon: URL_APP + 'icon-192.png', badge: URL_APP + 'icon-192.png', tag: 'alarma-' + pend[0].e.id },
+      fcmOptions: { link: URL_APP }
+    }
+  });
+
+  const borrar = [];
+  resp.responses.forEach((r, i) => {
+    const c = r.error && r.error.code;
+    if (c === 'messaging/registration-token-not-registered' || c === 'messaging/invalid-registration-token') borrar.push(tokens[i]);
+  });
+  await Promise.all(borrar.map(t => db.collection('dispositivos_notificaciones').doc(t).delete()));
+
+  console.log('Alarmas:', pend.length, '\u00b7 Enviadas:', resp.successCount, '\u00b7 Fallidas:', resp.failureCount, '\u00b7 Limpiadas:', borrar.length);
+  if (resp.successCount > 0) {
+    const iso = new Date().toISOString();
+    await Promise.all(pend.map(x => db.collection('notificaciones_estado').doc(idMarcaAlarma(x.e)).set({ enviado: iso })));
+  } else {
+    process.exitCode = 1;
+  }
+}
+
 async function main() {
   const modo = (process.env.MODO || 'anterior').toLowerCase();
+  if (modo === 'alarmas') return mainAlarmas();
   if (modo !== 'anterior' && modo !== 'hoy') throw new Error('MODO inválido: ' + modo);
   const crudo = process.env.FIREBASE_SERVICE_ACCOUNT;
   if (!crudo) throw new Error('Falta el secreto FIREBASE_SERVICE_ACCOUNT');
@@ -56,7 +185,9 @@ async function main() {
 
   const doc = await db.collection('suitedata').doc('agenda_eventos').get();
   const eventos = doc.exists ? doc.data().value : [];
-  const msg = armarMensaje(modo, citasDelDia(eventos, fechaObjetivo));
+  const msg = modo === 'hoy'
+    ? armarMensajeAgendaHoy(eventosDelDia(eventos, fechaObjetivo))
+    : armarMensaje(modo, citasDelDia(eventos, fechaObjetivo));
   if (!msg) { console.log('Sin citas para', fechaObjetivo, '— no se envía nada.'); return; }
 
   const snap = await db.collection('dispositivos_notificaciones').get();
@@ -85,7 +216,7 @@ async function main() {
   if (resp.successCount === 0) process.exitCode = 1;
 }
 
-module.exports = { fechaBogota, citasDelDia, horaTexto, armarMensaje };
+module.exports = { fechaBogota, citasDelDia, eventosDelDia, armarMensajeAgendaHoy, horaTexto, armarMensaje, alarmaMinutos, inicioUtcMs, alarmasPendientes, mensajeAlarma, idMarcaAlarma };
 
 if (require.main === module) {
   main().catch(e => { console.error('Error:', e && e.message ? e.message : e); process.exit(1); });
