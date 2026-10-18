@@ -1405,6 +1405,7 @@ function guardarCorreccion(sesionId, pid){
 // checkboxes, radios), sin tocar la visibilidad del formulario. Se usa
 // tanto al empezar una sesión nueva como al terminar de guardar una.
 function limpiarCamposFormSesion(){
+  try{ var _t=document.getElementById('ses-trans'); if(_t) _t.value=''; var _j=document.getElementById('ses-import-json'); if(_j) _j.value=''; sesLimpiarAvisoImport(); }catch(e){}
   ['ses-plan','ses-temas','ses-inter','ses-avances','ses-tarea','ses-acuerdos','ses-notas-priv','ses-eventos','ses-dif-tarea','ses-pensamiento','ses-ajustes'].forEach(id=>{
     var el = document.getElementById(id); if(el) el.value='';
   });
@@ -7472,10 +7473,7 @@ function _sesArmarPrompt(transcripcion){
   var hum=_sesOpciones('#ses-humores input[name=humor]');
   var dc=DISTORSIONES.map(function(d){return d.name;});
   var P=[
-'Analiza la transcripción de sesión que pego a continuación y llena el formulario de notas de sesión de mi consultorio (psicología clínica, enfoque TCC). Responde con DOS partes:',
-'',
-'PARTE 1 — Un único bloque de código JSON (sin texto adentro) con exactamente estas claves.',
-'PARTE 2 — Debajo, tu retroalimentación breve para mí como terapeuta (qué salió bien, qué reforzar, riesgos a vigilar, qué explorar en la próxima sesión).',
+'Analiza la transcripción de sesión que pego a continuación y llena el formulario de notas de sesión de mi consultorio (psicología clínica, enfoque TCC). Responde ÚNICAMENTE con un bloque de código JSON (sin texto antes ni después) con exactamente estas claves. No escribas retroalimentación aparte: la valoración y las sugerencias van dentro de "notasConfidenciales".',
 '',
 'REGLAS: (a) No inventes nada: si un dato no está en la transcripción, deja "" (o null en números) y anótalo en "porCompletar". (b) Usa SOLO las opciones permitidas, escritas igual. (c) No incluyas nombres completos, cédulas, teléfonos ni direcciones. (d) RESPETA SIEMPRE el estilo y la estructura descritos en "ESTILO OBLIGATORIO"; no cambies de registro entre campos. (e) Propones hipótesis y yo decido: no pongas diagnósticos como hechos. (f) Si hay cualquier mención de ideación suicida, autolesión o riesgo, regístralo en "riesgos" y en "notasConfidenciales".',
 '',
@@ -7491,7 +7489,6 @@ function _sesArmarPrompt(transcripcion){
 '- ajustes: lenguaje clínico, tercera persona ("La paciente muestra…, mantiene…. Se sugiere continuar priorizando… antes de retomar…").',
 '- notasConfidenciales: solo para mí, tercera persona clínica, párrafos separados por tema (cuadro familiar/médico, avance del trabajo, comparación con sesiones anteriores, riesgo e indagación de ideación, decisiones pendientes). Cierra SIEMPRE con estos DOS bloques, en este orden y con estos títulos exactos: (1) "Valoración de mi intervención:" — evaluación OBJETIVA y honesta de lo que hice yo como terapeuta en esta transcripción, basada en evidencia concreta de lo que se dijo (qué funcionó, y qué mejorar: por ejemplo adherencia al plan y a la estructura TCC, calidad de las preguntas y del cuestionamiento guiado, equilibrio entre validar y reestructurar, oportunidades que dejé pasar, manejo del tiempo, indagación de riesgo, claridad de la tarea). No me halagues ni suavices: incluye siempre al menos dos aspectos concretos a mejorar con una sugerencia de cómo. Aclara que solo ves el texto, no el tono ni lo no verbal. (2) "Sugerencias para la próxima sesión:" — lista corta y concreta (objetivos, técnicas a priorizar, temas a retomar, riesgos a indagar, tarea a revisar), incluyendo el seguimiento pendiente (lo que antes iba en \"Plan:\").',
 '- Género y trato: infiere el género del paciente por la transcripción para concordar ("la paciente"/"el paciente"). Nunca uses el apellido ni datos de contacto.',
-'- Estructura de la PARTE 2 (retroalimentación para mí), siempre con estos 4 encabezados cortos: "Lo que salió bien", "Qué reforzar", "Riesgos a vigilar", "Para explorar la próxima sesión".',
 '',
 'OPCIONES PERMITIDAS',
 '- tipo: sesion | evaluacion | cierre',
@@ -7625,9 +7622,15 @@ function sesConfigurarClaveIA(){
     localStorage.setItem('ses_ia_key',k); toast('🔑 Clave guardada en este dispositivo');
   }catch(e){ toast('No se pudo guardar la clave en este navegador'); }
 }
+function sesLimpiarAvisoImport(){
+  var m=document.getElementById('ses-import-msg'); if(m) m.innerHTML='';
+  var r=document.getElementById('ses-import-retro'); if(r){ r.style.display='none'; r.textContent=''; }
+}
 function sesBorrarTranscripcion(silencioso){
   var t=document.getElementById('ses-trans'); if(t) t.value='';
-  if(!silencioso) toast('🗑 Transcripción borrada');
+  // Al borrar a mano, también se borra el aviso "Por completar tú" (puede mencionar datos de la paciente).
+  // El borrado automático tras analizar lo deja visible para que alcances a leerlo.
+  if(!silencioso){ sesLimpiarAvisoImport(); toast('🗑 Transcripción borrada'); }
 }
 function _sesExtraerJSON(texto){
   // Prueba cada llave de apertura hasta encontrar un bloque que sea JSON válido con los campos de la sesión.
@@ -7692,8 +7695,6 @@ async function sesAnalizarTranscripcion(){
     }
     var d=ex.obj;
     _sesAplicarDatos(d);
-    var fb=(ex.resto||'').replace(/```[a-z]*/gi,'').trim();
-    if(fb && retro){ retro.style.display='block'; retro.textContent=fb; }
     var borrar=document.getElementById('ses-trans-autoborrar');
     if(borrar && borrar.checked) sesBorrarTranscripcion(true);
   }catch(e){
