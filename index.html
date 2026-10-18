@@ -625,6 +625,33 @@ html.modo-agenda #ag-app-extra { display:flex; position:fixed; left:8px; bottom:
           <textarea id="ses-plan" placeholder="¿Qué planeas trabajar hoy? Objetivos, técnicas a usar, temas pendientes de la sesión anterior..." style="min-height:80px"></textarea>
         </div>
 
+        <!-- ANALIZAR TRANSCRIPCIÓN Y RELLENAR EL FORMULARIO -->
+        <details id="ses-import-wrap" style="margin-bottom:18px;background:#f4f9f6;border:1.5px solid #cfe6da;border-radius:10px;padding:4px 14px">
+          <summary style="cursor:pointer;padding:10px 0;font-weight:700;color:#3f7d5e;font-size:.85rem">📥 Pegar transcripción y rellenar el formulario con IA</summary>
+          <div style="padding-bottom:14px;font-size:.8rem;line-height:1.6;color:var(--text)">
+            <p style="margin:0 0 8px">Pega la transcripción, toca <b>Analizar y rellenar</b> y revisa cada campo antes de guardar. La IA propone, tú decides. La transcripción <b>no se guarda</b> en la app.</p>
+            <textarea id="ses-trans" placeholder="Pega aquí la transcripción de la sesión (sin nombre completo ni datos de contacto de la paciente)..." style="min-height:130px;font-size:.8rem"></textarea>
+            <label style="display:flex;align-items:center;gap:6px;margin:6px 0;font-size:.76rem"><input type="checkbox" id="ses-trans-autoborrar" checked> Borrar la transcripción automáticamente al terminar</label>
+            <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:6px">
+              <button type="button" class="btn primary" id="ses-analizar-btn" onclick="sesAnalizarTranscripcion()">✨ Analizar y rellenar</button>
+              <button type="button" class="btn" onclick="sesBorrarTranscripcion()">🗑 Borrar transcripción</button>
+              <button type="button" class="btn" onclick="sesConfigurarClaveIA()">🔑 Clave de IA</button>
+            </div>
+            <div id="ses-import-msg" style="margin-top:10px;font-size:.78rem;line-height:1.5"></div>
+            <div id="ses-import-retro" style="display:none;margin-top:10px;background:#fff;border:1.5px solid #cfe6da;border-radius:10px;padding:10px 12px;white-space:pre-wrap;font-size:.78rem;line-height:1.6"></div>
+            <details style="margin-top:12px"><summary style="cursor:pointer;font-size:.74rem;color:#6b8f7c">Alternativa sin clave: analizar en Claude y pegar el resultado</summary>
+              <div style="margin-top:8px">
+                <button type="button" class="btn" onclick="sesImportCopiarPrompt()">📋 Copiar instrucciones para Claude</button>
+                <textarea id="ses-import-json" placeholder="Pega aquí el bloque de datos que te devolvió Claude..." style="margin-top:8px;min-height:80px;font-family:monospace;font-size:.75rem"></textarea>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px">
+                  <button type="button" class="btn" onclick="sesImportRellenar()">✨ Rellenar formulario</button>
+                  <button type="button" class="btn" onclick="sesImportBorrar()">🗑 Borrar lo pegado</button>
+                </div>
+              </div>
+            </details>
+          </div>
+        </details>
+
         <!-- DATOS BÁSICOS -->
         <div class="row col3">
           <div class="fg"><label class="lbl">Fecha</label><input type="date" id="ses-fecha"></div>

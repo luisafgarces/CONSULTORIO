@@ -7423,3 +7423,230 @@ function habEliminarDocumento(){
   habCerrarModal();
   toast('Documento eliminado');
 }
+
+
+// ══════════ Rellenar la sesión desde el análisis de una transcripción ══════════
+// La transcripción NO entra a la app: Claude la analiza aparte y devuelve un bloque JSON,
+// que aquí solo se usa para rellenar el formulario. Todo queda para revisión antes de guardar.
+function _sesNorm(t){ return String(t==null?'':t).normalize('NFD').replace(/[̀-ͯ]/g,'').toLowerCase().replace(/\s+/g,' ').trim(); }
+function _sesOpciones(sel){
+  var v=[]; document.querySelectorAll(sel).forEach(function(c){ if(v.indexOf(c.value)<0) v.push(c.value); }); return v;
+}
+function _sesArmarPrompt(transcripcion){
+  var tec=_sesOpciones('input[name=tecnica]');
+  var tc=_sesOpciones('#ses-tareas-check input[type=checkbox]');
+  var rie=_sesOpciones('input[name=riesgo]');
+  var rec=_sesOpciones('input[name=recurso]');
+  var tests=_sesOpciones('#ses-tests-chk input[type=checkbox]').filter(function(x){return x!=='Otro';});
+  var hum=_sesOpciones('#ses-humores input[name=humor]');
+  var dc=DISTORSIONES.map(function(d){return d.name;});
+  var P=[
+'Analiza la transcripción de sesión que pego a continuación y llena el formulario de notas de sesión de mi consultorio (psicología clínica, enfoque TCC). Responde con DOS partes:',
+'',
+'PARTE 1 — Un único bloque de código JSON (sin texto adentro) con exactamente estas claves.',
+'PARTE 2 — Debajo, tu retroalimentación breve para mí como terapeuta (qué salió bien, qué reforzar, riesgos a vigilar, qué explorar en la próxima sesión).',
+'',
+'REGLAS: (a) No inventes nada: si un dato no está en la transcripción, deja "" (o null en números) y anótalo en "porCompletar". (b) Usa SOLO las opciones permitidas, escritas igual. (c) No incluyas nombres completos, cédulas, teléfonos ni direcciones. (d) RESPETA SIEMPRE el estilo y la estructura descritos en "ESTILO OBLIGATORIO"; no cambies de registro entre campos. (e) Propones hipótesis y yo decido: no pongas diagnósticos como hechos. (f) Si hay cualquier mención de ideación suicida, autolesión o riesgo, regístralo en "riesgos" y en "notasConfidenciales".',
+'',
+'ESTILO OBLIGATORIO (es el formato fijo de mis notas; no te salgas de él)',
+'- eventos: narrativa clínica en tercera persona, párrafo corrido, hechos concretos desde la última sesión (ej. tono: "Semana de alta exigencia familiar. Su hermano continúa hospitalizado… Presentó un episodio de tristeza intensa el día anterior…"). Usa "la paciente"/"el paciente" según corresponda.',
+'- dificultadesTarea: si hubo revisión de tarea, una línea que empiece por el estado y una raya (ej. "Parcial — la tarea de escritura no se trabajó como ejercicio formal, aunque el contenido emergió en sesión.") y, si se indagó ideación de muerte o autolesión, dilo ahí también.',
+'- temas: SEGUNDA PERSONA dirigida al paciente (tú), cálido, validante, en 3–5 párrafos cortos que arrancan con fórmulas como "Hoy hablamos de…", "Hablamos de un tema importante:…", "Retomamos…", "Y hablamos de que…". Incluye validación explícita ("lo que sientes no es exagerado…"). Sin tecnicismos.',
+'- inter: lenguaje clínico, voz impersonal con "Se…" ("Se brindó psicoeducación sobre…", "Se trabajó activamente…", "Se realizó ensayo conductual de…", "Se indagó explícitamente ideación de muerte o autolesión, con respuesta…"). Un párrafo por intervención.',
+'- pensamiento: frases textuales del paciente entre comillas, separadas por " / ".',
+'- tarea: SEGUNDA PERSONA, imperativo amable, con plazo ("Para estas dos semanas, practica… También te invito a… Y sigue sosteniendo…").',
+'- acuerdos: primera persona del plural, concreto ("Quedamos en vernos el [fecha]. Ahí revisaremos cómo te fue con…, cómo quedó…"). Si no hay fecha, no la inventes.',
+'- avances: SEGUNDA PERSONA dirigida al paciente usando SOLO su primer nombre al inicio ("[Nombre], en medio de…"), basada en fortalezas y logros observables, reconociendo decisiones tomadas desde el autocuidado. Sin diagnósticos.',
+'- ajustes: lenguaje clínico, tercera persona ("La paciente muestra…, mantiene…. Se sugiere continuar priorizando… antes de retomar…").',
+'- notasConfidenciales: solo para mí, tercera persona clínica, párrafos separados por tema (cuadro familiar/médico, avance del trabajo, riesgo e indagación de ideación, decisiones pendientes) y cierra SIEMPRE con una línea que empiece por "Plan:" con los seguimientos para la próxima sesión.',
+'- Género y trato: infiere el género del paciente por la transcripción para concordar ("la paciente"/"el paciente"). Nunca uses el apellido ni datos de contacto.',
+'- Estructura de la PARTE 2 (retroalimentación para mí), siempre con estos 4 encabezados cortos: "Lo que salió bien", "Qué reforzar", "Riesgos a vigilar", "Para explorar la próxima sesión".',
+'',
+'OPCIONES PERMITIDAS',
+'- tipo: sesion | evaluacion | cierre',
+'- humores: '+hum.join(' | ')+' (y "humorOtro" en texto libre si ninguno aplica)',
+'- tareaRevision: Completa | Parcial | No realizada | No aplica',
+'- tecnicas (lista, varias): '+tec.join(' | '),
+'- distorsiones: lista de {"nombre": uno de los siguientes, "nivel": "Leve" | "Moderada" | "Severa"}: '+dc.join(' | '),
+'- tareasCheck: '+tc.join(' | '),
+'- riesgos: '+rie.join(' | '),
+'- recursos: '+rec.join(' | '),
+'- tests: '+tests.join(' | ')+' (solo los que se aplicaron en la sesión)',
+'',
+'FORMATO JSON',
+'{"fecha":"AAAA-MM-DD","duracion":null,"tipo":"sesion","estado":null,"humores":[],"humorOtro":"","eventos":"","tareaRevision":"","dificultadesTarea":"","temas":"","tecnicas":[],"inter":"","pensamiento":"","distorsiones":[],"tareasCheck":[],"tarea":"","acuerdos":"","avances":"","riesgos":[],"recursos":[],"ajustes":"","tests":[],"notasConfidenciales":"","porCompletar":[]}',
+'',
+'Significado de cada campo: estado = estado emocional al inicio 1–10 (solo si el paciente lo dijo; si no, null); eventos = eventos relevantes desde la última sesión; inter = intervenciones y descripciones adicionales; pensamiento = pensamiento automático clave; tarea = tarea específica acordada; acuerdos = acuerdos y objetivos para la próxima sesión; avances = avances y observaciones (al paciente); ajustes = ajustes terapéuticos; notasConfidenciales = solo para mí, no va al resumen del paciente.',
+'',
+'TRANSCRIPCIÓN:',
+transcripcion ? transcripcion : '[pega aquí la transcripción]'
+  ].join('\n');
+  return P;
+}
+function sesImportCopiarPrompt(){
+  var P=_sesArmarPrompt('');
+  function ok(){ toast('✅ Instrucciones copiadas. Pégalas en Claude con la transcripción.'); }
+  function fallback(){
+    var ta=document.createElement('textarea'); ta.value=P; ta.style.position='fixed'; ta.style.opacity='0'; document.body.appendChild(ta); ta.select();
+    try{ document.execCommand('copy'); ok(); }catch(e){ toast('No se pudo copiar. Intenta de nuevo.'); }
+    document.body.removeChild(ta);
+  }
+  if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(P).then(ok).catch(fallback); } else fallback();
+}
+function sesImportBorrar(){
+  var t=document.getElementById('ses-import-json'); if(t) t.value='';
+  var m=document.getElementById('ses-import-msg'); if(m) m.innerHTML='';
+  toast('🗑 Borrado');
+}
+function sesImportRellenar(){
+  var msg=document.getElementById('ses-import-msg');
+  var raw=(document.getElementById('ses-import-json').value||'').trim();
+  function err(t){ msg.innerHTML='<span style="color:#c0392b">'+t+'</span>'; }
+  if(!raw){ err('Pega primero el bloque de datos que te dio Claude.'); return; }
+  var i=raw.indexOf('{'), j=raw.lastIndexOf('}');
+  if(i<0||j<=i){ err('No encontré el bloque de datos. Copia desde la llave { hasta la llave } final.'); return; }
+  var d;
+  try{ d=JSON.parse(raw.slice(i,j+1)); }catch(e){ err('El bloque no se pudo leer (puede faltar una coma o comilla). Pídele a Claude que lo vuelva a enviar solo como JSON.'); return; }
+  return _sesAplicarDatos(d);
+}
+function _sesAplicarDatos(d){
+  var msg=document.getElementById('ses-import-msg');
+  var noReconocido=[]; var llenados=0;
+  function txt(id,v){ var el=document.getElementById(id); if(!el||v==null) return; v=String(v).trim(); if(v==='') return; el.value=v; llenados++; }
+  function marcar(selector,lista,etq){
+    if(!Array.isArray(lista)) return;
+    var cajas=[].slice.call(document.querySelectorAll(selector));
+    cajas.forEach(function(c){ c.checked=false; });
+    lista.forEach(function(x){
+      var n=_sesNorm(x), hit=false;
+      cajas.forEach(function(c){ if(_sesNorm(c.value)===n){ c.checked=true; hit=true; } });
+      if(!hit && String(x).trim()) noReconocido.push(etq+': '+x);
+    });
+    if(lista.length) llenados++;
+  }
+  // Datos básicos (el N° de sesión no se toca: lo calcula la app)
+  if(/^\d{4}-\d{2}-\d{2}$/.test(d.fecha||'')){ document.getElementById('ses-fecha').value=d.fecha; llenados++; }
+  if(d.duracion!=null && d.duracion!=='' && !isNaN(+d.duracion)){ document.getElementById('ses-dur').value=+d.duracion; llenados++; }
+  if(d.tipo){
+    var sel=document.getElementById('ses-tipo-sesion'), n=_sesNorm(d.tipo);
+    if(sel && ['sesion','evaluacion','cierre'].indexOf(n)>=0 && sel.value!==n){ sel.value=n; if(typeof toggleCancelacion==='function') toggleCancelacion(); llenados++; }
+  }
+  if(d.estado!=null && d.estado!=='' && +d.estado>=1 && +d.estado<=10){
+    document.getElementById('ses-estado').value=+d.estado; document.getElementById('ses-eval').textContent=+d.estado; llenados++;
+  }
+  marcar('#ses-humores input[name=humor]', d.humores, 'Humor');
+  if(d.humorOtro && String(d.humorOtro).trim()){
+    var oc=document.getElementById('ses-humor-otro-chk'); if(oc){ oc.checked=true; if(typeof toggleHumorOtro==='function') toggleHumorOtro(); document.getElementById('ses-humor-otro').value=String(d.humorOtro).trim(); }
+  }
+  txt('ses-eventos',d.eventos);
+  if(d.tareaRevision){
+    var tr=_sesNorm(d.tareaRevision), hit=false;
+    document.querySelectorAll('input[name=ses-tarea-rev]').forEach(function(c){ var m=_sesNorm(c.value)===tr; c.checked=m; if(m) hit=true; });
+    if(!hit) noReconocido.push('Revisión de tarea: '+d.tareaRevision); else llenados++;
+  }
+  txt('ses-dif-tarea',d.dificultadesTarea);
+  txt('ses-temas',d.temas);
+  marcar('input[name=tecnica]', d.tecnicas, 'Técnica');
+  txt('ses-inter',d.inter);
+  txt('ses-pensamiento',d.pensamiento);
+  if(Array.isArray(d.distorsiones)){
+    var sel2={};
+    d.distorsiones.forEach(function(x){
+      var nom=_sesNorm(x && x.nombre), niv=_sesNorm(x && x.nivel);
+      var dd=DISTORSIONES.filter(function(k){ return _sesNorm(k.name)===nom; })[0];
+      var nivel=['Leve','Moderada','Severa'].filter(function(v){ return _sesNorm(v)===niv; })[0]||'';
+      if(!dd){ if(x && x.nombre) noReconocido.push('Distorsión: '+x.nombre); return; }
+      sel2[dd.id]={nivel:nivel, selected:true};
+    });
+    window._sesDcSeleccionadas=sel2; renderSesDCGrid(); if(d.distorsiones.length) llenados++;
+  }
+  marcar('#ses-tareas-check input[type=checkbox]', d.tareasCheck, 'Tarea');
+  txt('ses-tarea',d.tarea);
+  txt('ses-acuerdos',d.acuerdos);
+  txt('ses-avances',d.avances);
+  marcar('input[name=riesgo]', d.riesgos, 'Riesgo');
+  marcar('input[name=recurso]', d.recursos, 'Recurso');
+  txt('ses-ajustes',d.ajustes);
+  marcar('#ses-tests-chk input[type=checkbox]:not(#ses-test-otro-chk)', d.tests, 'Test');
+  txt('ses-notas-priv',d.notasConfidenciales);
+  var h='<div style="color:#3f7d5e"><b>✅ Formulario rellenado.</b> Revísalo completo antes de guardar: es un borrador y la decisión clínica es tuya.</div>';
+  var falta=(Array.isArray(d.porCompletar)?d.porCompletar:[]).filter(function(x){return String(x).trim();});
+  if(falta.length) h+='<div style="margin-top:6px"><b>Por completar tú:</b> '+falta.map(function(x){return String(x).replace(/</g,'&lt;');}).join('; ')+'</div>';
+  if(noReconocido.length) h+='<div style="margin-top:6px;color:#b9770e"><b>No se pudieron marcar (revisa a mano):</b> '+noReconocido.map(function(x){return String(x).replace(/</g,'&lt;');}).join('; ')+'</div>';
+  msg.innerHTML=h;
+  toast('Formulario rellenado. Revísalo antes de guardar.');
+}
+
+
+// ── Análisis automático dentro de la app (llama a la IA con TU clave; la transcripción no se guarda) ──
+var SES_IA_MODELO = 'claude-sonnet-5-5';
+function _sesClaveIA(){ try{ return localStorage.getItem('ses_ia_key')||''; }catch(e){ return ''; } }
+function sesConfigurarClaveIA(){
+  var actual=_sesClaveIA();
+  var k=prompt('Pega tu clave de API de Anthropic (empieza por sk-ant-). Se guarda solo en este dispositivo.'+(actual?'\n\nYa hay una guardada. Deja vacío y acepta para BORRARLA.':''), '');
+  if(k===null) return;
+  k=k.trim();
+  try{
+    if(!k){ localStorage.removeItem('ses_ia_key'); toast('🔑 Clave borrada de este dispositivo'); return; }
+    if(k.indexOf('sk-ant-')!==0){ toast('Esa clave no parece válida (debe empezar por sk-ant-)'); return; }
+    localStorage.setItem('ses_ia_key',k); toast('🔑 Clave guardada en este dispositivo');
+  }catch(e){ toast('No se pudo guardar la clave en este navegador'); }
+}
+function sesBorrarTranscripcion(silencioso){
+  var t=document.getElementById('ses-trans'); if(t) t.value='';
+  if(!silencioso) toast('🗑 Transcripción borrada');
+}
+function _sesExtraerJSON(texto){
+  var i=texto.indexOf('{'); if(i<0) return null;
+  var depth=0, enStr=false, esc=false;
+  for(var k=i;k<texto.length;k++){
+    var c=texto[k];
+    if(enStr){ if(esc) esc=false; else if(c==='\\') esc=true; else if(c==='"') enStr=false; continue; }
+    if(c==='"') enStr=true;
+    else if(c==='{') depth++;
+    else if(c==='}'){ depth--; if(depth===0) return {json:texto.slice(i,k+1), resto:texto.slice(k+1)}; }
+  }
+  return null;
+}
+async function sesAnalizarTranscripcion(){
+  var msg=document.getElementById('ses-import-msg'), retro=document.getElementById('ses-import-retro');
+  var btn=document.getElementById('ses-analizar-btn');
+  var trans=(document.getElementById('ses-trans').value||'').trim();
+  function err(t){ msg.innerHTML='<span style="color:#c0392b">'+t+'</span>'; }
+  if(trans.length<200){ err('Pega primero la transcripción completa de la sesión.'); return; }
+  var key=_sesClaveIA();
+  if(!key){ err('Falta la clave de IA de este dispositivo. Toca “🔑 Clave de IA”.'); return; }
+  if(!confirm('Se enviará la transcripción a Anthropic para analizarla y llenar el formulario. Confirma que la paciente autorizó este uso y que quitaste su nombre completo y datos de contacto. ¿Continuar?')) return;
+  if(retro){ retro.style.display='none'; retro.textContent=''; }
+  btn.disabled=true; var etq=btn.textContent; btn.textContent='⏳ Analizando… (puede tardar 1–2 min)'; msg.textContent='';
+  var ctrl=new AbortController(); var to=setTimeout(function(){ ctrl.abort(); },180000);
+  try{
+    var r=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST', signal:ctrl.signal,
+      headers:{'content-type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01','anthropic-dangerous-direct-browser-access':'true'},
+      body:JSON.stringify({model:SES_IA_MODELO,max_tokens:6000,messages:[{role:'user',content:_sesArmarPrompt(trans)}]})
+    });
+    if(!r.ok){
+      var detalle=''; try{ var ej=await r.json(); detalle=(ej.error&&ej.error.message)||''; }catch(e){}
+      if(r.status===401) err('La clave de IA no es válida. Revísala en “🔑 Clave de IA”.');
+      else if(r.status===429) err('Se alcanzó el límite de uso. Espera unos minutos e intenta de nuevo.');
+      else if(r.status===400 && /credit|balance/i.test(detalle)) err('La cuenta de API no tiene saldo. Recarga créditos en console.anthropic.com.');
+      else err('La IA no pudo responder ('+r.status+'). '+detalle);
+      return;
+    }
+    var data=await r.json();
+    var texto=(data.content||[]).map(function(b){return b.text||'';}).join('\n');
+    var ex=_sesExtraerJSON(texto);
+    if(!ex){ err('La IA respondió, pero no en el formato esperado. Intenta de nuevo.'); return; }
+    var d; try{ d=JSON.parse(ex.json); }catch(e){ err('La respuesta venía incompleta. Intenta de nuevo.'); return; }
+    _sesAplicarDatos(d);
+    var fb=(ex.resto||'').replace(/```[a-z]*/gi,'').trim();
+    if(fb && retro){ retro.style.display='block'; retro.textContent=fb; }
+    var borrar=document.getElementById('ses-trans-autoborrar');
+    if(borrar && borrar.checked) sesBorrarTranscripcion(true);
+  }catch(e){
+    err(e && e.name==='AbortError' ? 'Se demoró demasiado. Intenta de nuevo.' : 'No se pudo conectar con la IA. Revisa tu internet e intenta de nuevo.');
+  }finally{
+    clearTimeout(to); btn.disabled=false; btn.textContent=etq;
+  }
+}
