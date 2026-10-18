@@ -5,8 +5,9 @@ on:
     # Colombia es UTC-5. GitHub corre en UTC y puede atrasarse unos minutos.
     - cron: '0 23 * * *'    # 6:00 pm  -> aviso de MAÑANA
     - cron: '30 23 * * *'   # 6:30 pm  -> reintento (no duplica)
-    - cron: '30 11 * * *'   # 6:30 am  -> resumen de HOY
-    - cron: '0 12 * * *'    # 7:00 am  -> reintento (no duplica)
+    - cron: '55 10 * * *'   # 5:55 am  -> agenda de HOY (suele llegar ~6:00)
+    - cron: '20 11 * * *'   # 6:20 am  -> reintento (no duplica)
+    - cron: '50 11 * * *'   # 6:50 am  -> reintento (no duplica)
   workflow_dispatch:
     inputs:
       modo:
@@ -40,7 +41,7 @@ jobs:
         run: |
           case "${{ github.event.schedule }}" in
             "0 23 * * *"|"30 23 * * *") echo "valor=anterior" >> "$GITHUB_OUTPUT" ;;
-            "30 11 * * *"|"0 12 * * *") echo "valor=hoy" >> "$GITHUB_OUTPUT" ;;
+            "55 10 * * *"|"20 11 * * *"|"50 11 * * *") echo "valor=hoy" >> "$GITHUB_OUTPUT" ;;
             *) echo "valor=${{ github.event.inputs.modo || 'anterior' }}" >> "$GITHUB_OUTPUT" ;;
           esac
 
