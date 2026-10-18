@@ -102,10 +102,20 @@ const DB = {
       var a = document.querySelector('link[rel="apple-touch-icon"]'); if(a) a.setAttribute('href','apple-touch-agenda.png');
       var t = document.querySelector('meta[name="apple-mobile-web-app-title"]'); if(t) t.setAttribute('content','Agenda');
       document.title = 'Agenda';
+      window.ES_AGENDA = true;
+      document.documentElement.className += ' modo-agenda';
     }
   } catch(e){}
 })();
 </script>
+<style>
+/* Modo "app Agenda": solo el calendario, sin menú lateral. */
+html.modo-agenda #sidebar, html.modo-agenda #sidebar-overlay, html.modo-agenda #mob-toggle { display:none !important; }
+html.modo-agenda #main { margin-left:0 !important; width:100% !important; max-width:none !important; }
+#ag-app-extra { display:none; }
+html.modo-agenda #ag-app-extra { display:flex; position:fixed; left:8px; bottom:8px; z-index:900; gap:6px; opacity:.85; }
+#ag-app-extra button { border:1px solid #cd8e9d; background:#fff; color:#7a3c4b; border-radius:14px; padding:4px 10px; font-size:.7rem; cursor:pointer; }
+</style>
 </head>
 <body>
 
@@ -1066,6 +1076,7 @@ const DB = {
       </div>
     </div>
     <div class="fg" style="margin-bottom:12px;max-width:320px"><label class="lbl">Calendario</label><select id="ag-nuevo-cal"></select></div>
+    <div class="fg" style="margin-bottom:12px;max-width:320px"><label class="lbl">Alarma</label><select id="ag-nuevo-alarma"><option value="0">Sin alarma</option><option value="10">10 minutos antes</option><option value="30" selected>30 minutos antes</option><option value="60">1 hora antes</option><option value="1440">1 día antes</option></select></div>
     <div class="row col3">
       <div class="fg"><label class="lbl">Fecha y hora inicio</label><input type="datetime-local" id="ag-nuevo-inicio" onchange="agAutocompletarFin()"></div>
       <div class="fg"><label class="lbl">Hora fin</label><input type="datetime-local" id="ag-nuevo-fin" oninput="this.dataset.editadoManual='1'"></div>
@@ -1892,6 +1903,7 @@ const DB = {
   </div>
 </div>
 </main>
+<div id="ag-app-extra"><button onclick="activarNotificaciones()" title="Activar notificaciones en este dispositivo">🔔 Notificaciones</button><button onclick="cerrarSesion()" title="Cerrar sesión en este dispositivo">Salir</button></div>
 
 <!-- TOAST -->
 <div id="toast"></div>
@@ -1981,6 +1993,11 @@ const DB = {
       </select>
     </div>
     <div class="fg" style="margin-bottom:12px"><label class="lbl">Calendario</label><select id="ag-edit-cal"></select></div>
+    <div class="row col2" style="margin-bottom:12px">
+      <div class="fg"><label class="lbl">Alarma</label><select id="ag-edit-alarma"><option value="0">Sin alarma</option><option value="10">10 minutos antes</option><option value="30">30 minutos antes</option><option value="60">1 hora antes</option><option value="1440">1 día antes</option></select></div>
+      <div class="fg"><label class="lbl">Repetir</label><select id="ag-edit-rep" onchange="document.getElementById('ag-edit-rep-hasta-wrap').style.display=this.value?'':'none'"><option value="">No repetir</option><option value="semanal">Cada semana</option><option value="quincenal">Cada 2 semanas</option><option value="mensual">Cada mes</option></select></div>
+    </div>
+    <div class="fg" id="ag-edit-rep-hasta-wrap" style="margin-bottom:12px;display:none"><label class="lbl">Repetir hasta (crea copias de esta cita)</label><input type="date" id="ag-edit-rep-hasta"></div>
     <div class="fg" style="margin-bottom:16px"><label class="lbl">Descripción / Notas</label><textarea id="ag-edit-desc" rows="2"></textarea></div>
     <div class="btn-row">
       <button class="btn" onclick="document.getElementById('ag-edit-overlay').classList.remove('open')">Cancelar</button>
@@ -2143,14 +2160,17 @@ function aplicarPermisosFinanzas(){
 
 (function(){
   try {
-    firebase.initializeApp(FIREBASE_CONFIG);
-    _firebaseDB = firebase.firestore();
+    // En la app "Agenda" se usa una instancia de Firebase con nombre propio: su sesión se guarda
+    // aparte y NO afecta a la app principal (que sigue pidiendo clave siempre).
+    window._fbApp = firebase.initializeApp(FIREBASE_CONFIG, window.ES_AGENDA ? 'agenda' : undefined);
+    _firebaseDB = window._fbApp.firestore();
     console.log("Firebase conectado correctamente");
 
     // ── Autenticación con correo y contraseña ──
-    var _auth = firebase.auth();
-    // NONE: la sesión no se guarda; al abrir o recargar la app siempre pide usuario y contraseña.
-    _auth.setPersistence(firebase.auth.Auth.Persistence.NONE).catch(function(e){ console.warn('Persistencia:', e); });
+    var _auth = window._fbApp.auth();
+    // App principal -> NONE: la sesión no se guarda; al abrir o recargar siempre pide usuario y contraseña.
+    // App Agenda -> LOCAL: la sesión se recuerda en ese dispositivo para entrar rápido al calendario.
+    _auth.setPersistence(window.ES_AGENDA ? firebase.auth.Auth.Persistence.LOCAL : firebase.auth.Auth.Persistence.NONE).catch(function(e){ console.warn('Persistencia:', e); });
 
     // Usuario → correo de la cuenta en Firebase. El usuario se escribe en minúsculas.
     var USUARIOS_LOGIN = { 'lf.consultorio': 'luisa.vida2026@gmail.com' };
@@ -3338,15 +3358,15 @@ function fechaHoy(){
   function obtenerToken(){
     return navigator.serviceWorker.register(SW_URL).then(function(reg){
       return navigator.serviceWorker.ready.then(function(){
-        return firebase.messaging().getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: reg })
+        return window._fbApp.messaging().getToken({ vapidKey: VAPID_KEY, serviceWorkerRegistration: reg })
           .then(function(token){ return { token: token, reg: reg }; });
       });
     });
   }
   function guardarToken(token){
-    var user = firebase.auth().currentUser;
+    var user = window._fbApp.auth().currentUser;
     if(!user || !token) return Promise.reject(new Error('Sin sesión o sin código de dispositivo'));
-    return firebase.firestore().collection('dispositivos_notificaciones').doc(token).set({
+    return window._fbApp.firestore().collection('dispositivos_notificaciones').doc(token).set({
       token: token,
       email: (user.email || '').toLowerCase(),
       plataforma: plataforma(),
@@ -3366,7 +3386,7 @@ function fechaHoy(){
       return;
     }
     if(!claveLista()){ alert('Falta configurar la clave de notificaciones (VAPID) en el código de la app.'); return; }
-    if(!firebase.auth().currentUser){ alert('Inicia sesión primero.'); return; }
+    if(!window._fbApp.auth().currentUser){ alert('Inicia sesión primero.'); return; }
     etiqueta('⏳ Activando…');
     // El permiso se pide aquí mismo, dentro del toque del botón (obligatorio en iPhone).
     Notification.requestPermission().then(function(perm){
@@ -3390,7 +3410,7 @@ function fechaHoy(){
 
   // Cada vez que inicias sesión en un dispositivo que ya dio permiso, se refresca su registro en silencio.
   try {
-    firebase.auth().onAuthStateChanged(function(user){
+    window._fbApp.auth().onAuthStateChanged(function(user){
       if(!user || !soportado() || !claveLista()) return;
       if(Notification.permission === 'granted'){
         etiqueta('🔔 Notificaciones activas ✓');

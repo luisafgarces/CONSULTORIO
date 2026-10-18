@@ -2842,7 +2842,8 @@ function agGAbrirModal(inicioISO){
     + '<div class="agg-f"><label>Fin</label><input type="datetime-local" id="aggm-fin" oninput="this.dataset.manual=\'1\'"></div></div>'
     + '<div class="agg-2"><div class="agg-f"><label>Calendario</label><select id="aggm-cal" onchange="agGModalCal()">'
     + cals.map(function(c){ return '<option value="'+agEsc(c.id)+'">'+agEsc(c.nombre)+'</option>'; }).join('')+'</select></div>'
-    + '<div class="agg-f"><label>Tipo</label><select id="aggm-tipo"><option value="virtual">Virtual</option><option value="presencial">Presencial</option><option value="admin">Administrativo</option></select></div></div>'
+    + '<div class="agg-f"><label>Tipo</label><select id="aggm-tipo" onchange="agGModalAlarmaDefecto()"><option value="virtual">Virtual</option><option value="presencial">Presencial</option><option value="admin">Administrativo</option></select></div></div>'
+    + '<div class="agg-f"><label>Alarma (notificaci\u00f3n al celular y al PC)</label><select id="aggm-alarma" onchange="this.dataset.manual=\'1\'"><option value="0">Sin alarma</option><option value="10">10 minutos antes</option><option value="30">30 minutos antes</option><option value="60">1 hora antes</option><option value="1440">1 d\u00eda antes</option></select></div>'
     + '<div class="agg-f" id="aggm-pac-wrap"><label>Paciente (opcional)</label><select id="aggm-pac" onchange="agGModalPac()">'+pacOpts+'</select></div>'
     + '<div class="agg-2"><div class="agg-f"><label>Se repite</label><select id="aggm-rep" onchange="document.getElementById(\'aggm-hasta-wrap\').style.display=this.value?\'\':\'none\'"><option value="">No se repite</option><option value="semanal">Cada semana</option><option value="quincenal">Cada 2 semanas</option><option value="mensual">Cada mes</option></select></div>'
     + '<div class="agg-f" id="aggm-hasta-wrap" style="display:none"><label>Repetir hasta</label><input type="date" id="aggm-hasta"></div></div>'
@@ -2872,6 +2873,14 @@ function agGModalCal(){
   document.getElementById('aggm-pac-wrap').style.display = esCons ? '' : 'none';
   if(!esCons){ document.getElementById('aggm-pac').value = ''; document.getElementById('aggm-tipo').value = 'admin'; }
   else if(document.getElementById('aggm-tipo').value==='admin'){ document.getElementById('aggm-tipo').value = 'virtual'; }
+  agGModalAlarmaDefecto();
+}
+// La alarma viene activada (30 min antes) para citas de pacientes del
+// calendario Consultorio; en los demás casos queda "Sin alarma" hasta que se elija.
+function agGModalAlarmaDefecto(){
+  var al = document.getElementById('aggm-alarma'); if(!al || al.dataset.manual==='1') return;
+  var cal = document.getElementById('aggm-cal').value, tipo = document.getElementById('aggm-tipo').value;
+  al.value = (cal==='consultorio' && tipo!=='admin') ? '30' : '0';
 }
 function agGModalPac(){
   var pid = document.getElementById('aggm-pac').value;
@@ -2891,6 +2900,7 @@ function agGGuardarModal(){
   // Se vuelcan los datos al formulario original y se reutiliza su lógica
   // de guardado (con la ventana de confirmación de fecha y hora).
   $('ag-nuevo-cal').value = cal;
+  $('ag-nuevo-alarma').value = $('aggm-alarma').value;
   $('ag-nuevo-pac').value = (cal==='consultorio') ? $('aggm-pac').value : '';
   $('ag-nuevo-titulo').value = titulo;
   $('ag-nuevo-tipo').value = $('aggm-tipo').value;
@@ -3213,7 +3223,8 @@ function agAgregarEvento(){
       fin: agFechaLocalISO(finEv),
       tipo, descripcion: desc,
       pacienteId: pacId || null,
-      calendario: (document.getElementById('ag-nuevo-cal')||{}).value || 'consultorio'
+      calendario: (document.getElementById('ag-nuevo-cal')||{}).value || 'consultorio',
+      alarma: parseInt((document.getElementById('ag-nuevo-alarma')||{}).value, 10) || 0
     });
     iter++;
   } while(repetir && new Date(fechaInicio.getTime() + iter*intervaloDias*24*60*60*1000) <= limite);
@@ -3282,6 +3293,7 @@ function agGuardarEventosConfirmados(nuevosEventos){
   document.getElementById('ag-nuevo-rep-dias').value='';
   document.getElementById('ag-nuevo-rep-hasta').value='';
   var calSelNuevo = document.getElementById('ag-nuevo-cal'); if(calSelNuevo) calSelNuevo.value='consultorio';
+  var alSelNuevo = document.getElementById('ag-nuevo-alarma'); if(alSelNuevo) alSelNuevo.value='30';
   agToggleRepetir();
   renderAgenda();
   toast(nuevosEventos.length>1 ? (nuevosEventos.length+' eventos guardados \u2713') : 'Evento guardado \u2713');
@@ -3336,6 +3348,15 @@ function agEditarEvento(id){
   document.getElementById('ag-edit-desc').value = e.descripcion||'';
   agPoblarCalSelects();
   var calSelEdit = document.getElementById('ag-edit-cal'); if(calSelEdit) calSelEdit.value = e.calendario||'consultorio';
+  var alEd = document.getElementById('ag-edit-alarma');
+  if(alEd){
+    var alVal = (e.alarma===undefined || e.alarma===null) ? ((e.tipo!=='admin' && agEsConsultorio(e)) ? 30 : 0) : e.alarma;
+    alEd.value = String(alVal);
+    if(alEd.value !== String(alVal)) alEd.value = '0';
+  }
+  var repEd = document.getElementById('ag-edit-rep'); if(repEd) repEd.value = '';
+  var repHastaEd = document.getElementById('ag-edit-rep-hasta'); if(repHastaEd) repHastaEd.value = '';
+  var repWrapEd = document.getElementById('ag-edit-rep-hasta-wrap'); if(repWrapEd) repWrapEd.style.display = 'none';
   document.getElementById('ag-edit-overlay').classList.add('open');
 }
 
@@ -3351,7 +3372,34 @@ function agGuardarEdicion(){
   var desc = document.getElementById('ag-edit-desc').value;
 
   var calEdit = (document.getElementById('ag-edit-cal')||{}).value || agEventos[idx].calendario || 'consultorio';
-  agMostrarConfirmacionEdicion(idx, { titulo, inicio, fin, tipo, descripcion: desc, calendario: calEdit });
+  var alarmaEdit = parseInt((document.getElementById('ag-edit-alarma')||{}).value, 10) || 0;
+  var repEdit = (document.getElementById('ag-edit-rep')||{}).value || '';
+  var repHastaEdit = (document.getElementById('ag-edit-rep-hasta')||{}).value || '';
+  if(repEdit && !repHastaEdit){ toast('Indica hasta qu\u00e9 fecha se repite'); return; }
+  agMostrarConfirmacionEdicion(idx, { titulo, inicio, fin, tipo, descripcion: desc, calendario: calEdit, alarma: alarmaEdit, rep: repEdit, repHasta: repHastaEdit });
+}
+
+// Crea copias de una cita (misma hora) cada semana / 2 semanas / 30 d\u00edas hasta la fecha indicada.
+// No toca las citas que ya existen; omite copias que ya est\u00e9n agendadas.
+function agCrearRepeticiones(base, rep, hasta){
+  var intervalo = rep==='semanal' ? 7 : rep==='quincenal' ? 14 : rep==='mensual' ? 30 : 0;
+  if(!intervalo || !hasta) return [];
+  var limite = new Date(hasta+'T23:59:59');
+  var ini0 = new Date(base.inicio), fin0 = new Date(base.fin || base.inicio);
+  var dur = fin0.getTime() - ini0.getTime();
+  var m = /Sesi\u00f3n #(\d+)/.exec(base.titulo);
+  var nuevos = [];
+  for(var i=1; i<=200; i++){
+    var ini = new Date(ini0.getTime() + i*intervalo*24*60*60*1000);
+    if(ini > limite) break;
+    var fin = new Date(ini.getTime() + dur);
+    var titulo = (base.pacienteId && m) ? base.titulo.replace(/Sesi\u00f3n #\d+/, 'Sesi\u00f3n #'+(parseInt(m[1],10)+i)) : base.titulo;
+    var inicioISO = agFechaLocalISO(ini);
+    var yaExiste = agEventos.some(function(e){ return e.inicio && e.inicio.slice(0,16)===inicioISO && e.titulo===titulo; });
+    if(yaExiste) continue;
+    nuevos.push({id:'ev'+Date.now()+'_r'+i, titulo:titulo, inicio:inicioISO, fin:agFechaLocalISO(fin), tipo:base.tipo, descripcion:base.descripcion||'', pacienteId:base.pacienteId||null, calendario:base.calendario||'consultorio', alarma:base.alarma});
+  }
+  return nuevos;
 }
 
 // Igual que agMostrarConfirmacion, pero para edición de una cita existente.
@@ -3387,9 +3435,12 @@ function agMostrarConfirmacionEdicion(idx, datos){
     agEventos[idx].tipo = datos.tipo;
     agEventos[idx].descripcion = datos.descripcion;
     agEventos[idx].calendario = datos.calendario || agEventos[idx].calendario || 'consultorio';
+    agEventos[idx].alarma = datos.alarma;
+    var copias = datos.rep ? agCrearRepeticiones(agEventos[idx], datos.rep, datos.repHasta) : [];
+    if(copias.length) agEventos = agEventos.concat(copias);
     agGuardar(); renderAgenda();
     document.getElementById('ag-edit-overlay').classList.remove('open');
-    toast('Cita actualizada \u2713');
+    toast(copias.length ? 'Cita actualizada \u2713 \u00b7 '+copias.length+' repetici\u00f3n(es) creadas' : 'Cita actualizada \u2713');
     modal.remove();
   };
 }
@@ -3441,7 +3492,7 @@ function finEnviarARevision(reg){
     toast('⚠️ Necesitas conexión a internet para enviar este movimiento');
     return;
   }
-  reg.registradoPor = (firebase.auth().currentUser && firebase.auth().currentUser.email) || 'desconocido';
+  reg.registradoPor = ((window._fbApp||firebase).auth().currentUser && (window._fbApp||firebase).auth().currentUser.email) || 'desconocido';
   reg.fechaEnvio = new Date().toISOString();
   _firebaseDB.collection('finanzas_pendientes_revision').doc(String(reg.id)).set(reg)
     .catch(function(err){
@@ -6813,7 +6864,7 @@ function usrRenderLista(){
         var u = doc.data();
         var esMiPropiaCuenta = false;
         try {
-          var auth = firebase.auth();
+          var auth = (window._fbApp||firebase).auth();
           esMiPropiaCuenta = auth.currentUser && auth.currentUser.email && auth.currentUser.email.toLowerCase() === u.email;
         } catch(e){}
         filas.push(`
