@@ -8,8 +8,8 @@
 
   var KEY = 'tareas';
   var T = [];                                   // todas las tareas
-  var st = { vista:'hoy', filtro:'todas', verAtrasadas:false, verMasHoy:false, addFecha:null, addLista:'', foco:null, sync:null };
-  try { st.vista = localStorage.getItem('tr_vista') || 'hoy'; st.filtro = localStorage.getItem('tr_filtro') || 'todas'; st.addLista = localStorage.getItem('tr_lista') || ''; } catch(e){}
+  var st = { fPrio:'todas', fFecha:'todas', verFiltros:false, verTodas:false, abiertas:{}, estadoV:'curso', estadoElegido:false, vista:'hoy', filtro:'todas', verAtrasadas:false, verMasHoy:false, addFecha:null, addLista:'', foco:null, sync:null };
+  try { st.estadoV = localStorage.getItem('tr_estadoV') || 'curso'; st.vista = localStorage.getItem('tr_vista') || 'hoy'; if(st.vista==='hechas'){ st.vista='tareas'; st.estadoV='completada'; st.estadoElegido=true; } st.filtro = localStorage.getItem('tr_filtro') || 'todas'; st.addLista = localStorage.getItem('tr_lista') || ''; } catch(e){}
   var MAX_HOY = 8;
 
   // ---------- utilidades ----------
@@ -27,8 +27,11 @@
   }
   function horaTxt(h){ if(!h) return ''; var a=h.split(':'), hh=+a[0]; return (hh%12===0?12:hh%12)+':'+a[1]+' '+(hh<12?'a. m.':'p. m.'); }
   function listas(){
-    try { if(typeof agCalendarios==='function'){ var c=agCalendarios(); if(c && c.length) return c; } } catch(e){}
-    return [{id:'consultorio',nombre:'Consultorio',color:'#cd8e9d'},{id:'personal',nombre:'Personal',color:'#7986cb'},{id:'conmovilidad',nombre:'CONMOVILIDAD',color:'#33b679'}];
+    var base=null;
+    try { if(typeof agCalendarios==='function'){ var c=agCalendarios(); if(c && c.length) base=c; } } catch(e){}
+    if(!base) base=[{id:'consultorio',nombre:'Consultorio',color:'#cd8e9d'},{id:'personal',nombre:'Personal',color:'#7986cb'},{id:'conmovilidad',nombre:'CONMOVILIDAD',color:'#33b679'}];
+    if(!base.some(function(l){ return l.id==='hospital' || /hospital/i.test(l.nombre); })) base=base.concat([{id:'hospital',nombre:'Hospital',color:'#f4511e'}]);
+    return base;
   }
   function lista(id){ var l=listas().filter(function(x){return x.id===id;})[0]; return l || listas()[0]; }
   function ls(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
@@ -46,6 +49,7 @@
   function cargar(){
     var v = DB.get(KEY);
     T = Array.isArray(v) ? v.filter(function(t){ return t && t.id && t.titulo!=null; }) : [];
+    T.forEach(normalizar);
   }
   function guardar(){ DB.set(KEY, T); }
   function porId(id){ return T.filter(function(t){return t.id===id;})[0]; }
@@ -151,7 +155,28 @@
 '.tr-foco-b{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-top:10px}',
 '.tr-foco-b button{min-height:48px;border-radius:24px;border:1.5px solid #cd8e9d;background:#fff;color:#7a3c4b;padding:0 20px;font-size:.95rem;cursor:pointer}',
 '.tr-foco-b button.main{background:#cd8e9d;color:#fff;border-color:#cd8e9d;font-weight:700}',
-'.tr-foco-b button.ok{background:#7ab87a;color:#fff;border-color:#7ab87a;font-weight:700}'
+'.tr-foco-b button.ok{background:#7ab87a;color:#fff;border-color:#7ab87a;font-weight:700}',
+'.tr-next{font-size:.84rem;color:#5b4549;margin-top:4px;line-height:1.35}',
+'.tr-punto{background:#fff8e6;border-radius:8px;padding:4px 8px;color:#7a5a00}',
+'.tr-est{border:1.5px solid #ecd3d9;background:#fff;border-radius:12px;padding:2px 9px;font-size:.72rem;cursor:pointer;color:#6b5459}',
+'.tr-est.e-curso{background:#eaf6ee;border-color:#bfe0c6;color:#2d6a3e}',
+'.tr-est.e-pausada{background:#fff4e5;border-color:#f3d29a;color:#8a5a00}',
+'.tr-est.e-espera{background:#eef1fb;border-color:#cdd3ee;color:#3c4160}',
+'.tr-pl{margin-top:8px;border-top:1px dashed #ecd3d9;padding-top:6px}',
+'.tr-pl label{display:flex;gap:10px;align-items:center;padding:7px 2px;font-size:.92rem;cursor:pointer}',
+'.tr-pl input{width:22px;height:22px;flex:0 0 auto}',
+'.tr-vistas{display:flex;gap:6px;overflow:auto;padding-bottom:4px;margin-bottom:8px}',
+'.tr-vistas .tr-chip{white-space:nowrap}',
+'.tr-barra{display:flex;gap:8px;align-items:center;margin-bottom:10px;flex-wrap:wrap}',
+'.tr-nueva{background:#cd8e9d;color:#fff;border:none;border-radius:14px;padding:11px 18px;font-size:.95rem;font-weight:700;cursor:pointer;min-height:46px}',
+'.tr-panelf{background:#fff;border:1.5px solid #f1dde2;border-radius:12px;padding:10px 12px;margin-bottom:10px}',
+'.tr-panelf .tr-sec{margin:6px 0 4px}',
+'.tr-hint{font-size:.74rem;color:#8a7279;margin-top:3px}',
+'.tr-panel{background:#fdf5f7;border-radius:10px;padding:10px 12px;margin-bottom:10px;font-size:.88rem;color:#4a3a3f}',
+'.tr-estopt{display:block;width:100%;text-align:left;border:1.5px solid #ecd3d9;background:#fff;border-radius:12px;padding:13px 14px;margin-bottom:8px;font-size:1rem;cursor:pointer;color:#4a3a3f}',
+'.tr-estopt.on{background:#fbe9ee;border-color:#cd8e9d;font-weight:700}',
+'.tr-summ{cursor:pointer;font-weight:700;color:#7a3c4b;padding:10px 0;font-size:.92rem}',
+'.tr-foco-next{font-size:1.05rem;color:#7a3c4b;max-width:520px;margin:2px auto 8px;font-weight:700}'
     ].join('\n');
     document.head.appendChild(s);
   }
@@ -183,7 +208,7 @@
 
   function fechaPorDefecto(){
     if(st.addFecha) return st.addFecha;
-    return st.vista==='bandeja' ? 'sin' : st.vista==='proximas' ? 'manana' : 'hoy';
+    return (st.vista==='bandeja'||st.vista==='tareas') ? 'sin' : st.vista==='proximas' ? 'manana' : 'hoy';
   }
   function resolverFecha(clave){
     var h=hoy();
@@ -197,9 +222,10 @@
 
   function pintarHead(){
     var el=document.getElementById('tr-head'); if(!el) return;
+    if(st.vista==='tareas'){ el.innerHTML=''; return; }
     var h=hoy();
     var hechasHoy = T.filter(function(t){ return t.hecha && t.hechaEn && t.hechaEn.slice(0,10)===h; }).length;
-    var pend = pendientes().filter(function(t){ return t.fecha && t.fecha<=h; }).length;
+    var pend = pendientes().filter(function(t){ var f=fechaEf(t); return f && f<=h; }).length;
     var total = hechasHoy+pend;
     var pct = total ? Math.round(hechasHoy*100/total) : 0;
     var msg = !total ? 'Día libre de tareas. Respira. 🌿' : pend===0 ? '¡Todo hecho por hoy! 🎉' : hechasHoy===0 ? 'Elige solo UNA para empezar.' : 'Vas bien: '+hechasHoy+' hecha'+(hechasHoy>1?'s':'')+'. Sigue con la siguiente.';
@@ -223,10 +249,11 @@
   function pintarTabs(){
     var el=document.getElementById('tr-tabs'); if(!el) return;
     var h=hoy(), pen=T.filter(function(t){return !t.hecha;});
-    var nBand = pen.filter(function(t){return !t.fecha;}).length;
-    var nHoy = pen.filter(function(t){return t.fecha && t.fecha<=h;}).length;
+    var nBand = pen.filter(function(t){return !fechaEf(t);}).length;
+    var nHoy = pen.filter(function(t){var f=fechaEf(t); return f && f<=h;}).length;
     function tab(id,txt){ return '<button class="tr-tab'+(st.vista===id?' on':'')+'" data-act="vista" data-v="'+id+'">'+txt+'</button>'; }
-    el.innerHTML = tab('hoy','🎯 Hoy'+(nHoy?' ('+nHoy+')':''))+tab('bandeja','📥 Bandeja'+(nBand?' ('+nBand+')':''))+tab('proximas','📅 Próximas')+tab('hechas','✔ Hechas');
+    var nAct = T.filter(function(t){return !t.hecha;}).length;
+    el.innerHTML = tab('hoy','☀️ Mi día'+(nHoy?' ('+nHoy+')':''))+tab('bandeja','📥 Bandeja'+(nBand?' ('+nBand+')':''))+tab('tareas','✅ Tareas'+(nAct?' ('+nAct+')':''))+tab('proximas','📅 Próximas');
   }
 
   function pintarFiltros(){
@@ -239,33 +266,50 @@
 
   function fila(t, opts){
     opts = opts || {};
-    var l = lista(t.lista||'consultorio'), h=hoy();
+    var l = lista(t.lista||'consultorio'), h=hoy(), full=!!opts.full, ide=esc(t.id);
     var meta = '<span><span class="tr-dot" style="background:'+esc(l.color)+'"></span>'+esc(l.nombre)+'</span>';
+    if(!t.hecha && (full || t.estado!=='pendiente')) meta += '<button type="button" class="tr-est e-'+t.estado+'" data-act="estado" data-id="'+ide+'">'+ESTADO_ICO[t.estado]+' '+ESTADO_TXT[t.estado]+'</button>';
+    if(t.limite){ var venc=!t.hecha && t.limite<h, hl=!t.hecha && t.limite===h; meta += '<span style="color:'+((venc||hl)?'#c0392b':'#a0536a')+';font-weight:700">⛔ Límite '+esc(etiquetaDia(t.limite))+(venc?' (vencida)':'')+'</span>'; }
+    if(full && !t.hecha){ if(t.prioridad==='alta') meta += '<span>🔺 Alta</span>'; else if(t.prioridad==='baja') meta += '<span>🔻 Baja</span>'; }
     if(t.hora) meta += '<span>🕒 '+esc(horaTxt(t.hora))+'</span>';
     var pb = proximoBloque(t.id); if(pb) meta += '<span>📌 '+esc(bloqueTxt(pb))+'</span>';
     if(t.eventoId){ var ev0 = evs().filter(function(e){return e.id===t.eventoId;})[0]; if(ev0) meta += '<span>🔗 '+esc(ev0.titulo)+'</span>'; }
-    if(t.fecha && t.fecha!==h && !opts.sinFecha) meta += '<span style="'+(t.fecha<h && !t.hecha?'color:#c27a00;font-weight:700':'')+'">📅 '+esc(etiquetaDia(t.fecha))+'</span>';
-    if(t.pasos && t.pasos.length){ var d=t.pasos.filter(function(p){return p.d;}).length; meta += '<span>☑ '+d+'/'+t.pasos.length+'</span>'; }
+    if(t.fecha && t.fecha!==h && !opts.sinFecha && !t.hecha) meta += '<span style="'+(t.fecha<h?'color:#c27a00;font-weight:700':'')+'">🎯 '+esc(etiquetaDia(t.fecha))+'</span>';
+    if(t.minutos && !t.hecha) meta += '<span>⏱ '+t.minutos+' min</span>';
+    var np = (t.pasos||[]).length, nd = (t.pasos||[]).filter(function(p){return p.d;}).length;
+    if(np) meta += '<span>☑ '+nd+'/'+np+'</span>';
     if(t.rep) meta += '<span>🔁</span>';
     if(t.notas) meta += '<span>📝</span>';
-    var extra = '';
-    if(opts.mover){
-      extra = '<div class="tr-meta" style="margin-top:6px"><button class="tr-mini" data-act="mover" data-id="'+esc(t.id)+'" data-v="hoy">Hacer hoy</button><button class="tr-mini" data-act="mover" data-id="'+esc(t.id)+'" data-v="manana">Mañana</button></div>';
-    }
+    if(t.hecha && t.hechaEn) meta += '<span>✔ '+esc(etiquetaDia(t.hechaEn.slice(0,10)))+'</span>';
     if(opts.restaurar){
-      return '<div class="tr-row done" data-id="'+esc(t.id)+'"><button class="tr-chk" data-act="reabrir" data-id="'+esc(t.id)+'" aria-label="Reabrir"></button><div class="tr-main" data-act="edit" data-id="'+esc(t.id)+'"><div class="tr-tit">'+esc(t.titulo)+'</div><div class="tr-meta">'+meta+'</div></div></div>';
+      return '<div class="tr-row done" data-id="'+ide+'"><button class="tr-chk" data-act="reabrir" data-id="'+ide+'" aria-label="Reabrir"></button><div class="tr-main" data-act="edit" data-id="'+ide+'"><div class="tr-tit">'+esc(t.titulo)+'</div><div class="tr-meta">'+meta+'</div></div></div>';
     }
-    return '<div class="tr-row'+(opts.big?' big':'')+'" data-id="'+esc(t.id)+'"><button class="tr-chk" data-act="chk" data-id="'+esc(t.id)+'" aria-label="Marcar como hecha"></button>'
-      + '<div class="tr-main" data-act="edit" data-id="'+esc(t.id)+'"><div class="tr-tit">'+esc(t.titulo)+'</div><div class="tr-meta">'+meta+'</div>'+extra+'</div>'
-      + '<button class="tr-star'+(t.prio?' on':'')+'" data-act="star" data-id="'+esc(t.id)+'" aria-label="Marcar como importante">'+(t.prio?'★':'☆')+'</button></div>';
+    var extra = '', na = proximaAccion(t), accs = '';
+    if(na) extra += '<div class="tr-next">→ '+esc(na)+'</div>';
+    if(t.estado==='pausada' && t.punto) extra += '<div class="tr-next tr-punto">⏸ Al volver: '+esc(t.punto)+'</div>';
+    if(t.estado==='espera' && t.esperaDe) extra += '<div class="tr-next tr-punto">⏳ Esperando: '+esc(t.esperaDe)+'</div>';
+    if(np && nd===np) extra += '<div class="tr-next" style="color:#2d6a3e">✅ Pasos listos: revisa si se cumple el criterio y complétala.</div>';
+    if(!na && !np) accs += '<button type="button" class="tr-mini" data-act="dividir" data-id="'+ide+'">✂ Dividir en pasos</button>';
+    if(t.estado==='pendiente' && full) accs += '<button type="button" class="tr-mini" data-act="setest" data-v="curso" data-id="'+ide+'">▶ Empezar</button>';
+    if(t.estado==='pausada') accs += '<button type="button" class="tr-mini" data-act="setest" data-v="curso" data-id="'+ide+'">▶ Retomar</button>';
+    if(t.estado==='espera') accs += '<button type="button" class="tr-mini" data-act="setest" data-v="curso" data-id="'+ide+'">✔ Ya llegó</button>';
+    if(np) accs += '<button type="button" class="tr-mini" data-act="expand" data-id="'+ide+'">'+(st.abiertas[t.id]?'▴':'▾')+' Pasos</button>';
+    if(opts.mover) accs += '<button class="tr-mini" data-act="mover" data-id="'+ide+'" data-v="hoy">Hacer hoy</button><button class="tr-mini" data-act="mover" data-id="'+ide+'" data-v="manana">Mañana</button>';
+    if(accs) extra += '<div class="tr-meta" style="margin-top:6px">'+accs+'</div>';
+    if(np && st.abiertas[t.id]) extra += '<div class="tr-pl">'+t.pasos.map(function(p,i){ return '<label><input type="checkbox" data-act="paso" data-id="'+ide+'" data-i="'+i+'"'+(p.d?' checked':'')+'> <span'+(p.d?' style="text-decoration:line-through;color:#9a8b8f"':'')+'>'+esc(p.t)+'</span></label>'; }).join('')+'</div>';
+    return '<div class="tr-row'+(opts.big?' big':'')+'" data-id="'+ide+'"><button class="tr-chk" data-act="chk" data-id="'+ide+'" aria-label="Marcar como hecha"></button>'
+      + '<div class="tr-main" data-act="edit" data-id="'+ide+'"><div class="tr-tit">'+esc(t.titulo)+'</div><div class="tr-meta">'+meta+'</div>'+extra+'</div>'
+      + '<button class="tr-star'+(t.prio?' on':'')+'" data-act="star" data-id="'+ide+'" aria-label="Marcar como importante">'+(t.prio?'★':'☆')+'</button></div>';
   }
 
   function pintarContenido(){
     var el=document.getElementById('tr-contenido'); if(!el) return;
     var h=hoy(), html='', pen=pendientes();
-    if(st.vista==='hoy'){
-      var atr = pen.filter(function(t){ return t.fecha && t.fecha<h; }).sort(function(a,b){ return a.fecha<b.fecha?-1:a.fecha>b.fecha?1:ordenar(a,b); });
-      var hoyT = pen.filter(function(t){ return t.fecha===h; });
+    if(st.vista==='tareas'){
+      html = vistaTareas();
+    } else if(st.vista==='hoy'){
+      var atr = pen.filter(function(t){ var f=fechaEf(t); return f && f<h; }).sort(function(a,b){ return fechaEf(a)<fechaEf(b)?-1:fechaEf(a)>fechaEf(b)?1:ordenar(a,b); });
+      var hoyT = pen.filter(function(t){ return fechaEf(t)===h; });
       var hoyOrd = hoyT.concat(atr).sort(ordenar);
       var imp = hoyOrd.filter(function(t){return t.prio;}).slice(0,3);
       var resto = hoyT.filter(function(t){ return imp.indexOf(t)<0; }).sort(ordenar);
@@ -288,15 +332,15 @@
         html += '<div class="tr-vacio" style="padding:10px">Toca ☆ en hasta 3 tareas para fijarlas como lo más importante.</div>';
       }
     } else if(st.vista==='bandeja'){
-      var b = pen.filter(function(t){return !t.fecha;}).sort(ordenar);
+      var b = pen.filter(function(t){return !fechaEf(t);}).sort(ordenar);
       html += '<div class="tr-sec"><span>📥 Ideas y pendientes sin fecha</span></div>';
       html += b.length ? b.map(function(t){ return fila(t,{mover:true}); }).join('') : '<div class="tr-vacio"><b>Bandeja vacía ✨</b>Aquí caen las cosas que anotas sin fecha. Luego eliges cuándo.</div>';
     } else if(st.vista==='proximas'){
-      var p = pen.filter(function(t){return t.fecha && t.fecha>h;}).sort(function(a,b){ return a.fecha<b.fecha?-1:a.fecha>b.fecha?1:ordenar(a,b); });
+      var p = pen.filter(function(t){var f=fechaEf(t); return f && f>h;}).sort(function(a,b){ return fechaEf(a)<fechaEf(b)?-1:fechaEf(a)>fechaEf(b)?1:ordenar(a,b); });
       if(!p.length) html += '<div class="tr-vacio"><b>Nada programado</b>Cuando le pongas fecha a una tarea, aparece aquí.</div>';
       var ult='';
       p.forEach(function(t){
-        if(t.fecha!==ult){ ult=t.fecha; html += '<div class="tr-sec"><span>'+esc(etiquetaDia(t.fecha))+'</span></div>'; }
+        if(fechaEf(t)!==ult){ ult=fechaEf(t); html += '<div class="tr-sec"><span>'+esc(etiquetaDia(ult))+'</span></div>'; }
         html += fila(t,{sinFecha:true});
       });
     } else {
@@ -338,7 +382,7 @@
     var sel=document.getElementById('tr-add-lista');
     var l = sel ? sel.value : (st.filtro!=='todas' ? st.filtro : ls_[0].id);
     ls('tr_lista', l); st.addLista=l;
-    var t={id:nuevoId(), titulo:txt, lista:l, fecha:f, hora:'', prio:false, notas:'', pasos:[], rep:'', hecha:false, creada:new Date().toISOString()};
+    var t=normalizar({id:nuevoId(), titulo:txt, lista:l, fecha:f, hora:'', prio:false, notas:'', pasos:[], rep:'', hecha:false, creada:new Date().toISOString()});
     T.push(t); guardar();
     inp.value=''; inp.focus();
     // si la tarea quedó fuera de la vista actual, avisar dónde quedó
@@ -352,15 +396,20 @@
   function completar(id, animar){
     var t=porId(id); if(!t || t.hecha) return;
     var fn=function(){
-      t.hecha=true; t.hechaEn=new Date().toISOString();
+      var prevE=t.estado;
+      t.hecha=true; t.estado='completada'; t.hechaEn=new Date().toISOString();
       var sig=null, fut=bloquesFuturos(t.id); quitarBloques(fut);
       if(t.rep){
         var nf=siguienteFecha(t);
-        if(nf){ sig={id:nuevoId(), titulo:t.titulo, lista:t.lista, fecha:nf, hora:t.hora||'', prio:!!t.prio, notas:t.notas||'', pasos:(t.pasos||[]).map(function(p){return {t:p.t,d:false};}), rep:t.rep, hecha:false, creada:new Date().toISOString()}; T.push(sig); }
+        if(nf){
+          var dd=Math.round((desdeYMD(nf)-desdeYMD(t.fecha||hoy()))/864e5);
+          sig=normalizar({id:nuevoId(), titulo:t.titulo, lista:t.lista, fecha:nf, limite:t.limite?sumarDias(t.limite,dd):'', hora:t.hora||'', prioridad:t.prioridad, notas:t.notas||'', pasos:(t.pasos||[]).map(function(p){return {t:p.t,d:false};}), rep:t.rep, hecha:false, creada:new Date().toISOString(), siguiente:t.siguiente||'', criterio:t.criterio||'', minutos:t.minutos||0});
+          T.push(sig);
+        }
       }
       guardar(); pintar();
       snack(FRASES[Math.floor(Math.random()*FRASES.length)]+(sig?' · próxima: '+etiquetaDia(sig.fecha):'')+(fut.length?' · bloque'+(fut.length>1?'s':'')+' del calendario quitado'+(fut.length>1?'s':''):''), function(){
-        t.hecha=false; delete t.hechaEn; if(sig) T=T.filter(function(x){return x!==sig;}); devolverBloques(fut); guardar(); pintar();
+        t.hecha=false; delete t.hechaEn; t.estado=(prevE&&prevE!=='completada')?prevE:'pendiente'; if(sig) T=T.filter(function(x){return x!==sig;}); devolverBloques(fut); guardar(); pintar();
       }, 6000);
     };
     if(animar){
@@ -371,17 +420,18 @@
   }
 
   function clickRoot(e){
+    if(e.target.closest && e.target.closest('.tr-pl') && !(e.target.tagName==='INPUT')) return;   // etiquetas de pasos: solo cambia el check
     var b=e.target.closest('[data-act]'); if(!b) return;
     var act=b.getAttribute('data-act'), id=b.getAttribute('data-id'), v=b.getAttribute('data-v');
     if(act==='afechad') return;                       // el calendario se maneja en "change"
     if(act==='alista') return;
-    if(act==='chk'){ completar(id,true); }
-    else if(act==='reabrir'){ var t=porId(id); if(t){ t.hecha=false; delete t.hechaEn; guardar(); pintar(); } }
+    if(act==='chk'){ intentarCompletar(id,true); }
+    else if(act==='reabrir'){ var t=porId(id); if(t){ t.hecha=false; delete t.hechaEn; t.estado='pendiente'; guardar(); pintar(); } }
     else if(act==='star'){
       var t2=porId(id); if(!t2) return;
       if(!t2.prio){
-        var h=hoy(); var yaImp = T.filter(function(x){ return !x.hecha && x.prio && x.fecha && x.fecha<=h; }).length;
-        if(yaImp>=3 && t2.fecha && t2.fecha<=h){ snack('Ya tienes 3 importantes hoy. Quita una ⭐ para elegir otra.',null,3500); return; }
+        var h=hoy(); var yaImp = T.filter(function(x){ return !x.hecha && x.prio && fechaEf(x) && fechaEf(x)<=h; }).length;
+        if(yaImp>=3 && fechaEf(t2) && fechaEf(t2)<=h){ snack('Ya tienes 3 importantes hoy. Quita una ⭐ para elegir otra.',null,3500); return; }
       }
       t2.prio=!t2.prio; guardar(); pintar();
     }
@@ -393,7 +443,7 @@
     else if(act==='mover'){ var t3=porId(id); if(!t3) return; t3.fecha = v==='hoy'?hoy():sumarDias(hoy(),1); guardar(); pintar(); snack('Movida a '+(v==='hoy'?'hoy':'mañana'),null,2500); }
     else if(act==='atr-ver'){ st.verAtrasadas=!st.verAtrasadas; pintarContenido(); }
     else if(act==='atr-hoy'){
-      var h2=hoy(), mov=T.filter(function(x){return !x.hecha && x.fecha && x.fecha<h2 && (st.filtro==='todas' || (x.lista||'consultorio')===st.filtro);});
+      var h2=hoy(), mov=T.filter(function(x){return !x.hecha && fechaEf(x) && fechaEf(x)<h2 && (st.filtro==='todas' || (x.lista||'consultorio')===st.filtro);});
       var prev=mov.map(function(x){return [x,x.fecha];}); mov.forEach(function(x){ x.fecha=h2; }); guardar(); pintar();
       snack(mov.length+' pasada'+(mov.length>1?'s':'')+' a hoy', function(){ prev.forEach(function(p){ p[0].fecha=p[1]; }); guardar(); pintar(); }, 8000);
     }
@@ -406,11 +456,190 @@
       snack(hechas.length+' borradas', function(){ hechas.forEach(function(x){T.push(x);}); guardar(); pintar(); }, 8000);
     }
     else if(act==='foco'){ abrirFoco(); }
+    else if(act==='nueva'){ abrirNueva(); }
+    else if(act==='estado'){ abrirEstado(id); }
+    else if(act==='setest'){ var te=porId(id); if(te) aplicarEstado(te,v); }
+    else if(act==='dividir'){ dividirTarea(id); }
+    else if(act==='expand'){ st.abiertas[id]=!st.abiertas[id]; pintarContenido(); }
+    else if(act==='evista'){ st.estadoV=v; st.estadoElegido=true; st.verTodas=false; ls('tr_estadoV',v); pintarContenido(); }
+    else if(act==='verfiltros'){ st.verFiltros=!st.verFiltros; pintarContenido(); }
+    else if(act==='fprio'){ st.fPrio=v; st.verTodas=false; pintarContenido(); }
+    else if(act==='ffecha'){ st.fFecha=v; st.verTodas=false; pintarContenido(); }
+    else if(act==='limpiarf'){ st.fPrio='todas'; st.fFecha='todas'; pintarContenido(); }
+    else if(act==='tmas'){ st.verTodas=!st.verTodas; pintarContenido(); }
   }
   function changeRoot(e){
     var el=e.target, act=el.getAttribute && el.getAttribute('data-act');
     if(act==='afechad'){ st.addFecha = el.value || null; pintarAddChips(); }
     else if(act==='alista'){ st.addLista=el.value; ls('tr_lista',el.value); }
+    else if(act==='paso'){
+      var tp=porId(el.getAttribute('data-id')), i=+el.getAttribute('data-i'); if(!tp||!tp.pasos[i]) return;
+      tp.pasos[i].d=el.checked; if(el.checked && tp.estado==='pendiente') tp.estado='curso';
+      guardar(); pintar();
+    }
+  }
+
+  // ===================== SECCIÓN TAREAS =====================
+  var ESTADOS = [['pendiente','Pendiente'],['curso','En curso'],['pausada','Pausada'],['espera','En espera']];
+  var ESTADO_TXT = {pendiente:'Pendiente',curso:'En curso',pausada:'Pausada',espera:'En espera',completada:'Completada'};
+  var ESTADO_ICO = {pendiente:'⚪',curso:'🟢',pausada:'⏸',espera:'⏳',completada:'✔'};
+  function fechaEf(t){ return t.fecha || t.limite || ''; }
+  function proximaAccion(t){ if(t.siguiente) return t.siguiente; var p=(t.pasos||[]).filter(function(x){return !x.d;})[0]; return p?p.t:''; }
+  function setPrioridad(t,p){ t.prioridad=p; t.prio=(p==='alta'); }
+  // Completa los campos nuevos en tareas antiguas sin perder nada
+  function normalizar(t){
+    if(t.hecha) t.estado='completada'; else if(!t.estado || t.estado==='completada') t.estado='pendiente';
+    if(t.prioridad!=='alta' && t.prioridad!=='baja' && t.prioridad!=='normal') t.prioridad = t.prio ? 'alta' : 'normal';
+    t.prio = (t.prioridad==='alta');
+    ['limite','siguiente','punto','criterio','esperaDe'].forEach(function(k){ if(t[k]==null) t[k]=''; });
+    t.minutos = parseInt(t.minutos,10)||0;
+    if(!Array.isArray(t.pasos)) t.pasos=[];
+    return t;
+  }
+  function rankPrio(t){ return t.prioridad==='alta'?0 : t.prioridad==='baja'?2 : 1; }
+  function ordenTareas(a,b){
+    var la=a.limite||'9999', lb=b.limite||'9999'; if(la!==lb) return la<lb?-1:1;
+    if(rankPrio(a)!==rankPrio(b)) return rankPrio(a)-rankPrio(b);
+    return String(a.creada||'').localeCompare(String(b.creada||''));
+  }
+  function porHechaDesc(a,b){ return String(b.hechaEn||'').localeCompare(String(a.hechaEn||'')); }
+
+  function vistaTareas(){
+    var h=hoy();
+    var base=T.filter(function(t){ return st.filtro==='todas' || (t.lista||'consultorio')===st.filtro; });
+    var cnt={todas:base.length};
+    ['pendiente','curso','pausada','espera','completada'].forEach(function(e){ cnt[e]=base.filter(function(t){return t.estado===e;}).length; });
+    var ev=st.estadoV; if(!st.estadoElegido && ev==='curso' && !cnt.curso) ev='pendiente';
+    var vistas=[['todas','Todas'],['pendiente','Pendientes'],['curso','En curso'],['pausada','Pausadas'],['espera','En espera'],['completada','Completadas']];
+    var nF=(st.fPrio!=='todas'?1:0)+(st.fFecha!=='todas'?1:0);
+    var html='<div class="tr-vistas">'+vistas.map(function(v){ return '<button class="tr-chip'+(ev===v[0]?' on':'')+'" data-act="evista" data-v="'+v[0]+'">'+v[1]+' '+cnt[v[0]]+'</button>'; }).join('')+'</div>'
+      +'<div class="tr-barra"><button class="tr-nueva" data-act="nueva">＋ Nueva tarea</button><button class="tr-chip'+(nF?' on':'')+'" data-act="verfiltros">🔎 Filtros'+(nF?' ('+nF+')':'')+'</button></div>';
+    if(st.verFiltros){
+      var P=[['todas','Todas'],['alta','Alta'],['normal','Normal'],['baja','Baja']];
+      var F=[['todas','Todas'],['limite','Con límite real'],['vencidas','Vencidas'],['hoy','Hoy'],['semana','Esta semana'],['sin','Sin fecha']];
+      html+='<div class="tr-panelf"><div class="tr-sec"><span>Prioridad</span></div><div class="tr-chips">'+P.map(function(x){ return '<button class="tr-chip'+(st.fPrio===x[0]?' on':'')+'" data-act="fprio" data-v="'+x[0]+'">'+x[1]+'</button>'; }).join('')+'</div>'
+        +'<div class="tr-sec"><span>Fecha</span></div><div class="tr-chips">'+F.map(function(x){ return '<button class="tr-chip'+(st.fFecha===x[0]?' on':'')+'" data-act="ffecha" data-v="'+x[0]+'">'+x[1]+'</button>'; }).join('')+'</div>'
+        +'<div class="tr-hint">El área se filtra con los botones de arriba. Los filtros son opcionales.</div></div>';
+    }
+    var lst=base.filter(function(t){ return ev==='todas' || t.estado===ev; });
+    if(st.fPrio!=='todas') lst=lst.filter(function(t){ return t.prioridad===st.fPrio; });
+    if(st.fFecha!=='todas') lst=lst.filter(function(t){
+      var f=fechaEf(t), sem=sumarDias(h,6);
+      return st.fFecha==='limite' ? !!t.limite : st.fFecha==='vencidas' ? (!t.hecha && f && f<h) : st.fFecha==='hoy' ? f===h : st.fFecha==='semana' ? (f && f>=h && f<=sem) : !f;
+    });
+    var act=lst.filter(function(t){return !t.hecha;}).sort(ordenTareas), hec=lst.filter(function(t){return t.hecha;}).sort(porHechaDesc);
+    lst = act.concat(hec);
+    var MAX=7, vis = st.verTodas ? lst : lst.slice(0,MAX);
+    if(!lst.length){
+      var msg={todas:['Aún no hay tareas','Toca «＋ Nueva tarea» y empieza con una sola.'],pendiente:['Nada pendiente por empezar ✨','Lo que anotes y aún no empieces aparece aquí.'],curso:['Nada en curso','Cuando empieces una tarea (▶ Empezar) queda aquí. Mejor pocas a la vez.'],pausada:['Nada pausado','Si dejas algo a medias, guarda dónde te quedaste y vuelve desde aquí.'],espera:['Nada en espera','Aquí van las tareas que dependen de una respuesta, un documento o alguien más.'],completada:['Aún no hay completadas','Cada tarea que termines queda registrada aquí.']}[ev];
+      html+='<div class="tr-vacio"><b>'+msg[0]+'</b>'+msg[1]+(nF?'<br><button class="tr-link" data-act="limpiarf">Quitar filtros</button>':'')+'</div>';
+    } else {
+      html+=vis.map(function(t){ return fila(t,{full:true, restaurar:t.hecha, sinFecha:false}); }).join('');
+      if(lst.length>MAX) html+='<div style="text-align:center"><button class="tr-link" data-act="tmas">'+(st.verTodas?'Ver menos':'Ver '+(lst.length-MAX)+' más')+'</button></div>';
+      if(ev==='completada' && hec.length) html+='<div style="text-align:center"><button class="tr-link" data-act="borrar-hechas">Borrar completadas</button></div>';
+    }
+    return html;
+  }
+
+  // ---------- ventanitas ----------
+  function cerrarSheet(){ var m=document.getElementById('tr-sheet'); if(m) m.remove(); }
+  function sheet(html){
+    cerrarSheet();
+    var m=document.createElement('div'); m.id='tr-sheet'; m.className='tr-bg'; m.style.zIndex='9950';
+    m.onclick=function(e){ if(e.target===m) cerrarSheet(); };
+    m.innerHTML='<div class="tr-modal">'+html+'</div>'; document.body.appendChild(m); return m;
+  }
+  function preguntar(titulo, label, val, multi, cb){
+    var m=sheet('<h3 style="margin:0 0 12px;font-family:\'Playfair Display\',serif;color:#7a3c4b">'+titulo+'</h3><div class="tr-f"><label>'+label+'</label>'
+      +(multi?'<textarea id="trq" rows="3">'+esc(val)+'</textarea>':'<input id="trq" type="text" value="'+esc(val)+'">')
+      +'</div><div class="tr-acc"><button type="button" class="tr-sec2" id="trq-no">Cancelar</button><button type="button" class="tr-pri" id="trq-ok">Guardar</button></div>');
+    m.querySelector('#trq-no').onclick=cerrarSheet;
+    m.querySelector('#trq-ok').onclick=function(){ var v=m.querySelector('#trq').value.trim(); cerrarSheet(); cb(v); };
+    setTimeout(function(){ var i=m.querySelector('#trq'); if(i) i.focus(); },50);
+  }
+  function pedirPasos(cb){
+    var m=sheet('<h3 style="margin:0 0 6px;font-family:\'Playfair Display\',serif;color:#7a3c4b">✂ Dividir en pasos</h3>'
+      +'<div style="font-size:.84rem;color:#6b5459;margin-bottom:8px">Escribe un paso por línea, cada uno con un verbo concreto (Revisar…, Enviar…). No tiene que quedar perfecto: luego los editas.</div>'
+      +'<div class="tr-f"><textarea id="trp" rows="6" placeholder="Revisar el material entregado&#10;Identificar lo que falta&#10;Corregir lo pendiente&#10;Revisar todo completo&#10;Entregar la versión final"></textarea></div>'
+      +'<div class="tr-acc"><button type="button" class="tr-sec2" id="trp-no">Cancelar</button><button type="button" class="tr-pri" id="trp-ok">Agregar pasos</button></div>');
+    m.querySelector('#trp-no').onclick=cerrarSheet;
+    m.querySelector('#trp-ok').onclick=function(){
+      var lines=m.querySelector('#trp').value.split(/\n/).map(function(x){ return x.replace(/^\s*(?:[-•*·]|\d+[.)])\s*/,'').trim(); }).filter(Boolean).slice(0,20);
+      if(!lines.length){ m.querySelector('#trp').focus(); return; }
+      cerrarSheet(); cb(lines);
+    };
+    setTimeout(function(){ var i=m.querySelector('#trp'); if(i) i.focus(); },50);
+  }
+  function dividirTarea(id){
+    var t=porId(id); if(!t) return;
+    pedirPasos(function(lines){
+      t.pasos=(t.pasos||[]).concat(lines.map(function(x){ return {t:x,d:false}; }));
+      st.abiertas[t.id]=true; guardar(); pintar(); snack('Tarea dividida en '+lines.length+' paso'+(lines.length>1?'s':''),null,3000);
+    });
+  }
+
+  // ---------- estados ----------
+  function instantanea(t){ return {estado:t.estado,punto:t.punto,esperaDe:t.esperaDe}; }
+  function cambiarEstado(t, nuevo, datos){
+    var prev=instantanea(t); t.estado=nuevo; if(datos) Object.keys(datos).forEach(function(k){ t[k]=datos[k]; });
+    guardar(); pintar();
+    snack('Estado: '+ESTADO_TXT[nuevo], function(){ Object.keys(prev).forEach(function(k){ t[k]=prev[k]; }); guardar(); pintar(); }, 5000);
+  }
+  function aplicarEstado(t, e){
+    if(e===t.estado) return;
+    if(e==='pausada') preguntar('⏸ Pausar tarea','¿Dónde te quedaste y qué haces cuando regreses?',t.punto||'',true,function(v){ cambiarEstado(t,'pausada',{punto:v}); });
+    else if(e==='espera') preguntar('⏳ En espera','¿Qué o a quién estás esperando?',t.esperaDe||'',false,function(v){ cambiarEstado(t,'espera',{esperaDe:v}); });
+    else cambiarEstado(t,e);
+  }
+  function abrirEstado(id){
+    var t=porId(id); if(!t||t.hecha) return;
+    var m=sheet('<div class="tr-sec" style="margin-top:0"><span>Estado de la tarea</span></div>'
+      +ESTADOS.map(function(e){ return '<button type="button" class="tr-estopt'+(t.estado===e[0]?' on':'')+'" data-e="'+e[0]+'">'+ESTADO_ICO[e[0]]+' '+e[1]+'</button>'; }).join('')
+      +'<div class="tr-acc"><button type="button" class="tr-sec2" id="trs-no">Cerrar</button></div>');
+    m.querySelector('#trs-no').onclick=cerrarSheet;
+    [].slice.call(m.querySelectorAll('[data-e]')).forEach(function(b){ b.onclick=function(){ var e=b.getAttribute('data-e'); cerrarSheet(); aplicarEstado(t,e); }; });
+  }
+
+  // La tarea con criterio de finalización o pasos pendientes se confirma antes de cerrarse
+  function intentarCompletar(id, animar, despues){
+    var t=porId(id); if(!t || t.hecha) return;
+    var pend=(t.pasos||[]).filter(function(p){return !p.d;});
+    if(!t.criterio && !pend.length){ completar(id,animar); if(despues) despues(); return; }
+    var m=sheet('<h3 style="margin:0 0 10px;font-family:\'Playfair Display\',serif;color:#7a3c4b">¿Está terminada?</h3>'
+      +(t.criterio?'<div class="tr-panel"><b>Terminada significa:</b><br>'+esc(t.criterio)+'</div>':'')
+      +(pend.length?'<div class="tr-panel"><b>Pasos sin marcar ('+pend.length+'):</b><br>'+pend.map(function(p){ return '• '+esc(p.t); }).join('<br>')+'</div>':'')
+      +'<div class="tr-acc"><button type="button" class="tr-sec2" id="trc-no">Todavía no</button><button type="button" class="tr-pri" id="trc-si">Sí, está completa</button></div>');
+    m.querySelector('#trc-no').onclick=cerrarSheet;
+    m.querySelector('#trc-si').onclick=function(){ cerrarSheet(); completar(id,false); if(despues) despues(); };
+  }
+
+  // ---------- Nueva tarea (4 preguntas) ----------
+  function abrirNueva(){
+    var ls_=listas();
+    var area=(st.addLista && ls_.some(function(l){return l.id===st.addLista;})) ? st.addLista : (st.filtro!=='todas' ? st.filtro : ls_[0].id);
+    var conLim=false;
+    var m=sheet('<h3 style="margin:0 0 12px;font-family:\'Playfair Display\',serif;color:#7a3c4b">＋ Nueva tarea</h3>'
+      +'<div class="tr-f"><label>1. ¿Qué necesitas hacer?</label><input id="trn-tit" type="text" autocomplete="off" placeholder="Ej: Terminar carrusel de movilidad"><div class="tr-hint">Escribe el resultado que quieres conseguir.</div></div>'
+      +'<div class="tr-f"><label>2. ¿A qué área pertenece?</label><div class="tr-chips" id="trn-area">'+ls_.map(function(l){ return '<button type="button" class="tr-chip'+(l.id===area?' on':'')+'" data-a="'+esc(l.id)+'"><span class="tr-dot" style="background:'+esc(l.color)+'"></span>'+esc(l.nombre)+'</button>'; }).join('')+'</div></div>'
+      +'<div class="tr-f"><label>3. ¿Tiene una fecha límite real?</label><div class="tr-chips"><button type="button" class="tr-chip on" data-l="no">No</button><button type="button" class="tr-chip" data-l="si">Sí</button></div><input type="date" id="trn-lim" min="'+hoy()+'" style="display:none;margin-top:6px"><div class="tr-hint">Solo si de verdad vence ese día (no si es un día que tú eliges).</div></div>'
+      +'<div class="tr-f"><label>4. ¿Cuál es la siguiente acción?</label><input id="trn-sig" type="text" autocomplete="off" placeholder="Empieza con un verbo: Revisar, Llamar, Redactar…"><div class="tr-hint">Lo primero que harías. Los demás detalles los completas después.</div></div>'
+      +'<div class="tr-acc"><button type="button" class="tr-sec2" id="trn-no">Cancelar</button><button type="button" class="tr-pri" id="trn-ok">Guardar tarea</button></div>');
+    [].slice.call(m.querySelectorAll('[data-a]')).forEach(function(b){ b.onclick=function(){ area=b.getAttribute('data-a'); [].slice.call(m.querySelectorAll('[data-a]')).forEach(function(x){ x.classList.toggle('on',x===b); }); }; });
+    [].slice.call(m.querySelectorAll('[data-l]')).forEach(function(b){ b.onclick=function(){ conLim=b.getAttribute('data-l')==='si'; [].slice.call(m.querySelectorAll('[data-l]')).forEach(function(x){ x.classList.toggle('on',x===b); }); var i=m.querySelector('#trn-lim'); i.style.display=conLim?'':'none'; if(conLim) i.focus(); }; });
+    m.querySelector('#trn-tit').addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); m.querySelector('#trn-sig').focus(); } });
+    m.querySelector('#trn-sig').addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); m.querySelector('#trn-ok').click(); } });
+    m.querySelector('#trn-no').onclick=cerrarSheet;
+    m.querySelector('#trn-ok').onclick=function(){
+      var tit=m.querySelector('#trn-tit').value.replace(/\s+/g,' ').trim();
+      if(!tit){ m.querySelector('#trn-tit').focus(); return; }
+      var lim=conLim ? m.querySelector('#trn-lim').value : '';
+      if(conLim && !lim){ m.querySelector('#trn-lim').focus(); return; }
+      var t=normalizar({id:nuevoId(), titulo:tit, lista:area, fecha:'', limite:lim, hora:'', notas:'', pasos:[], rep:'', hecha:false, creada:new Date().toISOString(), siguiente:m.querySelector('#trn-sig').value.replace(/\s+/g,' ').trim()});
+      T.push(t); ls('tr_lista',area); st.addLista=area; guardar(); cerrarSheet();
+      if(st.vista==='tareas' && st.estadoV!=='todas' && st.estadoV!=='pendiente'){ st.estadoV='pendiente'; st.estadoElegido=true; ls('tr_estadoV','pendiente'); }
+      pintar(); snack('Tarea guardada ✓ · toca la tarea para completar más detalles', function(){ T=T.filter(function(x){return x.id!==t.id;}); guardar(); pintar(); }, 6000);
+    };
+    setTimeout(function(){ m.querySelector('#trn-tit').focus(); },50);
   }
 
   // ---------- editor ----------
@@ -419,19 +648,28 @@
     cerrarModal();
     var t=porId(id); if(!t) return;
     var ls_=listas();
+    var abierto=!!(t.limite||t.fecha||t.hora||t.rep||t.minutos||t.punto||t.criterio||t.esperaDe||(t.pasos&&t.pasos.length)||t.notas||t.prioridad!=='normal');
     var m=document.createElement('div'); m.id='tr-modal'; m.className='tr-bg';
     m.onclick=function(ev){ if(ev.target===m) cerrarModal(); };
     m.innerHTML = '<div class="tr-modal">'
-      +'<div class="tr-f"><label>Tarea</label><textarea id="tre-tit" rows="2">'+esc(t.titulo)+'</textarea></div>'
-      +'<div class="tr-2"><div class="tr-f"><label>Lista</label><select id="tre-lista">'+ls_.map(function(l){return '<option value="'+esc(l.id)+'"'+(l.id===(t.lista||'consultorio')?' selected':'')+'>'+esc(l.nombre)+'</option>';}).join('')+'</select></div>'
-      +'<div class="tr-f"><label>Repetir</label><select id="tre-rep">'
-        +[['','No se repite'],['diaria','Cada día'],['laboral','Lunes a viernes'],['semanal','Cada semana'],['mensual','Cada mes']].map(function(o){return '<option value="'+o[0]+'"'+((t.rep||'')===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select></div></div>'
-      +'<div class="tr-f"><label>Fecha</label><div class="tr-chips" style="margin:0 0 6px"><button type="button" class="tr-chip" data-q="hoy">Hoy</button><button type="button" class="tr-chip" data-q="manana">Mañana</button><button type="button" class="tr-chip" data-q="sem">En 1 semana</button><button type="button" class="tr-chip" data-q="sin">Sin fecha</button></div><input type="date" id="tre-fecha" value="'+esc(t.fecha||'')+'"></div>'
+      +'<div class="tr-f"><label>Tarea (el resultado que quieres conseguir)</label><textarea id="tre-tit" rows="2">'+esc(t.titulo)+'</textarea></div>'
+      +'<div class="tr-2"><div class="tr-f"><label>Área</label><select id="tre-lista">'+ls_.map(function(l){return '<option value="'+esc(l.id)+'"'+(l.id===(t.lista||'consultorio')?' selected':'')+'>'+esc(l.nombre)+'</option>';}).join('')+'</select></div>'
+      +(t.hecha ? '<div class="tr-f"><label>Estado</label><button type="button" class="tr-mini" id="tre-reabrir" style="padding:10px 12px">✔ Completada · Reabrir</button></div>'
+               : '<div class="tr-f"><label>Estado</label><select id="tre-estado">'+ESTADOS.map(function(e){return '<option value="'+e[0]+'"'+(t.estado===e[0]?' selected':'')+'>'+e[1]+'</option>';}).join('')+'</select></div>')+'</div>'
+      +'<div class="tr-f"><label>Siguiente acción</label><input type="text" id="tre-sig" value="'+esc(t.siguiente||'')+'" placeholder="Verbo concreto: Llamar a…, Redactar…, Revisar…"></div>'
+      +'<details id="tre-mas"'+(abierto?' open':'')+'><summary class="tr-summ">Más detalles</summary>'
+      +'<div class="tr-2"><div class="tr-f"><label>Prioridad</label><select id="tre-prio">'+[['alta','Alta'],['normal','Normal'],['baja','Baja']].map(function(o){return '<option value="'+o[0]+'"'+(t.prioridad===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select></div>'
+      +'<div class="tr-f"><label>Tiempo para el siguiente paso</label><select id="tre-min"><option value="0">— Sin estimar —</option>'+[5,10,15,25,45,60,90].map(function(x){return '<option value="'+x+'"'+(t.minutos===x?' selected':'')+'>'+x+' min</option>';}).join('')+'</select></div></div>'
+      +'<div class="tr-f"><label>⛔ Fecha límite real (no se puede mover)</label><input type="date" id="tre-lim" value="'+esc(t.limite||'')+'"></div>'
+      +'<div class="tr-f"><label>🎯 Fecha objetivo: cuándo PLANEAS hacerla (la eliges tú)</label><div class="tr-chips" style="margin:0 0 6px"><button type="button" class="tr-chip" data-q="hoy">Hoy</button><button type="button" class="tr-chip" data-q="manana">Mañana</button><button type="button" class="tr-chip" data-q="sem">En 1 semana</button><button type="button" class="tr-chip" data-q="sin">Sin fecha</button></div><input type="date" id="tre-fecha" value="'+esc(t.fecha||'')+'"></div>'
       +'<div class="tr-2"><div class="tr-f"><label>Hora (opcional)</label><input type="time" id="tre-hora" value="'+esc(t.hora||'')+'"></div>'
-      +'<div class="tr-f"><label>Importante</label><select id="tre-prio"><option value="0"'+(!t.prio?' selected':'')+'>Normal</option><option value="1"'+(t.prio?' selected':'')+'>⭐ Importante</option></select></div></div>'
-      +'<div class="tr-f"><label>Pasos pequeños (opcional)</label><div id="tre-pasos"></div><button type="button" class="tr-mini" id="tre-addpaso">+ Agregar paso</button></div>'
+      +'<div class="tr-f"><label>Repetir</label><select id="tre-rep">'+[['','No se repite'],['diaria','Cada día'],['laboral','Lunes a viernes'],['semanal','Cada semana'],['mensual','Cada mes']].map(function(o){return '<option value="'+o[0]+'"'+((t.rep||'')===o[0]?' selected':'')+'>'+o[1]+'</option>';}).join('')+'</select></div></div>'
+      +'<div class="tr-f"><label>Esperando a… (si depende de alguien o algo)</label><input type="text" id="tre-esp" value="'+esc(t.esperaDe||'')+'" placeholder="Ej: respuesta del cliente"></div>'
+      +'<div class="tr-f"><label>Punto de continuación: dónde te quedaste y qué haces al volver</label><textarea id="tre-punto" rows="2">'+esc(t.punto||'')+'</textarea></div>'
+      +'<div class="tr-f"><label>Criterio de finalización: ¿cómo sabes que terminó?</label><textarea id="tre-crit" rows="2" placeholder="Ej: Carrusel entregado al cliente y aprobado">'+esc(t.criterio||'')+'</textarea></div>'
+      +'<div class="tr-f"><label>Pasos (si tiene pasos, es un proyecto)</label><div id="tre-pasos"></div><div class="tr-chips"><button type="button" class="tr-mini" id="tre-addpaso">+ Agregar paso</button><button type="button" class="tr-mini" id="tre-dividir">✂ Dividir en pasos</button></div></div>'
       +'<div class="tr-f"><label>Notas</label><textarea id="tre-notas" rows="2">'+esc(t.notas||'')+'</textarea></div>'
-      +'<div class="tr-f"><label>Calendario</label><div id="tre-bloques"></div></div>'
+      +'<div class="tr-f"><label>Calendario</label><div id="tre-bloques"></div></div></details>'
       +'<div class="tr-acc"><button type="button" class="tr-del" id="tre-del">🗑 Eliminar</button><button type="button" class="tr-sec2" id="tre-cancel">Cancelar</button><button type="button" class="tr-pri" id="tre-save">Guardar</button></div></div>';
     document.body.appendChild(m);
     var pasos=(t.pasos||[]).map(function(p){return {t:p.t,d:!!p.d};});
@@ -445,16 +683,17 @@
       var bl=bloquesDe(t.id), hay=(typeof agxAgendarBloque==='function');
       c.innerHTML=(bl.length?bl.map(function(e){ return '<div class="tr-paso"><span style="flex:1;font-size:.88rem">📌 '+esc(bloqueTxt(e))+'</span><button type="button" class="tr-mini" data-brep="'+esc(e.id)+'">Reprogramar</button><button type="button" class="tr-link" data-bdel="'+esc(e.id)+'" aria-label="Quitar bloque">✕</button></div>'; }).join(''):'<div style="font-size:.82rem;color:#8a7279;margin-bottom:6px">Sin bloque en el calendario.</div>')
         +(hay?'<button type="button" class="tr-mini" id="tre-agendar">📅 Agendar bloque de trabajo</button>':'');
-      var ag=c.querySelector('#tre-agendar'); if(ag) ag.onclick=function(){ guardarCambiosBasicos(); agxAgendarBloque(t.id, pintarBloques); };
+      var ag=c.querySelector('#tre-agendar'); if(ag) ag.onclick=function(){ agxAgendarBloque(t.id, pintarBloques); };
       [].slice.call(c.querySelectorAll('[data-brep]')).forEach(function(b){ b.onclick=function(){ agxReprogramarBloque(b.getAttribute('data-brep'), pintarBloques); }; });
       [].slice.call(c.querySelectorAll('[data-bdel]')).forEach(function(b){ b.onclick=function(){ var id=b.getAttribute('data-bdel'); quitarBloques(evs().filter(function(e){return e.id===id;})); pintarBloques(); }; });
     }
-    function guardarCambiosBasicos(){ /* el título se guarda con "Guardar"; el bloque usa el título actual de la tarea */ }
     pintarBloques();
     m.querySelector('#tre-pasos').addEventListener('input',function(ev){ var i=ev.target.getAttribute('data-pt'); if(i!==null) pasos[+i].t=ev.target.value; });
     m.querySelector('#tre-pasos').addEventListener('change',function(ev){ var i=ev.target.getAttribute('data-pd'); if(i!==null) pasos[+i].d=ev.target.checked; });
     m.querySelector('#tre-pasos').addEventListener('click',function(ev){ var i=ev.target.getAttribute('data-px'); if(i!==null){ pasos.splice(+i,1); pintarPasos(); } });
     m.querySelector('#tre-addpaso').onclick=function(){ pasos.push({t:'',d:false}); pintarPasos(); var ins=m.querySelectorAll('#tre-pasos input[type=text]'); if(ins.length) ins[ins.length-1].focus(); };
+    m.querySelector('#tre-dividir').onclick=function(){ pedirPasos(function(lines){ lines.forEach(function(x){ pasos.push({t:x,d:false}); }); pintarPasos(); }); };
+    var rb=m.querySelector('#tre-reabrir'); if(rb) rb.onclick=function(){ t.hecha=false; delete t.hechaEn; t.estado='pendiente'; guardar(); cerrarModal(); pintar(); };
     [].slice.call(m.querySelectorAll('[data-q]')).forEach(function(b){ b.onclick=function(){
       var q=b.getAttribute('data-q'), f=document.getElementById('tre-fecha');
       f.value = q==='hoy'?hoy(): q==='manana'?sumarDias(hoy(),1): q==='sem'?sumarDias(hoy(),7):''; }; });
@@ -465,8 +704,11 @@
       var rep=document.getElementById('tre-rep').value;
       var fecha=document.getElementById('tre-fecha').value;
       if(rep && !fecha){ fecha=hoy(); }
-      t.titulo=tit; t.lista=document.getElementById('tre-lista').value; t.fecha=fecha; t.hora=document.getElementById('tre-hora').value||'';
-      t.prio=document.getElementById('tre-prio').value==='1'; t.rep=rep; t.notas=document.getElementById('tre-notas').value.trim();
+      t.titulo=tit; t.lista=document.getElementById('tre-lista').value; t.fecha=fecha; t.limite=document.getElementById('tre-lim').value||''; t.hora=document.getElementById('tre-hora').value||'';
+      setPrioridad(t, document.getElementById('tre-prio').value); t.rep=rep; t.notas=document.getElementById('tre-notas').value.trim();
+      t.siguiente=document.getElementById('tre-sig').value.replace(/\s+/g,' ').trim(); t.punto=document.getElementById('tre-punto').value.trim(); t.criterio=document.getElementById('tre-crit').value.trim();
+      t.esperaDe=document.getElementById('tre-esp').value.trim(); t.minutos=parseInt(document.getElementById('tre-min').value,10)||0;
+      var es=document.getElementById('tre-estado'); if(es && !t.hecha) t.estado=es.value;
       t.pasos=pasos.filter(function(p){return String(p.t).trim();}).map(function(p){return {t:String(p.t).trim(),d:!!p.d};});
       var bls=bloquesDe(t.id); if(bls.length){ bls.forEach(function(e){ e.titulo=t.titulo; e.calendario=t.lista||e.calendario; }); if(typeof agGuardar==='function') agGuardar(); }
       guardar(); cerrarModal(); pintar();
@@ -483,7 +725,7 @@
   var foco=null, focoTimer=null;
   function cerrarFoco(){ var f=document.getElementById('tr-foco'); if(f) f.remove(); clearInterval(focoTimer); focoTimer=null; foco=null; pintar(); }
   function abrirFoco(){
-    var h=hoy(), pen=pendientes().filter(function(t){ return t.fecha && t.fecha<=h; }).sort(ordenar);
+    var h=hoy(), pen=pendientes().filter(function(t){ var f=fechaEf(t); return f && f<=h; }).sort(ordenar);
     var imp=pen.filter(function(t){return t.prio;});
     var cola=imp.concat(pen.filter(function(t){return !t.prio;}));
     if(!cola.length){ snack('No hay tareas para hoy. Agrega una o mira tu Bandeja.',null,3500); return; }
@@ -506,6 +748,8 @@
     var restantes=foco.cola.length-foco.i;
     f.innerHTML = '<div class="tr-foco-lbl">Ahora solo esto · '+restantes+' en la cola</div>'
       +'<div class="tr-foco-tit">'+esc(t.titulo)+'</div>'
+      +(proximaAccion(t)?'<div class="tr-foco-next">→ '+esc(proximaAccion(t))+'</div>':'')
+      +(t.punto?'<div style="max-width:520px;color:#7a5a00;background:#fff8e6;border-radius:10px;padding:6px 10px;font-size:.88rem;margin-bottom:6px">Al volver: '+esc(t.punto)+'</div>':'')
       +(t.notas?'<div style="max-width:520px;color:#6b5459;font-size:.9rem;margin-bottom:6px">'+esc(t.notas)+'</div>':'')
       +((t.pasos&&t.pasos.length)?'<div class="tr-foco-pasos">'+t.pasos.map(function(p,i){return '<label><input type="checkbox" data-fp="'+i+'"'+(p.d?' checked':'')+'> '+esc(p.t)+'</label>';}).join('')+'</div>':'')
       +'<div class="tr-time" id="trf-time">'+fmtT(foco.corriendo?(foco.fin-Date.now())/1000:foco.restante)+'</div>'
@@ -520,10 +764,9 @@
       pintarFoco();
     };
     f.querySelector('#trf-ok').onclick=function(){
-      clearInterval(focoTimer); foco.corriendo=false; foco.restante=foco.dur;
-      t.hecha=true; t.hechaEn=new Date().toISOString(); quitarBloques(bloquesFuturos(t.id));
-      if(t.rep){ var nf=siguienteFecha(t); if(nf) T.push({id:nuevoId(),titulo:t.titulo,lista:t.lista,fecha:nf,hora:t.hora||'',prio:!!t.prio,notas:t.notas||'',pasos:(t.pasos||[]).map(function(p){return {t:p.t,d:false};}),rep:t.rep,hecha:false,creada:new Date().toISOString()}); }
-      guardar(); foco.i++; pintarFoco();
+      intentarCompletar(t.id,false,function(){
+        clearInterval(focoTimer); focoTimer=null; foco.corriendo=false; foco.restante=foco.dur; foco.i++; pintarFoco();
+      });
     };
     f.querySelector('#trf-sig').onclick=function(){ clearInterval(focoTimer); foco.corriendo=false; foco.restante=foco.dur;
       // la tarea saltada pasa al final de la cola
@@ -555,8 +798,8 @@
 
   // ---------- integración con la navegación de la app ----------
   window.tareasAbrir = abrir;
-  window.tareasIr = function(v){ if(['hoy','bandeja','proximas','hechas'].indexOf(v)<0) return; st.vista=v; st.addFecha=null; ls('tr_vista',v); if(document.getElementById('tr-contenido')) pintar(); };
-  window.tareasDeHoyConteo = function(){ var h=hoy(); return T.filter(function(t){ return !t.hecha && t.fecha && t.fecha<=h; }).length; };
+  window.tareasIr = function(v){ if(['hoy','bandeja','tareas','proximas'].indexOf(v)<0) return; st.vista=v; st.addFecha=null; ls('tr_vista',v); if(document.getElementById('tr-contenido')) pintar(); };
+  window.tareasDeHoyConteo = function(){ var h=hoy(); return T.filter(function(t){ return !t.hecha && fechaEf(t) && fechaEf(t)<=h; }).length; };
   var gpOriginal = window.goPage;
   if(typeof gpOriginal==='function'){
     window.goPage = function(name){
