@@ -265,7 +265,14 @@
     st_.textContent = [
 '/* nada debe ensanchar la página: el contenido se adapta al ancho de la pantalla */',
 '#main{min-width:0;max-width:100%}',
+'.ag-ico{margin-right:6px}',
 '@media(max-width:1280px){',
+'  /* pestañas de la Agenda: una fila, con el ícono arriba y la palabra abajo */',
+'  .ag-tab-nav{display:grid;grid-template-columns:repeat(9,1fr);gap:0}',
+'  .ag-tab{padding:9px 2px;font-size:.66rem;letter-spacing:.02em;text-align:center;white-space:normal;line-height:1.25;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}',
+'  #ag-tab-cumple{display:flex!important;flex-direction:column;gap:2px}',
+'  .ag-ico{font-size:1.2rem;line-height:1.1;display:block;margin:0}',
+'  .ag-lb{display:block}',
 '  #main .agg-scroll > div{min-width:520px!important}',
 '  #main .agg-side{width:190px}',
 '}',
@@ -317,8 +324,10 @@
 '  #main .agg-title{font-size:1.02rem;margin:0 4px}',
 '}',
 '@media(max-width:700px){',
-'  .ag-tab-nav{display:grid;grid-template-columns:repeat(4,1fr);gap:0}',
-'  .ag-tab{padding:9px 2px;font-size:.66rem;letter-spacing:0;text-align:center;white-space:normal;line-height:1.25;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}',
+'  .ag-tab-nav{display:grid;grid-template-columns:repeat(5,1fr);gap:0}',
+'  .ag-ico{font-size:1.2rem;line-height:1.1;display:block;margin:0}',
+'  .ag-lb{display:block;font-size:.64rem}',
+'  .ag-tab{padding:8px 1px;font-size:.64rem;letter-spacing:0;text-align:center;white-space:normal;line-height:1.25;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}',
 '  #ag-tab-cumple{display:flex!important;flex-direction:column;gap:2px}',
 '  .tr-wrap{padding-left:0;padding-right:0}',
 '  .page-header{margin-bottom:12px}',
@@ -412,7 +421,7 @@
     var nHoy = pen.filter(function(t){var f=fechaEf(t); return f && f<=h;}).length;
     function tab(id,txt){ return '<button class="tr-tab'+(st.vista===id?' on':'')+'" data-act="vista" data-v="'+id+'">'+txt+'</button>'; }
     var nAct = T.filter(function(t){return !t.hecha;}).length;
-    el.innerHTML = tab('hoy','☀️ Mi día'+(nHoy?' ('+nHoy+')':''))+tab('bandeja','📥 Bandeja'+(nBand?' ('+nBand+')':''))+tab('tareas','✅ Tareas'+(nAct?' ('+nAct+')':''))+tab('proximas','📅 Próximas')+tab('areas','🗂 Áreas'); marcarTabAgenda();
+    el.innerHTML = tab('hoy','☀️ Mi día'+(nHoy?' ('+nHoy+')':''))+tab('bandeja','📥 Bandeja'+(nBand?' ('+nBand+')':''))+tab('tareas','✅ Tareas'+(nAct?' ('+nAct+')':''))+tab('proximas','📅 Próximas')+tab('areas','🗂 Áreas'); marcarTabAgenda(); contadorBandeja();
   }
 
   function pintarFiltros(){
@@ -1513,13 +1522,19 @@
   }
 
   // ---------- Tareas dentro de la Agenda (pestañas del calendario) ----------
-  var TABS_AG = [['t-hoy','hoy','☀️ Mi día'],['t-tareas','tareas','✅ Tareas'],['t-areas','areas','🗂 Áreas']];
+  var TABS_AG = [['t-hoy','hoy','☀️ Mi día'],['t-bandeja','bandeja','📥 Bandeja'],['t-tareas','tareas','✅ Tareas'],['t-areas','areas','🗂 Áreas']];
   function enAgenda(){ var r=document.getElementById('tareas-root'); return !!(r && r.parentNode && r.parentNode.id==='ag-panel-tareas'); }
   function volverRoot(){ var pa=document.getElementById('page-agenda'); if(pa) pa.classList.remove('ag-embed'); var r=document.getElementById('tareas-root'), pg=document.getElementById('page-tareas'); if(r && pg && r.parentNode!==pg) pg.appendChild(r); var p=document.getElementById('ag-panel-tareas'); if(p) p.style.display='none'; }
   function marcarTabAgenda(){
     if(!enAgenda()) return;
-    var m = st.vista==='hoy' ? 't-hoy' : st.vista==='areas' ? 't-areas' : 't-tareas';
+    var m = st.vista==='hoy' ? 't-hoy' : st.vista==='areas' ? 't-areas' : st.vista==='bandeja' ? 't-bandeja' : 't-tareas';
     [].forEach.call(document.querySelectorAll('.ag-tab-nav .ag-tab'), function(b){ b.classList.toggle('active', b.getAttribute('data-tab')===m); });
+  }
+  // «📥 Bandeja (N)»: el contador se ve siempre, estés en la pestaña que estés
+  function contadorBandeja(){
+    var b=document.querySelector('.ag-tab[data-tab="t-bandeja"]'); if(!b) return;
+    var n=0; try{ var v=DB.get('bandeja'); n=Array.isArray(v)?v.filter(function(x){ return x && !x.archivada; }).length:0; }catch(e){}
+    var lb=b.querySelector('.ag-lb'), txt='Bandeja'+(n?' ('+n+')':''); if(lb && lb.textContent!==txt) lb.textContent=txt;
   }
   function irCalendario(){
     if(enAgenda()){ var tb=document.querySelector('.ag-tab[data-tab="horario"]'); if(tb && typeof agSwitchTab==='function'){ agSwitchTab('horario', tb); return; } }
@@ -1539,7 +1554,15 @@
   function montarTabsAgenda(){
     var n=document.querySelector('.ag-tab-nav'); if(!n || n.querySelector('[data-tab="t-hoy"]')) return;
     var cumple=document.getElementById('ag-tab-cumple'), cp=document.getElementById('ag-panel-cumple'); if(!cp) return;
-    TABS_AG.forEach(function(v){ var b=document.createElement('button'); b.className='ag-tab'; b.setAttribute('data-tab',v[0]); b.textContent=v[2]; b.onclick=function(){ window.agxTabTareas(v[1], b); }; n.insertBefore(b, cumple||null); });
+    var ref=n.querySelector('.ag-tab[data-tab="horario"]'), sig=ref?ref.nextSibling:(cumple||null);
+    TABS_AG.forEach(function(v){ var b=document.createElement('button'); b.className='ag-tab'; b.setAttribute('data-tab',v[0]); var mm=/^(\S+)\s+(.*)$/.exec(v[2]); b.innerHTML='<span class="ag-ico">'+mm[1]+'</span><span class="ag-lb">'+mm[2]+'</span>'; b.onclick=function(){ window.agxTabTareas(v[1], b); }; n.insertBefore(b, sig); });
+    // las pestañas de siempre: el emoji arriba y la palabra abajo (más legible en el celular)
+    [].forEach.call(n.querySelectorAll('.ag-tab'), function(b){
+      if(b.querySelector('.ag-ico') || b.id==='ag-tab-cumple' || b.children.length) return;
+      var m2=/^(\S+)\s+(.*)$/.exec(b.textContent.trim()); if(m2 && /[^\w\s]/.test(m2[1]) && !/^[A-Za-zÁÉÍÓÚáéíóú]/.test(m2[1])) b.innerHTML='<span class="ag-ico">'+m2[1]+'</span><span class="ag-lb">'+m2[2]+'</span>';
+    });
+    var cu=document.getElementById('ag-tab-cumple'); if(cu && !cu.querySelector('.ag-ico')){ var tn=cu.firstChild; if(tn && tn.nodeType===3){ var m3=/^(\S+)\s+(.*)$/.exec(tn.textContent.trim()); if(m3){ var w=document.createElement('span'); w.innerHTML='<span class="ag-ico">'+m3[1]+'</span><span class="ag-lb">'+m3[2]+'</span>'; cu.replaceChild(w,tn); } } }
+    contadorBandeja();
     var panel=document.createElement('div'); panel.id='ag-panel-tareas'; panel.style.display='none'; cp.parentNode.insertBefore(panel, cp);
     // «Semana» pasa a ser el calendario tipo Google (rejilla por horas); Hoy y Mes siguen como estaban
     var oSw=window.agSwitchTab;
@@ -1567,6 +1590,7 @@
   if(typeof gpOriginal==='function'){
     window.goPage = function(name){
       var r = gpOriginal.apply(this, arguments);
+      if(name==='agenda'){ try{ contadorBandeja(); }catch(e){} }
       if(name==='tareas'){ var p=document.getElementById('page-tareas'); if(p && p.classList.contains('active')){ volverRoot(); abrir(); } }
       return r;
     };
