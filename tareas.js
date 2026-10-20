@@ -258,6 +258,63 @@
     document.head.appendChild(s);
   }
 
+  // ---------- Ajuste a cada dispositivo (iPhone, iPad, computador) ----------
+  function estiloMovil(){
+    if(document.getElementById('tr-movil-style')) return;
+    var st_=document.createElement('style'); st_.id='tr-movil-style';
+    st_.textContent = [
+'/* nada debe ensanchar la página: el contenido se adapta al ancho de la pantalla */',
+'#main{min-width:0;max-width:100%}',
+'@media(max-width:1280px){',
+'  #main .agg-scroll > div{min-width:520px!important}',
+'  #main .agg-side{width:190px}',
+'}',
+'@media(max-width:1024px){',
+'  #main{min-width:0;max-width:100%}',
+'  #main > .page{max-width:100%}',
+'  .ag-tab-nav{flex-wrap:wrap;overflow:visible;border-radius:14px;margin-bottom:14px;border:1.5px solid #f1dde2}',
+'  .ag-tab{flex:1 1 auto;white-space:nowrap;padding:11px 10px;min-height:44px;margin-bottom:0;border-bottom:3px solid transparent;letter-spacing:.03em}',
+'  html:not(.modo-agenda) #main > .page.active{padding-top:50px}',
+'  .ag-tab{color:var(--strong)}',
+'  .ag-tab.active{color:var(--text)}',
+'}',
+'@media(max-width:1024px){',
+'  /* en iPhone/iPad, letra de 16px en los campos evita que Safari acerque la pantalla al escribir */',
+'  .agg-f input,.agg-f select,.agg-f textarea,.agg-in-titulo,.tr-f input,.tr-f select,.tr-f textarea,#tr-nuevo,#tr-idea,#trq,.tr-sel,.tr-add input[type=text]{font-size:16px}',
+'  .agg-2{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}',
+'  .agg-f input,.agg-f select{min-width:0;max-width:100%}',
+'  .agg-modal{padding:18px 16px}',
+'}',
+'@media(max-width:560px){',
+'  .agg-2:has(input[type=datetime-local]){grid-template-columns:1fr}',
+'}',
+'@media(max-width:820px){',
+'  #main .agg-wrap{align-items:stretch}',
+'  #main .agg-main,#main .agg-side{width:100%;min-width:0;max-width:100%}',
+'  #main .agg-toolbar{gap:4px}',
+'  #main .agg-title{font-size:1.02rem;margin:0 4px}',
+'}',
+'@media(max-width:700px){',
+'  .ag-tab-nav{display:grid;grid-template-columns:repeat(4,1fr);gap:0}',
+'  .ag-tab{padding:9px 2px;font-size:.66rem;letter-spacing:0;text-align:center;white-space:normal;line-height:1.25;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}',
+'  #ag-tab-cumple{display:flex!important;flex-direction:column;gap:2px}',
+'  .tr-wrap{padding-left:0;padding-right:0}',
+'  .page-header{margin-bottom:12px}',
+'  #ag-panel-tareas .tr-h1{display:none}',
+'  .tr-top{gap:8px;align-items:center}',
+'  .tr-foco-btn{padding:10px 12px;font-size:.84rem;white-space:nowrap}',
+'  #main .tr-filtros,#main .tr-vistas,.tr-add .tr-chips{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}',
+'  #main .tr-filtros > *,#main .tr-vistas > *,.tr-add .tr-chips > *{flex:0 0 auto;white-space:nowrap}',
+'  #main .tr-filtros::-webkit-scrollbar,#main .tr-vistas::-webkit-scrollbar,.tr-add .tr-chips::-webkit-scrollbar{display:none}',
+'  .tr-tabs{overflow-x:auto;-webkit-overflow-scrolling:touch}',
+'  .tr-tab{min-width:0;flex:1 1 0;padding:10px 2px;font-size:.74rem}',
+'  .tr-sel{max-width:100%}',
+'}'
+    ].join('\n');
+    document.head.appendChild(st_);
+  }
+  estiloMovil();
+
   // ---------- estructura ----------
   function abrir(){
     estilo(); cargar(); try{ if(typeof window.agxMigrarAreas==='function') window.agxMigrarAreas(); }catch(e){}
