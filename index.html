@@ -2026,6 +2026,7 @@ html.modo-agenda #ag-app-extra { display:flex; position:fixed; left:8px; bottom:
     <div class="fg" id="ag-edit-rep-hasta-wrap" style="margin-bottom:12px;display:none"><label class="lbl">Repetir hasta (crea copias de esta cita)</label><input type="date" id="ag-edit-rep-hasta"></div>
     <div class="fg" style="margin-bottom:16px"><label class="lbl">Descripción / Notas</label><textarea id="ag-edit-desc" rows="2"></textarea></div>
     <div class="btn-row">
+      <button class="btn" style="color:#c0392b;border-color:#e8a0a0;margin-right:auto" onclick="agGEliminarDesdeEdicion()">🗑 Eliminar</button>
       <button class="btn" onclick="document.getElementById('ag-edit-overlay').classList.remove('open')">Cancelar</button>
       <button class="btn primary" onclick="agGuardarEdicion()">💾 Guardar cambios</button>
     </div>

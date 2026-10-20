@@ -2950,6 +2950,57 @@ var AG_SNAP_MIN = 15;
   },true);
 })();
 
+// ---- Eliminar citas (una sola, o toda una serie) ----
+function agSerieKey(e){
+  if(e.pacienteId) return 'p:'+e.pacienteId;
+  return 't:'+String(e.titulo||'').replace(/Sesión #\d+/i,'Sesión #').trim().toLowerCase();
+}
+function agGSnack(texto, fnDeshacer, ms){
+  var u=document.getElementById('agg-undo'); if(u) u.remove();
+  u=document.createElement('div'); u.id='agg-undo'; u.className='agg-undo';
+  var s=document.createElement('span'); s.textContent=texto; u.appendChild(s);
+  var b=document.createElement('button'); b.type='button'; b.textContent='Deshacer';
+  b.onclick=function(){ fnDeshacer(); u.remove(); }; u.appendChild(b);
+  document.body.appendChild(u);
+  setTimeout(function(){ if(u.parentNode) u.remove(); }, ms||10000);
+}
+function agGEliminarDesdeEdicion(){
+  var id=document.getElementById('ag-edit-id').value;
+  var e=agEventos.filter(function(x){return x.id===id;})[0]; if(!e) return;
+  agInyectarEstiloG(); agGCerrarModal();
+  var key=agSerieKey(e), cal=agEventoCalId(e);
+  var serie=agEventos.filter(function(x){ return agSerieKey(x)===key && agEventoCalId(x)===cal; });
+  var siguientes=serie.filter(function(x){ return String(x.inicio)>=String(e.inicio); });
+  var base=String(e.titulo||'').replace(/Sesión #\d+/i,'').replace(/^[\s·\-–]+|[\s·\-–]+$/g,'').trim() || String(e.titulo||'');
+  function fmt(x){ var d=new Date(x.inicio); return d.toLocaleDateString('es-CO',{weekday:'short',day:'numeric',month:'short'})+' '+agFormatHora(x.inicio); }
+  var ops=[{n:1,txt:'Solo esta cita ('+fmt(e)+')',sel:function(x){return x.id===id;}}];
+  if(siguientes.length>1) ops.push({n:siguientes.length,txt:'Esta y las '+(siguientes.length-1)+' siguientes de la misma serie',sel:function(x){return siguientes.indexOf(x)>=0;}});
+  if(serie.length>siguientes.length) ops.push({n:serie.length,txt:'Todas las citas de «'+base+'» ('+serie.length+', pasadas y futuras)',sel:function(x){return serie.indexOf(x)>=0;}});
+  var m=document.createElement('div'); m.id='agg-modal'; m.className='agg-modal-bg';
+  m.onclick=function(ev){ if(ev.target===m) agGCerrarModal(); };
+  var h='<div class="agg-modal" style="max-width:420px"><div style="font-size:1.1rem;margin-bottom:6px;color:#3c4043">¿Qué quieres eliminar?</div>'
+    +'<div style="font-size:.8rem;color:#70757a;margin-bottom:14px">«'+agEsc(e.titulo)+'» · podrás deshacerlo durante 10 segundos.</div>';
+  ops.forEach(function(o,i){
+    h+='<button type="button" data-op="'+i+'" style="display:block;width:100%;text-align:left;margin-bottom:8px;padding:11px 14px;border:1px solid #dadce0;border-radius:8px;background:#fff;color:#d93025;font-size:.86rem;cursor:pointer">🗑 '+agEsc(o.txt)+'</button>';
+  });
+  h+='<div class="agg-acc"><button class="agg-sec" onclick="agGCerrarModal()">Cancelar</button></div></div>';
+  m.innerHTML=h; document.body.appendChild(m);
+  [].slice.call(m.querySelectorAll('button[data-op]')).forEach(function(b){
+    b.onclick=function(){
+      var o=ops[+b.getAttribute('data-op')];
+      var quitadas=[];
+      for(var i=agEventos.length-1;i>=0;i--){ if(o.sel(agEventos[i])){ quitadas.unshift(agEventos[i]); agEventos.splice(i,1); } }
+      agGuardar();
+      agGCerrarModal();
+      var ov=document.getElementById('ag-edit-overlay'); if(ov) ov.classList.remove('open');
+      renderAgenda();
+      agGSnack(quitadas.length===1?'Cita eliminada':quitadas.length+' citas eliminadas', function(){
+        quitadas.forEach(function(x){ agEventos.push(x); }); agGuardar(); renderAgenda();
+      }, 10000);
+    };
+  });
+}
+
 // ---- Ventana "Nueva cita" ----
 function agGCerrarModal(){ var m = document.getElementById('agg-modal'); if(m) m.remove(); }
 
