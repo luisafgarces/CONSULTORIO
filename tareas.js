@@ -8,7 +8,7 @@
 
   var KEY = 'tareas';
   var T = [], B = [];                                   // todas las tareas
-  var st = { fPrio:'todas', fFecha:'todas', verArch:false, verFiltros:false, saltadas:[], verDespues:false, verTodas:false, abiertas:{}, estadoV:'curso', estadoElegido:false, vista:'hoy', filtro:'todas', verAtrasadas:false, verMasHoy:false, addFecha:null, addLista:'', foco:null, sync:null };
+  var st = { fPrio:'todas', fFecha:'todas', verArch:false, verFiltros:false, saltadas:[], verDespues:false, verTodas:false, abiertas:{}, estadoV:'curso', estadoElegido:false, vista:'hoy', filtro:'todas', verAtrasadas:false, verMasHoy:false, area:'', areaMas:{}, areaHechas:false, addFecha:null, addLista:'', foco:null, sync:null };
   try { st.estadoV = localStorage.getItem('tr_estadoV') || 'curso'; st.vista = localStorage.getItem('tr_vista') || 'hoy'; if(st.vista==='hechas'){ st.vista='tareas'; st.estadoV='completada'; st.estadoElegido=true; } st.filtro = localStorage.getItem('tr_filtro') || 'todas'; st.addLista = localStorage.getItem('tr_lista') || ''; } catch(e){}
   var MAX_HOY = 8;
 
@@ -35,6 +35,23 @@
   }
   function lista(id){ var l=listas().filter(function(x){return x.id===id;})[0]; return l || listas()[0]; }
   function ls(k,v){ try{ localStorage.setItem(k,v); }catch(e){} }
+
+  // ---------- ÁREAS ----------
+  var DESC_AREA = {
+    consultorio:'Pacientes, agenda, seguimiento administrativo, contenido, captación y desarrollo del consultorio.',
+    conmovilidad:'Diseños, entregables, reuniones, solicitudes y fechas de entrega.',
+    hospital:'Turnos, actividades laborales, trámites y pendientes relacionados con ese trabajo.',
+    personal:'Casa, diligencias, finanzas personales, actividades familiares y asuntos propios.'
+  };
+  var COLORES_AREA = ['#cd8e9d','#e67c73','#f4511e','#f6bf26','#33b679','#039be5','#7986cb','#8e24aa','#616161'];
+  function descMap(){ var m=null; try{ m=DB.get('areas_desc'); }catch(e){} return (m && typeof m==='object' && !Array.isArray(m)) ? m : {}; }
+  function descArea(id){ var m=descMap(); if(m[id]!=null) return String(m[id]); return DESC_AREA[id]||''; }
+  function areaDe(t){ var id=t.lista||'consultorio', l=listas(); return l.some(function(x){return x.id===id;}) ? id : l[0].id; }
+  function tareasDeArea(id){ return T.filter(function(t){ return areaDe(t)===id; }); }
+  function areaPref(ls_){
+    if(st.vista==='areas' && st.area && ls_.some(function(l){return l.id===st.area;})) return st.area;
+    return (st.addLista && ls_.some(function(l){return l.id===st.addLista;})) ? st.addLista : (st.filtro!=='todas' ? st.filtro : ls_[0].id);
+  }
 
   // ---------- vínculo con el calendario (misma información, sin duplicar) ----------
   function evs(){ return (typeof agEventos!=='undefined' && Array.isArray(agEventos)) ? agEventos : []; }
@@ -224,14 +241,25 @@
 '.md-plan{display:flex;gap:8px;align-items:center;padding:9px 0;border-bottom:1px dashed #f1dde2}',
 '.md-plan .m{flex:1;min-width:0;font-size:.9rem;word-break:break-word}',
 '.md-plan button{border:1.5px solid #ecd3d9;background:#fff;color:#7a3c4b;border-radius:12px;padding:6px 10px;font-size:.76rem;cursor:pointer}',
-'.md-plan button.on{background:#cd8e9d;border-color:#cd8e9d;color:#fff;font-weight:700}'
+'.md-plan button.on{background:#cd8e9d;border-color:#cd8e9d;color:#fff;font-weight:700}',
+'.tr-areab{border:1px dashed #e3c3cb;background:#fff;color:#6b5459;border-radius:10px;padding:2px 8px;font-size:.76rem;cursor:pointer;display:inline-flex;align-items:center;gap:4px;min-height:26px}',
+'.ar-card{background:#fff;border:1.5px solid #f1dde2;border-left-width:7px;border-radius:14px;padding:12px 14px;margin-bottom:10px;cursor:pointer}',
+'.ar-card:active{background:#fdf6f8}',
+'.ar-t{font-weight:700;color:#4a3a3f;font-size:1.02rem}',
+'.ar-d{font-size:.82rem;color:#6b5459;margin-top:3px}',
+'.ar-c{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px;font-size:.78rem;color:#7a3c4b}',
+'.ar-c span{background:#fbe9ee;border-radius:10px;padding:2px 9px}',
+'.ar-head{background:#fff;border:1.5px solid #f1dde2;border-left-width:7px;border-radius:14px;padding:12px 14px;margin:6px 0 10px}',
+'.ar-sw{display:flex;gap:8px;flex-wrap:wrap;margin-top:4px}',
+'.ar-sw span{width:30px;height:30px;border-radius:50%;cursor:pointer;border:3px solid transparent}',
+'.ar-sw span.sel{border-color:#4a3a3f}'
     ].join('\n');
     document.head.appendChild(s);
   }
 
   // ---------- estructura ----------
   function abrir(){
-    estilo(); cargar();
+    estilo(); cargar(); try{ if(typeof window.agxMigrarAreas==='function') window.agxMigrarAreas(); }catch(e){}
     var root = document.getElementById('tareas-root'); if(!root) return;
     if(!document.getElementById('tr-head')){
       var d = new Date();
@@ -257,7 +285,7 @@
 
   function fechaPorDefecto(){
     if(st.addFecha) return st.addFecha;
-    return (st.vista==='bandeja'||st.vista==='tareas') ? 'sin' : st.vista==='proximas' ? 'manana' : 'hoy';
+    return (st.vista==='bandeja'||st.vista==='tareas'||st.vista==='areas') ? 'sin' : st.vista==='proximas' ? 'manana' : 'hoy';
   }
   function resolverFecha(clave){
     var h=hoy();
@@ -266,7 +294,7 @@
   }
 
   function pintar(){
-    var ab=document.getElementById('tr-addbar'); if(ab) ab.style.display=(st.vista==='bandeja')?'none':'';
+    var ab=document.getElementById('tr-addbar'); if(ab) ab.style.display=(st.vista==='bandeja' || (st.vista==='areas' && !st.area))?'none':'';
     pintarHead(); pintarAddChips(); pintarTabs(); pintarFiltros(); pintarContenido();
   }
 
@@ -284,7 +312,7 @@
     var f=fechaPorDefecto(), h=hoy();
     var esOtra = f!=='hoy' && f!=='manana' && f!=='sin' && f!=='bandeja';
     var ls_ = listas();
-    var actual = st.addLista && ls_.some(function(l){return l.id===st.addLista;}) ? st.addLista : (st.filtro!=='todas' ? st.filtro : ls_[0].id);
+    var actual = areaPref(ls_);
     el.innerHTML =
       '<button class="tr-chip'+(f==='hoy'?' on':'')+'" data-act="afecha" data-v="hoy">Hoy</button>'
       +'<button class="tr-chip'+(f==='manana'?' on':'')+'" data-act="afecha" data-v="manana">Mañana</button>'
@@ -301,13 +329,13 @@
     var nHoy = pen.filter(function(t){var f=fechaEf(t); return f && f<=h;}).length;
     function tab(id,txt){ return '<button class="tr-tab'+(st.vista===id?' on':'')+'" data-act="vista" data-v="'+id+'">'+txt+'</button>'; }
     var nAct = T.filter(function(t){return !t.hecha;}).length;
-    el.innerHTML = tab('hoy','☀️ Mi día'+(nHoy?' ('+nHoy+')':''))+tab('bandeja','📥 Bandeja'+(nBand?' ('+nBand+')':''))+tab('tareas','✅ Tareas'+(nAct?' ('+nAct+')':''))+tab('proximas','📅 Próximas');
+    el.innerHTML = tab('hoy','☀️ Mi día'+(nHoy?' ('+nHoy+')':''))+tab('bandeja','📥 Bandeja'+(nBand?' ('+nBand+')':''))+tab('tareas','✅ Tareas'+(nAct?' ('+nAct+')':''))+tab('proximas','📅 Próximas')+tab('areas','🗂 Áreas'); marcarTabAgenda();
   }
 
   function pintarFiltros(){
     var el=document.getElementById('tr-filtros'); if(!el) return;
     var ls_=listas();
-    if(ls_.length<2){ el.innerHTML=''; return; }
+    if(ls_.length<2 || st.vista==='areas'){ el.innerHTML=''; return; }
     el.innerHTML = '<button class="tr-chip'+(st.filtro==='todas'?' on':'')+'" data-act="filtro" data-v="todas">Todas</button>'
       + ls_.map(function(l){ return '<button class="tr-chip'+(st.filtro===l.id?' on':'')+'" data-act="filtro" data-v="'+esc(l.id)+'"><span class="tr-dot" style="background:'+esc(l.color)+'"></span>'+esc(l.nombre)+'</button>'; }).join('');
   }
@@ -315,7 +343,7 @@
   function fila(t, opts){
     opts = opts || {};
     var l = lista(t.lista||'consultorio'), h=hoy(), full=!!opts.full, ide=esc(t.id);
-    var meta = '<span><span class="tr-dot" style="background:'+esc(l.color)+'"></span>'+esc(l.nombre)+'</span>';
+    var meta = opts.sinArea ? '' : '<button type="button" class="tr-areab" data-act="area" data-id="'+ide+'" title="Cambiar de área"><span class="tr-dot" style="background:'+esc(l.color)+'"></span>'+esc(l.nombre)+' ▾</button>';
     if(!t.hecha && (full || t.estado!=='pendiente')) meta += '<button type="button" class="tr-est e-'+t.estado+'" data-act="estado" data-id="'+ide+'">'+ESTADO_ICO[t.estado]+' '+ESTADO_TXT[t.estado]+'</button>';
     if(t.limite){ var venc=!t.hecha && t.limite<h, hl=!t.hecha && t.limite===h; meta += '<span style="color:'+((venc||hl)?'#c0392b':'#a0536a')+';font-weight:700">⛔ Límite '+esc(etiquetaDia(t.limite))+(venc?' (vencida)':'')+'</span>'; }
     if(full && !t.hecha){ if(t.prioridad==='alta') meta += '<span>🔺 Alta</span>'; else if(t.prioridad==='baja') meta += '<span>🔻 Baja</span>'; }
@@ -361,6 +389,8 @@
       html = vistaMiDia();
     } else if(st.vista==='bandeja'){
       html = vistaBandeja();
+    } else if(st.vista==='areas'){
+      html = vistaAreas();
     } else if(st.vista==='proximas'){
       var p = pen.filter(function(t){var f=fechaEf(t); return f && f>h;}).sort(function(a,b){ return fechaEf(a)<fechaEf(b)?-1:fechaEf(a)>fechaEf(b)?1:ordenar(a,b); });
       if(!p.length) html += '<div class="tr-vacio"><b>Nada programado</b>Cuando le pongas fecha a una tarea, aparece aquí.</div>';
@@ -497,7 +527,7 @@
     else if(act==='otra'){ st.saltadas.push(id); pintarContenido(); }
     else if(act==='planear'){ abrirPlan(); }
     else if(act==='reorg'){ reorganizarDia(); }
-    else if(act==='vercal'){ goPage('agenda'); }
+    else if(act==='vercal'){ irCalendario(); }
     else if(act==='pdespues'){ st.verDespues=!st.verDespues; pintarContenido(); }
     else if(act==='pausarb'){ var tb=porId(id); if(tb) pausarTarea(tb); }
     else if(act==='estado'){ abrirEstado(id); }
@@ -510,6 +540,14 @@
     else if(act==='ffecha'){ st.fFecha=v; st.verTodas=false; pintarContenido(); }
     else if(act==='limpiarf'){ st.fPrio='todas'; st.fFecha='todas'; pintarContenido(); }
     else if(act==='tmas'){ st.verTodas=!st.verTodas; pintarContenido(); }
+    else if(act==='area'){ abrirMoverArea(id); }
+    else if(act==='areaver'){ st.area=v; st.areaMas={}; st.areaHechas=false; pintar(); try{ window.scrollTo(0,0); }catch(e){} }
+    else if(act==='areaback'){ st.area=''; pintar(); }
+    else if(act==='areanueva'){ abrirArea(''); }
+    else if(act==='areaedit'){ abrirArea(v); }
+    else if(act==='areacal'){ if(typeof window.agxVerArea==='function') window.agxVerArea(st.area); else goPage('agenda'); }
+    else if(act==='areamas'){ st.areaMas[v]=!st.areaMas[v]; pintarContenido(); }
+    else if(act==='areahechas'){ st.areaHechas=!st.areaHechas; pintarContenido(); }
   }
   function changeRoot(e){
     var el=e.target, act=el.getAttribute && el.getAttribute('data-act');
@@ -641,6 +679,143 @@
       if(ev==='completada' && hec.length) html+='<div style="text-align:center"><button class="tr-link" data-act="borrar-hechas">Borrar completadas</button></div>';
     }
     return html;
+  }
+
+  // ===================== ÁREAS =====================
+  function conteoArea(id){
+    var c={curso:0,pendiente:0,pausada:0,espera:0,completada:0};
+    tareasDeArea(id).forEach(function(t){ if(c[t.estado]!=null) c[t.estado]++; });
+    return c;
+  }
+  function textoConteo(c){
+    var p=[];
+    if(c.curso) p.push('▶ '+c.curso+' en curso');
+    if(c.pendiente) p.push(c.pendiente+(c.pendiente>1?' pendientes':' pendiente'));
+    if(c.pausada) p.push('⏸ '+c.pausada+(c.pausada>1?' pausadas':' pausada'));
+    if(c.espera) p.push('⏳ '+c.espera+' en espera');
+    if(c.completada) p.push('✔ '+c.completada+(c.completada>1?' completadas':' completada'));
+    return p.length ? p.map(function(x){ return '<span>'+x+'</span>'; }).join('') : '<span>Sin tareas todavía</span>';
+  }
+  function vistaAreas(){
+    var ls_=listas();
+    if(st.area && !ls_.some(function(l){return l.id===st.area;})) st.area='';
+    if(st.area) return vistaArea(st.area);
+    var html='<div class="tr-hint" style="margin-bottom:8px">Cada tarea pertenece a un área. Toca una para ver solo lo suyo.</div>'
+      +'<div class="tr-barra"><button class="tr-nueva" data-act="areanueva">＋ Nueva área</button></div>';
+    ls_.forEach(function(l){
+      var d=descArea(l.id);
+      html+='<div class="ar-card" data-act="areaver" data-v="'+esc(l.id)+'" style="border-left-color:'+esc(l.color)+'"><div class="ar-t">'+esc(l.nombre)+'</div>'
+        +(d?'<div class="ar-d">'+esc(d)+'</div>':'')+'<div class="ar-c">'+textoConteo(conteoArea(l.id))+'</div></div>';
+    });
+    return html;
+  }
+  function vistaArea(id){
+    var l=lista(id), d=descArea(id), c=conteoArea(id), now=new Date();
+    var html='<div><button class="tr-link" data-act="areaback">← Todas las áreas</button></div>'
+      +'<div class="ar-head" style="border-left-color:'+esc(l.color)+'"><div class="ar-t">'+esc(l.nombre)+'</div>'+(d?'<div class="ar-d">'+esc(d)+'</div>':'')+'</div>'
+      +'<div class="tr-barra"><button class="tr-nueva" data-act="nueva">＋ Nueva tarea</button>'
+      +'<button class="tr-chip" data-act="areacal">📅 Ver en el calendario</button>'
+      +'<button class="tr-chip" data-act="areaedit" data-v="'+esc(id)+'">✏ Editar área</button></div>';
+    var prox=evs().filter(function(e){ return (e.calendario||'consultorio')===id && e.inicio && new Date(e.fin||e.inicio)>=now; })
+      .sort(function(a,b){ return String(a.inicio).localeCompare(String(b.inicio)); }).slice(0,3);
+    if(prox.length) html+='<div class="tr-sec"><span>📅 Próximos compromisos</span></div>'
+      +prox.map(function(e){ return '<div class="md-opt"><div class="m"><div class="tt">'+esc(e.titulo||'Compromiso')+'</div><div class="md-sub">'+esc(bloqueTxt(e))+'</div></div></div>'; }).join('');
+    var todas=tareasDeArea(id);
+    var secs=[['curso','▶ En curso'],['pendiente','Pendientes'],['pausada','⏸ Pausadas'],['espera','⏳ En espera'],['completada','✔ Completadas']];
+    var MAX=5;
+    secs.forEach(function(sc){
+      var e=sc[0], n=c[e];
+      if(e==='espera' && !n) return;
+      html+='<div class="tr-sec"><span>'+sc[1]+' · '+n+'</span></div>';
+      if(!n){ html+='<div class="tr-hint">Nada aquí por ahora.</div>'; return; }
+      if(e==='completada' && !st.areaHechas){ html+='<div style="text-align:center"><button class="tr-link" data-act="areahechas">Ver completadas ('+n+')</button></div>'; return; }
+      var lst=todas.filter(function(t){ return t.estado===e; });
+      lst = e==='completada' ? lst.sort(porHechaDesc) : lst.sort(ordenTareas);
+      var vis = st.areaMas[e] ? lst : lst.slice(0,MAX);
+      html+=vis.map(function(t){ return fila(t,{full:true, restaurar:t.hecha, sinArea:true}); }).join('');
+      if(lst.length>MAX) html+='<div style="text-align:center"><button class="tr-link" data-act="areamas" data-v="'+e+'">'+(st.areaMas[e]?'Ver menos':'Ver '+(lst.length-MAX)+' más')+'</button></div>';
+      if(e==='completada') html+='<div style="text-align:center"><button class="tr-link" data-act="areahechas">Ocultar completadas</button></div>';
+    });
+    return html;
+  }
+
+  // Cambiar una tarea de área (con sus bloques del calendario)
+  function abrirMoverArea(id){
+    var t=porId(id); if(!t) return;
+    var actual=areaDe(t);
+    var m=sheet('<div class="tr-sec" style="margin-top:0"><span>Mover a otra área</span></div>'
+      +listas().map(function(l){ return '<button type="button" class="tr-estopt'+(l.id===actual?' on':'')+'" data-a="'+esc(l.id)+'"><span class="tr-dot" style="background:'+esc(l.color)+'"></span> '+esc(l.nombre)+'</button>'; }).join('')
+      +'<div class="tr-acc"><button type="button" class="tr-sec2" id="trs-no">Cerrar</button></div>');
+    m.querySelector('#trs-no').onclick=cerrarSheet;
+    [].slice.call(m.querySelectorAll('[data-a]')).forEach(function(b){ b.onclick=function(){ var a=b.getAttribute('data-a'); cerrarSheet(); if(a!==actual) moverArea(t,a); }; });
+  }
+  function moverArea(t, dest){
+    var prev=t.lista, bl=bloquesDe(t.id), prevB=bl.map(function(e){ return e.calendario; });
+    t.lista=dest; bl.forEach(function(e){ e.calendario=dest; });
+    guardar(); if(bl.length && typeof agGuardar==='function') agGuardar();
+    pintar();
+    snack('Movida a '+lista(dest).nombre, function(){ t.lista=prev; bl.forEach(function(e,i){ e.calendario=prevB[i]; }); guardar(); if(bl.length && typeof agGuardar==='function') agGuardar(); pintar(); }, 6000);
+  }
+
+  // Crear / editar área (comparte datos con el calendario: mismas áreas en los dos lados)
+  function guardarListaAreas(l){
+    if(typeof agGuardarCalendarios==='function') agGuardarCalendarios(l); else DB.set('agenda_calendarios', l);
+  }
+  function abrirArea(id){
+    var ls_=listas(), a = id ? ls_.filter(function(x){return x.id===id;})[0] : null;
+    if(id && !a) return;
+    var color = a ? a.color : COLORES_AREA[ls_.length % COLORES_AREA.length];
+    var m=sheet('<h3 style="margin:0 0 10px;font-family:\'Playfair Display\',serif;color:#7a3c4b">'+(a?'Editar área':'Nueva área')+'</h3>'
+      +'<div class="tr-f"><label>Nombre</label><input id="tra-n" type="text" value="'+esc(a?a.nombre:'')+'" placeholder="Ej: Docencia"></div>'
+      +'<div class="tr-f"><label>¿Qué incluye? (opcional)</label><textarea id="tra-d" rows="3" placeholder="Ej: clases, preparación, calificación">'+esc(a?descArea(a.id):'')+'</textarea></div>'
+      +'<div class="tr-f"><label>Color</label><div class="ar-sw" id="tra-sw" data-color="'+esc(color)+'">'+COLORES_AREA.map(function(k){ return '<span data-k="'+k+'" style="background:'+k+'" class="'+(k===color?'sel':'')+'"></span>'; }).join('')+'</div></div>'
+      +'<div class="tr-hint" id="tra-err" style="color:#b3453a"></div>'
+      +'<div class="tr-acc">'+((a && a.id!=='consultorio')?'<button type="button" class="tr-sec2" id="tra-del" style="color:#b3453a">Eliminar</button>':'')
+      +'<button type="button" class="tr-sec2" id="tra-no">Cancelar</button><button type="button" class="tr-pri" id="tra-ok">Guardar</button></div>');
+    var sw=m.querySelector('#tra-sw');
+    [].slice.call(sw.children).forEach(function(sp){ sp.onclick=function(){ sw.setAttribute('data-color',sp.getAttribute('data-k')); [].slice.call(sw.children).forEach(function(x){ x.classList.remove('sel'); }); sp.classList.add('sel'); }; });
+    m.querySelector('#tra-no').onclick=cerrarSheet;
+    var del=m.querySelector('#tra-del'); if(del) del.onclick=function(){ cerrarSheet(); eliminarArea(id); };
+    m.querySelector('#tra-ok').onclick=function(){
+      var nombre=m.querySelector('#tra-n').value.replace(/\s+/g,' ').trim(), desc=m.querySelector('#tra-d').value.trim(), col=sw.getAttribute('data-color');
+      var err=m.querySelector('#tra-err');
+      if(!nombre){ err.textContent='Escribe un nombre para el área.'; return; }
+      if(ls_.some(function(x){ return x.id!==id && x.nombre.toLowerCase()===nombre.toLowerCase(); })){ err.textContent='Ya existe un área con ese nombre.'; return; }
+      var base=ls_.map(function(c){ return {id:c.id,nombre:c.nombre,color:c.color}; }), nid=id;
+      if(id) base.forEach(function(c){ if(c.id===id){ c.nombre=nombre; c.color=col; } });
+      else { nid='cal_'+Date.now().toString(36); base.push({id:nid,nombre:nombre,color:col}); }
+      guardarListaAreas(base);
+      var dm=descMap(); dm[nid]=desc; DB.set('areas_desc', dm);
+      cerrarSheet();
+      if(!id){ st.area=nid; st.vista='areas'; ls('tr_vista','areas'); }
+      pintar(); snack(id?'Área guardada ✓':'Área creada ✓',null,2500);
+    };
+    setTimeout(function(){ var i=m.querySelector('#tra-n'); if(i && !a) i.focus(); },50);
+  }
+  function eliminarArea(id){
+    if(id==='consultorio'){ snack('Esta área no se puede eliminar',null,3000); return; }
+    var ls_=listas(), a=ls_.filter(function(x){return x.id===id;})[0]; if(!a) return;
+    var tareas=tareasDeArea(id), eventos=evs().filter(function(e){ return (e.calendario||'consultorio')===id; });
+    var otras=ls_.filter(function(x){return x.id!==id;});
+    function quitar(dest){
+      if(dest){ tareas.forEach(function(t){ t.lista=dest; }); eventos.forEach(function(e){ e.calendario=dest; }); guardar(); if(eventos.length && typeof agGuardar==='function') agGuardar(); }
+      guardarListaAreas(ls_.filter(function(x){return x.id!==id;}).map(function(c){ return {id:c.id,nombre:c.nombre,color:c.color}; }));
+      var dm=descMap(); delete dm[id]; DB.set('areas_desc', dm);
+      try{ var o=JSON.parse(localStorage.getItem('ag_cal_ocultos')||'[]').filter(function(x){return x!==id;}); localStorage.setItem('ag_cal_ocultos',JSON.stringify(o)); }catch(e){}
+      st.area=''; pintar(); snack('Área eliminada',null,3000);
+    }
+    if(!tareas.length && !eventos.length){
+      var m0=sheet('<h3 style="margin:0 0 10px;font-family:\'Playfair Display\',serif;color:#7a3c4b">¿Eliminar «'+esc(a.nombre)+'»?</h3><div class="tr-hint">Está vacía.</div>'
+        +'<div class="tr-acc"><button type="button" class="tr-sec2" id="trd-no">Cancelar</button><button type="button" class="tr-pri" id="trd-ok">Eliminar</button></div>');
+      m0.querySelector('#trd-no').onclick=cerrarSheet; m0.querySelector('#trd-ok').onclick=function(){ cerrarSheet(); quitar(''); };
+      return;
+    }
+    var m=sheet('<h3 style="margin:0 0 10px;font-family:\'Playfair Display\',serif;color:#7a3c4b">Eliminar «'+esc(a.nombre)+'»</h3>'
+      +'<div class="tr-hint" style="margin-bottom:8px">Tiene '+tareas.length+' tarea'+(tareas.length===1?'':'s')+' y '+eventos.length+' compromiso'+(eventos.length===1?'':'s')+'. No se borra nada: pasan a otra área.</div>'
+      +'<div class="tr-f"><label>Pasar todo a…</label><select id="trd-dest">'+otras.map(function(x){ return '<option value="'+esc(x.id)+'">'+esc(x.nombre)+'</option>'; }).join('')+'</select></div>'
+      +'<div class="tr-acc"><button type="button" class="tr-sec2" id="trd-no">Cancelar</button><button type="button" class="tr-pri" id="trd-ok">Mover y eliminar</button></div>');
+    m.querySelector('#trd-no').onclick=cerrarSheet;
+    m.querySelector('#trd-ok').onclick=function(){ var d=m.querySelector('#trd-dest').value; cerrarSheet(); quitar(d); };
   }
 
   // ---------- ventanitas ----------
@@ -924,7 +1099,7 @@
   // ---------- Nueva tarea (4 preguntas) ----------
   function abrirNueva(){
     var ls_=listas();
-    var area=(st.addLista && ls_.some(function(l){return l.id===st.addLista;})) ? st.addLista : (st.filtro!=='todas' ? st.filtro : ls_[0].id);
+    var area=areaPref(ls_);
     var conLim=false;
     var m=sheet('<h3 style="margin:0 0 12px;font-family:\'Playfair Display\',serif;color:#7a3c4b">＋ Nueva tarea</h3>'
       +'<div class="tr-f"><label>1. ¿Qué necesitas hacer?</label><input id="trn-tit" type="text" autocomplete="off" placeholder="Ej: Terminar carrusel de movilidad"><div class="tr-hint">Escribe el resultado que quieres conseguir.</div></div>'
@@ -1243,7 +1418,7 @@
     if(document.getElementById('tr-sheet')) return;
     var ae=document.activeElement; if(ae && (ae.id==='tr-nuevo'||ae.id==='tr-idea') && ae.value) return;
     if(typeof DB==='undefined' || !DB.loadAll) return;
-    DB.loadAll().then(function(ok){ if(ok){ cargar(); pintar(); } }).catch(function(){});
+    DB.loadAll().then(function(ok){ if(ok){ cargar(); try{ if(typeof window.agxMigrarAreas==='function') window.agxMigrarAreas(); }catch(e){} pintar(); } }).catch(function(){});
   }
   function iniciarSync(){
     if(st.sync) return;
@@ -1251,15 +1426,61 @@
     document.addEventListener('visibilitychange', function(){ if(!document.hidden) refrescar(); });
   }
 
+  // ---------- Tareas dentro de la Agenda (pestañas del calendario) ----------
+  var TABS_AG = [['t-hoy','hoy','☀️ Mi día'],['t-tareas','tareas','✅ Tareas'],['t-areas','areas','🗂 Áreas']];
+  function enAgenda(){ var r=document.getElementById('tareas-root'); return !!(r && r.parentNode && r.parentNode.id==='ag-panel-tareas'); }
+  function volverRoot(){ var r=document.getElementById('tareas-root'), pg=document.getElementById('page-tareas'); if(r && pg && r.parentNode!==pg) pg.appendChild(r); var p=document.getElementById('ag-panel-tareas'); if(p) p.style.display='none'; }
+  function marcarTabAgenda(){
+    if(!enAgenda()) return;
+    var m = st.vista==='hoy' ? 't-hoy' : st.vista==='areas' ? 't-areas' : 't-tareas';
+    [].forEach.call(document.querySelectorAll('.ag-tab-nav .ag-tab'), function(b){ b.classList.toggle('active', b.getAttribute('data-tab')===m); });
+  }
+  function irCalendario(){
+    if(enAgenda()){ var tb=document.querySelector('.ag-tab[data-tab="horario"]'); if(tb && typeof agSwitchTab==='function'){ agSwitchTab('horario', tb); return; } }
+    goPage('agenda');
+  }
+  window.agxTabTareas = function(vista, el){
+    var panel=document.getElementById('ag-panel-tareas'), root=document.getElementById('tareas-root'); if(!panel || !root) return;
+    try { window.agTabActual='horario'; } catch(e){}
+    [].forEach.call(document.querySelectorAll('.ag-tab-nav .ag-tab'), function(b){ b.classList.remove('active'); });
+    if(el) el.classList.add('active');
+    ['ag-nav-card','ag-container','ag-form-card','ag-panel-cumple'].forEach(function(id){ var e=document.getElementById(id); if(e) e.style.display='none'; });
+    panel.style.display=''; if(root.parentNode!==panel) panel.appendChild(root);
+    if(vista!=='areas' || !st.area) {} 
+    window.tareasIr(vista); abrir(); marcarTabAgenda();
+  };
+  function montarTabsAgenda(){
+    var n=document.querySelector('.ag-tab-nav'); if(!n || n.querySelector('[data-tab="t-hoy"]')) return;
+    var cumple=document.getElementById('ag-tab-cumple'), cp=document.getElementById('ag-panel-cumple'); if(!cp) return;
+    TABS_AG.forEach(function(v){ var b=document.createElement('button'); b.className='ag-tab'; b.setAttribute('data-tab',v[0]); b.textContent=v[2]; b.onclick=function(){ window.agxTabTareas(v[1], b); }; n.insertBefore(b, cumple||null); });
+    var panel=document.createElement('div'); panel.id='ag-panel-tareas'; panel.style.display='none'; cp.parentNode.insertBefore(panel, cp);
+    // «Semana» pasa a ser el calendario tipo Google (rejilla por horas); Hoy y Mes siguen como estaban
+    var oSw=window.agSwitchTab;
+    if(typeof oSw==='function') window.agSwitchTab=function(tab, el){
+      volverRoot();
+      if(tab==='semana'){
+        var h=document.querySelector('.ag-tab[data-tab="horario"]');
+        oSw.call(this,'horario',h||el);
+        try { window.agGView='semana'; window.agGFecha=new Date(); window.agGFecha.setHours(0,0,0,0); } catch(e){}
+        [].forEach.call(document.querySelectorAll('.ag-tab-nav .ag-tab'), function(b){ b.classList.toggle('active', b===el); });
+        if(typeof renderAgenda==='function') renderAgenda();
+        return;
+      }
+      return oSw.apply(this, arguments);
+    };
+  }
+  montarTabsAgenda();
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', montarTabsAgenda);
+
   // ---------- integración con la navegación de la app ----------
   window.tareasAbrir = abrir;
-  window.tareasIr = function(v){ if(['hoy','bandeja','tareas','proximas'].indexOf(v)<0) return; st.vista=v; st.addFecha=null; ls('tr_vista',v); if(document.getElementById('tr-contenido')) pintar(); };
+  window.tareasIr = function(v){ if(['hoy','bandeja','tareas','proximas','areas'].indexOf(v)<0) return; st.vista=v; st.addFecha=null; ls('tr_vista',v); if(document.getElementById('tr-contenido')) pintar(); };
   window.tareasDeHoyConteo = function(){ var h=hoy(); return T.filter(function(t){ return !t.hecha && fechaEf(t) && fechaEf(t)<=h; }).length; };
   var gpOriginal = window.goPage;
   if(typeof gpOriginal==='function'){
     window.goPage = function(name){
       var r = gpOriginal.apply(this, arguments);
-      if(name==='tareas'){ var p=document.getElementById('page-tareas'); if(p && p.classList.contains('active')) abrir(); }
+      if(name==='tareas'){ var p=document.getElementById('page-tareas'); if(p && p.classList.contains('active')){ volverRoot(); abrir(); } }
       return r;
     };
   }

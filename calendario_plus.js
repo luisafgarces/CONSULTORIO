@@ -42,6 +42,8 @@
 '.agg-viaje,.agx-viaje{position:absolute;box-sizing:border-box;pointer-events:none;border-radius:6px;background:repeating-linear-gradient(45deg,rgba(0,0,0,.10) 0 5px,rgba(0,0,0,.03) 5px 10px);border:1px dashed rgba(0,0,0,.28);font-size:.62rem;color:#555;padding:0 4px;overflow:hidden;line-height:1.4}',
 '.agg-ev.agx-bloque{border:2px dashed rgba(255,255,255,.95);opacity:.88;box-shadow:none}',
 '.agg-ev.agx-choque{outline:2px solid #d93025;outline-offset:1px}',
+'.agx-filtro{background:#fbe9ee;border:1.5px solid #cd8e9d;border-radius:12px;padding:8px 12px;margin:0 0 10px;font-size:.84rem;color:#7a3c4b;display:flex;gap:10px;align-items:center;flex-wrap:wrap}',
+'.agx-filtro button{border:1.5px solid #cd8e9d;background:#fff;color:#7a3c4b;border-radius:14px;padding:5px 12px;font-size:.8rem;cursor:pointer}',
 '.agx-libres{background:#fff;border:1.5px solid #f1dde2;border-radius:12px;padding:8px 12px;margin:0 0 10px;font-size:.8rem;color:#5b4549}',
 '.agx-libres b{color:#7a3c4b}',
 '.agx-libres .agx-g{display:inline-block;background:#eaf6ee;border:1px solid #bfe0c6;color:#2d6a3e;border-radius:12px;padding:2px 9px;margin:3px 5px 0 0;font-size:.76rem}',
@@ -352,6 +354,7 @@
       });
     }
     var cont = $('ag-container'); if(!cont) return;
+    try { rotularAreas(cont); } catch(e){}
     [].forEach.call(cont.querySelectorAll('.agx-viaje,.agx-libres'), function(n){ n.remove(); });
     [].forEach.call(cont.querySelectorAll('.agx-bloque,.agx-choque'), function(n){ n.classList.remove('agx-bloque','agx-choque'); });
     if(typeof agGView === 'undefined' || agGView==='mes') return;
@@ -405,7 +408,7 @@
   var oRender = window.agRenderHorario;
   window.agRenderHorario = function(){
     var r = oRender.apply(this, arguments);
-    try { decorar(); asegurarHospital(); } catch(e){ console.warn('[calendario-plus]', e); }
+    try { decorar(); asegurarHospital(); window.agxMigrarAreas(); } catch(e){ console.warn('[calendario-plus]', e); }
     return r;
   };
 
@@ -429,6 +432,65 @@
   if(typeof oGoPage === 'function') window.goPage = function(name){
     if(name==='agenda' && !abiertaYa){ abiertaYa = true; try { agGView = 'dia'; agGFecha = new Date(); agGFecha.setHours(0,0,0,0); } catch(e){} }
     return oGoPage.apply(this, arguments);
+  };
+
+
+  // ---------- ÁREAS: nombres iniciales, filtro del calendario por área ----------
+  var AREAS_NOMBRES = { consultorio:['Consultorio','Consultorio privado'], personal:['Personal','Vida personal'], conmovilidad:['CONMOVILIDAD','Empresa de movilidad'] };
+  window.agxMigrarAreas = function(){
+    try {
+      if(typeof DB==='undefined' || !DB._loaded) return;
+      if(localStorage.getItem('agx_areas_ok')==='1') return;
+      var l = agCalendarios().map(function(c){ return {id:c.id, nombre:c.nombre, color:c.color}; }), cambio = false;
+      l.forEach(function(c){ var a = AREAS_NOMBRES[c.id]; if(a && c.nombre===a[0]){ c.nombre = a[1]; cambio = true; } });
+      if(!l.some(function(c){ return c.id==='hospital' || /hospital/i.test(c.nombre); })){ l.push({id:'hospital', nombre:'Hospital', color:'#f4511e'}); cambio = true; }
+      if(cambio) agGuardarCalendarios(l);
+      localStorage.setItem('agx_areas_ok','1');
+      if(cambio && typeof renderAgenda==='function') { try { renderAgenda(); } catch(e){} }
+    } catch(e){}
+  };
+  function rotularAreas(cont){
+    var t = cont.querySelector('.agg-cal-tit'); if(t) t.textContent = 'Áreas';
+    var lk = cont.querySelectorAll('.agg-link'); [].forEach.call(lk, function(b){ if(/Nuevo calendario/i.test(b.textContent)) b.textContent = '＋ Nueva área'; });
+    [].forEach.call(cont.querySelectorAll('.agx-filtro'), function(n){ n.remove(); });
+    var oc = []; try { oc = agCalOcultos(); } catch(e){}
+    var todas = agCalendarios().map(function(c){ return c.id; });
+    var ocultas = oc.filter(function(id){ return todas.indexOf(id)>=0; });
+    if(!ocultas.length) return;
+    var visibles = agCalendarios().filter(function(c){ return ocultas.indexOf(c.id)<0; });
+    var txt = visibles.length===0 ? 'Todas las áreas están ocultas' : (visibles.length<=2 ? 'Mostrando solo: '+visibles.map(function(c){ return c.nombre; }).join(' y ') : 'Mostrando '+visibles.length+' de '+todas.length+' áreas');
+    var d = document.createElement('div'); d.className = 'agx-filtro';
+    d.innerHTML = '<span>🗂 '+String(txt).replace(/</g,'&lt;')+'</span><button type="button">Ver todas las áreas</button>';
+    d.querySelector('button').onclick = function(){ window.agxVerTodasAreas(); };
+    var main = cont.querySelector('.agg-main') || cont; main.insertBefore(d, main.firstChild);
+  }
+  window.agxVerTodasAreas = function(){ try { localStorage.setItem('ag_cal_ocultos','[]'); } catch(e){} renderAgenda(); };
+  // Abre el calendario general mostrando solo una área
+  window.agxVerArea = function(id){
+    try {
+      var o = agCalendarios().map(function(c){ return c.id; }).filter(function(x){ return x!==id; });
+      localStorage.setItem('ag_cal_ocultos', JSON.stringify(o));
+    } catch(e){}
+    var pt = document.getElementById('ag-panel-tareas');
+    if(pt && pt.style.display!=='none'){ var tb = document.querySelector('.ag-tab[data-tab="horario"]'); if(tb && typeof agSwitchTab==='function') agSwitchTab('horario', tb); }
+    else if(typeof goPage==='function') goPage('agenda');
+    try { renderAgenda(); } catch(e){}
+  };
+  // Los nombres del formulario de calendario pasan a decir «área»
+  var oAbrirCal = window.agGAbrirCalModal;
+  if(typeof oAbrirCal==='function') window.agGAbrirCalModal = function(id){
+    var r = oAbrirCal.apply(this, arguments);
+    try { var h = document.querySelector('#agg-modal .agg-modal > div'); if(h) h.textContent = id ? 'Editar área' : 'Nueva área'; } catch(e){}
+    return r;
+  };
+  // Un área con tareas no se elimina desde el calendario (las tareas quedarían sin área)
+  var oElimCal = window.agGEliminarCal;
+  if(typeof oElimCal==='function') window.agGEliminarCal = function(id){
+    try {
+      var T = DB.get('tareas'); var n = Array.isArray(T) ? T.filter(function(t){ return t && (t.lista||'consultorio')===id; }).length : 0;
+      if(n){ toast('Esta área tiene '+n+' tarea(s). Muévelas a otra área antes de eliminarla (pestaña Áreas en Tareas)'); return; }
+    } catch(e){}
+    return oElimCal.apply(this, arguments);
   };
 
   // ---------- todas las listas de alarmas con las mismas opciones ----------
