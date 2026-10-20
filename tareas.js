@@ -8,7 +8,7 @@
 
   var KEY = 'tareas';
   var T = [], B = [];                                   // todas las tareas
-  var st = { fPrio:'todas', fFecha:'todas', verArch:false, verFiltros:false, saltadas:[], verDespues:false, verTodas:false, abiertas:{}, estadoV:'curso', estadoElegido:false, vista:'hoy', filtro:'todas', verAtrasadas:false, verMasHoy:false, area:'', areaMas:{}, areaHechas:false, addFecha:null, addLista:'', foco:null, sync:null };
+  var st = { fPrio:'todas', fFecha:'todas', verArch:false, verFiltros:false, saltadas:[], verDespues:false, verTodas:false, abiertas:{}, estadoV:'curso', estadoElegido:false, vista:'hoy', filtro:'todas', verAtrasadas:false, verMasHoy:false, area:'', areaMas:{}, areaHechas:false, verOtras:false, addFecha:null, addLista:'', foco:null, sync:null };
   try { st.estadoV = localStorage.getItem('tr_estadoV') || 'curso'; st.vista = localStorage.getItem('tr_vista') || 'hoy'; if(st.vista==='hechas'){ st.vista='tareas'; st.estadoV='completada'; st.estadoElegido=true; } st.filtro = localStorage.getItem('tr_filtro') || 'todas'; st.addLista = localStorage.getItem('tr_lista') || ''; } catch(e){}
   var MAX_HOY = 8;
 
@@ -241,6 +241,7 @@
 '.md-plan{display:flex;gap:8px;align-items:center;padding:9px 0;border-bottom:1px dashed #f1dde2}',
 '.md-plan .m{flex:1;min-width:0;font-size:.9rem;word-break:break-word}',
 '.md-plan button{border:1.5px solid #ecd3d9;background:#fff;color:#7a3c4b;border-radius:12px;padding:6px 10px;font-size:.76rem;cursor:pointer}',
+'.md-foot{display:flex;gap:4px 14px;flex-wrap:wrap;justify-content:center;margin:12px 0 4px}',
 '.md-plan button.on{background:#cd8e9d;border-color:#cd8e9d;color:#fff;font-weight:700}',
 '.tr-areab{border:1px dashed #e3c3cb;background:#fff;color:#6b5459;border-radius:10px;padding:2px 8px;font-size:.76rem;cursor:pointer;display:inline-flex;align-items:center;gap:4px;min-height:26px}',
 '.ar-card{background:#fff;border:1.5px solid #f1dde2;border-left-width:7px;border-radius:14px;padding:12px 14px;margin-bottom:10px;cursor:pointer}',
@@ -528,6 +529,7 @@
     else if(act==='planear'){ abrirPlan(); }
     else if(act==='reorg'){ reorganizarDia(); }
     else if(act==='vercal'){ irCalendario(); }
+    else if(act==='otras'){ st.verOtras=!st.verOtras; pintarContenido(); }
     else if(act==='pdespues'){ st.verDespues=!st.verDespues; pintarContenido(); }
     else if(act==='pausarb'){ var tb=porId(id); if(tb) pausarTarea(tb); }
     else if(act==='estado'){ abrirEstado(id); }
@@ -944,7 +946,7 @@
     var mostrados=[rec.t?rec.t.id:''].concat(opc.map(function(t){return t.id;}),pausadas.map(function(t){return t.id;}));
     var despues=eligibles().filter(function(t){ return mostrados.indexOf(t.id)<0; });
 
-    // BLOQUE 1: cómo está tu día
+    // 1 · COMPROMISOS DE HOY (lo primero: lo que tiene hora)
     var fixed=evh.filter(function(e){return !e.tareaId;}), bloques=evh.filter(function(e){return e.tareaId;});
     var ocup=ocupadosHoy().reduce(function(a,o){ return a+Math.max(0,Math.min(o.fin,H1_DIA)-Math.max(o.ini,H0_DIA)); },0);
     var gaps=huecosHoy(30), libre=gaps.reduce(function(a,g){return a+(g[1]-g[0]);},0), ea=estadoAhora();
@@ -952,15 +954,8 @@
                         : 'Ahora estás en <b>'+esc(ea.e.titulo)+'</b> hasta las '+hm(ea.hasta);
     var hechasHoy=T.filter(function(t){ return t.hecha && t.hechaEn && t.hechaEn.slice(0,10)===h; }).length, mh=minHoy();
     var logro=(hechasHoy||mh)?'<div class="md-sub" style="margin-top:6px">Hoy llevas'+(hechasHoy?' ✔ '+hechasHoy+' hecha'+(hechasHoy>1?'s':''):'')+(hechasHoy&&mh?' ·':'')+(mh?' ⏱ '+mh+' min de enfoque':'')+'. Todo suma.</div>':'';
-    html+='<div class="md-h" style="margin-top:4px">1 · Cómo está tu día</div><div class="md-card md-res">'
-      +'<b>'+fixed.length+'</b> compromiso'+(fixed.length===1?'':'s')+(bloques.length?' + '+bloques.length+' bloque'+(bloques.length>1?'s':'')+' de tarea':'')+' · ocupado <b>'+durMin(ocup)+'</b> · libre <b>'+(ahora<H1_DIA?durMin(libre):'0 min')+'</b>'
-      +'<div style="margin-top:4px">'+ahoraTxt+'</div>'
-      +(gaps.length?'<div>'+gaps.slice(0,4).map(function(g){ return '<span class="md-g">'+hm(g[0])+' – '+hm(g[1])+' · '+durMin(g[1]-g[0])+'</span>'; }).join('')+'</div>':'')
-      +logro
-      +'<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><button class="tr-mini" data-act="planear">📝 Planear mi día</button><button class="tr-mini" data-act="reorg">🔄 Reorganizar lo que queda del día</button></div></div>';
-
-    // BLOQUE 2: compromisos de hoy
-    html+='<div class="md-h">2 · Compromisos de hoy</div><div class="md-card">';
+    html+='<div class="md-h" style="margin-top:4px">Compromisos de hoy</div><div class="md-card">'
+      +'<div class="md-sub" style="font-size:.84rem;margin-bottom:8px"><b>'+fixed.length+'</b> compromiso'+(fixed.length===1?'':'s')+(bloques.length?' + '+bloques.length+' bloque'+(bloques.length>1?'s':'')+' de tarea':'')+' · ocupado <b>'+durMin(ocup)+'</b> · libre <b>'+(ahora<H1_DIA?durMin(libre):'0 min')+'</b><br>'+ahoraTxt+'</div>';
     if(!evh.length) html+='<div class="md-sub" style="font-size:.88rem">Sin compromisos con hora hoy. Tu día está abierto.</div>';
     else html+=evh.map(function(e){
       var ini=minDe(e.inicio), fin=finMinEv(e), cls=fin<=ahora?' past':(ini<=ahora&&ahora<fin?' now':'');
@@ -968,10 +963,10 @@
       if(parseInt(e.viajeAntes,10)) v.push('🚗 '+e.viajeAntes+' min antes'); if(parseInt(e.viajeDespues,10)) v.push('🚗 '+e.viajeDespues+' min después');
       return '<div class="md-ev'+cls+'"><div class="md-t">'+hm(ini)+'<br><span style="font-weight:400;color:#8a7279">'+hm(fin)+'</span></div><div><div class="tr-tit">'+(e.tareaId?'📌 ':'')+esc(e.titulo)+'</div><div class="md-sub"><span class="tr-dot" style="background:'+esc(l.color)+'"></span>'+esc(l.nombre)+(e.tareaId?' · bloque de trabajo (flexible)':'')+(v.length?' · '+esc(v.join(' · ')):'')+(cls===' now'?' · <b>ahora</b>':'')+'</div></div></div>';
     }).join('');
-    html+='<div style="text-align:right"><button class="md-lnk" data-act="vercal">Ver calendario</button></div></div>';
+    html+='<div style="text-align:right"><button class="md-lnk" data-act="vercal">Ver calendario</button></div>'+logro+'</div>';
 
-    // BLOQUE 3: tu siguiente paso
-    html+='<div class="md-h">3 · Tu siguiente paso</div>';
+    // 2 · TU SIGUIENTE PASO (una sola tarea recomendada)
+    html+='<div class="md-h">Tu siguiente paso</div>';
     if(rec.urg) html+='<div class="md-alerta">⏰ Tienes <b>'+esc(rec.urg.e.titulo)+'</b> en '+rec.urg.en+' min. Prepárate con calma; la tarea de abajo puede esperar.</div>';
     if(rec.t){
       var t=rec.t, l=lista(t.lista||'consultorio'), na=proximaAccion(t), tm=totalMin(t);
@@ -986,27 +981,36 @@
       html+='<div class="md-card tr-vacio" style="padding:18px"><b>Nada que necesite tu atención ahora 🌿</b>Descansa o revisa tu Bandeja. Si quieres avanzar algo, elige una tarea en «Planear mi día».</div>';
     }
 
-    // BLOQUE 4: opcionales
+
+    // 3 · ACCESO DISCRETO: retomar otras tareas, planear, reorganizar
+    var otrosIds={}; opc.concat(pausadas,despues).forEach(function(t){ otrosIds[t.id]=1; });
+    var nOtras=Object.keys(otrosIds).length;
+    html+='<div class="md-foot">'
+      +(nOtras?'<button class="md-lnk" data-act="otras">'+(st.verOtras?'▴ Ocultar otras tareas':'▾ Retomar otras tareas ('+nOtras+')')+'</button>':'')
+      +'<button class="md-lnk" data-act="planear">📝 Planear mi día</button><button class="md-lnk" data-act="reorg">🔄 Reorganizar lo que queda del día</button></div>';
+    if(st.verOtras){
     if(opc.length){
-      html+='<div class="md-h">4 · Si tienes más energía o tiempo</div><div class="md-sub" style="margin:-4px 2px 8px">Opcional: no son obligaciones adicionales.</div>'
+      html+='<div class="md-h">Si tienes más energía o tiempo</div><div class="md-sub" style="margin:-4px 2px 8px">Opcional: no son obligaciones adicionales.</div>'
         +opc.map(function(t){ var l=lista(t.lista||'consultorio'), na=proximaAccion(t);
           return '<div class="md-opt"><div class="m"><div class="tt">'+esc(t.titulo)+'</div><div class="md-sub"><span class="tr-dot" style="background:'+esc(l.color)+'"></span>'+esc(l.nombre)+(t.minutos?' · ⏱ '+t.minutos+' min':'')+(na?' · → '+esc(na):'')+'</div></div><button class="tr-mini" data-act="empezar" data-id="'+esc(t.id)+'">Empezar</button></div>'; }).join('');
     }
 
-    // BLOQUE 5: retomar
     if(pausadas.length){
-      html+='<div class="md-h">5 · Retomar lo pendiente</div>'
+      html+='<div class="md-h">Retomar lo que dejaste a medias</div>'
         +pausadas.map(function(t){ var l=lista(t.lista||'consultorio');
           return '<div class="md-opt"><div class="m"><div class="tt">'+esc(t.titulo)+'</div><div class="md-sub">'+(t.punto?'⏸ '+esc(t.punto):'<span class="tr-dot" style="background:'+esc(l.color)+'"></span>'+esc(l.nombre))+(t.actualizada?' · '+esc(ultimaTxt(t)):'')+'</div></div><button class="tr-mini pri" data-act="empezar" data-id="'+esc(t.id)+'">▶ Retomar</button></div>'; }).join('');
     }
 
+    }
     var nid=ideasActivas().length;
     if(nid) html+='<div class="md-sub" style="margin-top:14px;text-align:center">📥 Tienes '+nid+' idea'+(nid>1?'s':'')+' guardada'+(nid>1?'s':'')+' en la Bandeja. <button class="md-lnk" data-act="irbandeja">Revisar cuando quieras</button></div>';
-    // Pendientes para después: guardados, fuera del centro
+    // Pendientes para después: guardados, solo dentro de «otras tareas»
+    if(st.verOtras){
     if(despues.length){
       html+='<div class="md-h">Pendientes para después</div><div class="md-sub" style="margin:-4px 2px 6px">Siguen guardados. No hace falta hacerlos hoy.</div>'
         +'<button class="md-lnk" data-act="pdespues">'+(st.verDespues?'Ocultar':'Ver las '+despues.length+' tareas')+'</button>'
         +(st.verDespues?despues.sort(ordenTareas).map(function(t){ return fila(t,{}); }).join(''):'');
+    }
     }
     return html;
   }

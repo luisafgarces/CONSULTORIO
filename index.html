@@ -51,12 +51,48 @@ const DB = {
     try { var v = localStorage.getItem(k); return v ? JSON.parse(v) : null; } catch(e){ return null; }
   },
 
+  // Escrituras que aún no llegaron a la nube. Se guardan en este navegador para que
+  // sobrevivan a cerrar la pestaña y no se pisen con datos viejos del servidor.
+  _pend: (function(){ try { return JSON.parse(localStorage.getItem('_db_pend')||'{}') || {}; } catch(e){ return {}; } })(),
+  _seq: 0,
+  _guardarPend: function(){ try { localStorage.setItem('_db_pend', JSON.stringify(this._pend)); } catch(e){} this._avisoPend(); },
+  pendientes: function(){ return Object.keys(this._pend).length; },
+  _avisoPend: function(){
+    var self = this, n = this.pendientes(), el = document.getElementById('sync-pend');
+    if(!n){ if(el) el.style.display = 'none'; return; }
+    if(self._tAviso) return;
+    self._tAviso = setTimeout(function(){          // solo avisa si tarda más de unos segundos (no parpadea en un guardado normal)
+      self._tAviso = null;
+      var m = self.pendientes(); var e2 = document.getElementById('sync-pend');
+      if(!m){ if(e2) e2.style.display = 'none'; return; }
+      if(!e2){
+        e2 = document.createElement('div'); e2.id = 'sync-pend';
+        e2.style.cssText = 'position:fixed;left:50%;transform:translateX(-50%);bottom:14px;max-width:92vw;background:#fff3e0;border:1.5px solid #e57373;color:#7a2f2f;border-radius:14px;padding:8px 14px;font:0.8rem Lato,sans-serif;z-index:9999;display:flex;gap:10px;align-items:center;box-shadow:0 2px 10px rgba(0,0,0,.15)';
+        e2.innerHTML = '<span id="sync-pend-t"></span><button type="button" style="border:1.5px solid #e57373;background:#fff;color:#7a2f2f;border-radius:10px;padding:4px 10px;cursor:pointer">Reintentar</button>';
+        e2.querySelector('button').onclick = function(){ DB.reintentar(); };
+        document.body.appendChild(e2);
+      }
+      document.getElementById('sync-pend-t').textContent = '\u26a0\ufe0f ' + m + ' cambio' + (m>1?'s':'') + ' sin guardar en la nube (est\u00e1n a salvo en este dispositivo). Se reintenta solo.';
+      e2.style.display = 'flex';
+    }, 4000);
+  },
+  reintentar: function(){
+    var self = this, ks = Object.keys(this._pend);
+    ks.forEach(function(k){ var v = self.get(k); if(v !== null && v !== undefined) self.set(k, v); else { delete self._pend[k]; } });
+    this._guardarPend();
+  },
+
   set: function(k, v){
     this._cache[k] = v;
     try { localStorage.setItem(k, JSON.stringify(v)); } catch(e){}
     if(_firebaseDB){
+      var self = this, mi = ++this._seq;
+      this._pend[k] = mi; this._guardarPend();
       _firebaseDB.collection("suitedata").doc(k).set({ value: v })
-        .then(function(){ showSyncBadge("\u2601\ufe0f Guardado en la nube \u2713", "#7ab87a"); })
+        .then(function(){
+          if(self._pend[k] === mi){ delete self._pend[k]; self._guardarPend(); }
+          showSyncBadge("\u2601\ufe0f Guardado en la nube \u2713", "#7ab87a");
+        })
         .catch(function(err){ console.warn("Error Firebase:", err); showSyncBadge("\u26a0\ufe0f Error al guardar en nube", "#e57373"); });
     }
   },
@@ -68,12 +104,13 @@ const DB = {
     return _firebaseDB.collection("suitedata").get()
       .then(function(snap){
         snap.forEach(function(d){
+          if(self._pend[d.id]) return;          // hay un cambio local sin enviar: no lo pises con la copia vieja del servidor
           var v = d.data().value;
           self._cache[d.id] = v;
           try { localStorage.setItem(d.id, JSON.stringify(v)); } catch(e){}
         });
         self._loaded = true;
-        showSyncBadge("\u2705 Sincronizado con la nube", "#7ab87a");
+        if(self.pendientes()) self.reintentar(); else showSyncBadge("\u2705 Sincronizado con la nube", "#7ab87a");
         return true;
       })
       .catch(function(e){
@@ -90,6 +127,10 @@ const DB = {
     this.loadAll().then(function(){ callback(); });
   }
 };
+// Reintenta solo lo que no se alcanzó a guardar: al volver la conexión y cada 30 s
+window.addEventListener('online', function(){ try { if(DB.pendientes() && _firebaseDB) DB.reintentar(); } catch(e){} });
+setInterval(function(){ try { if(DB.pendientes() && _firebaseDB && navigator.onLine!==false) DB.reintentar(); } catch(e){} }, 30000);
+setTimeout(function(){ try { DB._avisoPend(); } catch(e){} }, 1500);
 </script>
 <link rel="stylesheet" href="css/style.css">
 <script>
@@ -186,6 +227,7 @@ html.modo-agenda #ag-app-extra { display:flex; position:fixed; left:8px; bottom:
     <button class="nav-btn" onclick="goPage('tareas');tareasIr('hoy');cerrarSidebarMobile()"><span class="icon">☀️</span><span class="nav-label"> Mi día</span></button>
     <button class="nav-btn" onclick="goPage('tareas');tareasIr('tareas');cerrarSidebarMobile()"><span class="icon">✅</span><span class="nav-label"> Tareas</span></button>
     <button class="nav-btn" onclick="goPage('tareas');tareasIr('bandeja');cerrarSidebarMobile()"><span class="icon">📥</span><span class="nav-label"> Bandeja de entrada</span></button>
+    <button class="nav-btn" onclick="goPage('tareas');tareasIr('areas');cerrarSidebarMobile()"><span class="icon">🗂</span><span class="nav-label"> Áreas</span></button>
     <button class="nav-btn" onclick="goPage('finanzas');cerrarSidebarMobile()"><span class="icon">💰</span><span class="nav-label"> Finanzas</span></button>
     <button class="nav-btn" onclick="goPage('documentos');cerrarSidebarMobile()"><span class="icon">📄</span><span class="nav-label"> Documentos</span></button>
 
