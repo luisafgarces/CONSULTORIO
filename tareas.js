@@ -7,8 +7,8 @@
   if(window.__tareasInit) return; window.__tareasInit = true;
 
   var KEY = 'tareas';
-  var T = [];                                   // todas las tareas
-  var st = { fPrio:'todas', fFecha:'todas', verFiltros:false, saltadas:[], verDespues:false, verTodas:false, abiertas:{}, estadoV:'curso', estadoElegido:false, vista:'hoy', filtro:'todas', verAtrasadas:false, verMasHoy:false, addFecha:null, addLista:'', foco:null, sync:null };
+  var T = [], B = [];                                   // todas las tareas
+  var st = { fPrio:'todas', fFecha:'todas', verArch:false, verFiltros:false, saltadas:[], verDespues:false, verTodas:false, abiertas:{}, estadoV:'curso', estadoElegido:false, vista:'hoy', filtro:'todas', verAtrasadas:false, verMasHoy:false, addFecha:null, addLista:'', foco:null, sync:null };
   try { st.estadoV = localStorage.getItem('tr_estadoV') || 'curso'; st.vista = localStorage.getItem('tr_vista') || 'hoy'; if(st.vista==='hechas'){ st.vista='tareas'; st.estadoV='completada'; st.estadoElegido=true; } st.filtro = localStorage.getItem('tr_filtro') || 'todas'; st.addLista = localStorage.getItem('tr_lista') || ''; } catch(e){}
   var MAX_HOY = 8;
 
@@ -50,7 +50,12 @@
     var v = DB.get(KEY);
     T = Array.isArray(v) ? v.filter(function(t){ return t && t.id && t.titulo!=null; }) : [];
     T.forEach(normalizar);
+    var vb = DB.get('bandeja');
+    B = Array.isArray(vb) ? vb.filter(function(x){ return x && x.id && x.texto!=null; }) : [];
   }
+  function guardarB(){ DB.set('bandeja', B); }
+  function ideaPorId(id){ return B.filter(function(x){return x.id===id;})[0]; }
+  function ideasActivas(){ return B.filter(function(x){ return !x.archivada; }); }
   function guardar(){ DB.set(KEY, T); }
   function porId(id){ return T.filter(function(t){return t.id===id;})[0]; }
   function pendientes(){ return T.filter(function(t){ return !t.hecha && (st.filtro==='todas' || (t.lista||'consultorio')===st.filtro); }); }
@@ -234,13 +239,14 @@
         '<div class="tr-wrap">'
         + '<div class="tr-top"><div><h1 class="tr-h1">✅ Tareas</h1><div class="tr-fecha" id="tr-fecha"></div></div><button class="tr-foco-btn" data-act="foco">🎯 Empezar tarea</button></div>'
         + '<div id="tr-head"></div>'
-        + '<div class="tr-add"><div class="tr-add-row"><input type="text" id="tr-nuevo" placeholder="Escribe una tarea y Enter…" autocomplete="off" enterkeyhint="done"><button class="tr-add-btn" data-act="add" aria-label="Agregar tarea">+</button></div>'
+        + '<div class="tr-add" id="tr-addbar"><div class="tr-add-row"><input type="text" id="tr-nuevo" placeholder="Escribe una tarea y Enter…" autocomplete="off" enterkeyhint="done"><button class="tr-add-btn" data-act="add" aria-label="Agregar tarea">+</button></div>'
         + '<div class="tr-chips" id="tr-addchips"></div></div>'
         + '<div class="tr-tabs" id="tr-tabs"></div>'
         + '<div class="tr-filtros" id="tr-filtros"></div>'
         + '<div id="tr-contenido"></div></div>';
       var inp = document.getElementById('tr-nuevo');
       inp.addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); agregarDesdeInput(); } });
+      root.addEventListener('keydown', function(e){ if(e.key==='Enter' && e.target && e.target.id==='tr-idea'){ e.preventDefault(); guardarDesdeCampo(); } });
       root.addEventListener('click', clickRoot);
       root.addEventListener('change', changeRoot);
     }
@@ -260,6 +266,7 @@
   }
 
   function pintar(){
+    var ab=document.getElementById('tr-addbar'); if(ab) ab.style.display=(st.vista==='bandeja')?'none':'';
     pintarHead(); pintarAddChips(); pintarTabs(); pintarFiltros(); pintarContenido();
   }
 
@@ -275,13 +282,14 @@
   function pintarAddChips(){
     var el=document.getElementById('tr-addchips'); if(!el) return;
     var f=fechaPorDefecto(), h=hoy();
-    var esOtra = f!=='hoy' && f!=='manana' && f!=='sin';
+    var esOtra = f!=='hoy' && f!=='manana' && f!=='sin' && f!=='bandeja';
     var ls_ = listas();
     var actual = st.addLista && ls_.some(function(l){return l.id===st.addLista;}) ? st.addLista : (st.filtro!=='todas' ? st.filtro : ls_[0].id);
     el.innerHTML =
       '<button class="tr-chip'+(f==='hoy'?' on':'')+'" data-act="afecha" data-v="hoy">Hoy</button>'
       +'<button class="tr-chip'+(f==='manana'?' on':'')+'" data-act="afecha" data-v="manana">Mañana</button>'
       +'<button class="tr-chip'+(f==='sin'?' on':'')+'" data-act="afecha" data-v="sin">Sin fecha</button>'
+      +'<button class="tr-chip'+(f==='bandeja'?' on':'')+'" data-act="afecha" data-v="bandeja">📥 Solo guardar idea</button>'
       +'<label class="tr-chip'+(esOtra?' on':'')+'">📅 <input type="date" id="tr-add-fecha" min="'+h+'" value="'+(esOtra?esc(f):'')+'" data-act="afechad"></label>'
       +'<select class="tr-sel" id="tr-add-lista" data-act="alista">'+ls_.map(function(l){ return '<option value="'+esc(l.id)+'"'+(l.id===actual?' selected':'')+'>'+esc(l.nombre)+'</option>'; }).join('')+'</select>';
   }
@@ -289,7 +297,7 @@
   function pintarTabs(){
     var el=document.getElementById('tr-tabs'); if(!el) return;
     var h=hoy(), pen=T.filter(function(t){return !t.hecha;});
-    var nBand = pen.filter(function(t){return !fechaEf(t);}).length;
+    var nBand = ideasActivas().length;
     var nHoy = pen.filter(function(t){var f=fechaEf(t); return f && f<=h;}).length;
     function tab(id,txt){ return '<button class="tr-tab'+(st.vista===id?' on':'')+'" data-act="vista" data-v="'+id+'">'+txt+'</button>'; }
     var nAct = T.filter(function(t){return !t.hecha;}).length;
@@ -352,9 +360,7 @@
     } else if(st.vista==='hoy'){
       html = vistaMiDia();
     } else if(st.vista==='bandeja'){
-      var b = pen.filter(function(t){return !fechaEf(t);}).sort(ordenar);
-      html += '<div class="tr-sec"><span>📥 Ideas y pendientes sin fecha</span></div>';
-      html += b.length ? b.map(function(t){ return fila(t,{mover:true}); }).join('') : '<div class="tr-vacio"><b>Bandeja vacía ✨</b>Aquí caen las cosas que anotas sin fecha. Luego eliges cuándo.</div>';
+      html = vistaBandeja();
     } else if(st.vista==='proximas'){
       var p = pen.filter(function(t){var f=fechaEf(t); return f && f>h;}).sort(function(a,b){ return fechaEf(a)<fechaEf(b)?-1:fechaEf(a)>fechaEf(b)?1:ordenar(a,b); });
       if(!p.length) html += '<div class="tr-vacio"><b>Nada programado</b>Cuando le pongas fecha a una tarea, aparece aquí.</div>';
@@ -383,11 +389,12 @@
   }
 
   // ---------- acciones ----------
-  function snack(texto, undo, ms){
+  function snack(texto, undo, ms, extra){
     var s=document.getElementById('tr-snack'); if(s) s.remove();
     s=document.createElement('div'); s.id='tr-snack'; s.className='tr-snack';
     var sp=document.createElement('span'); sp.textContent=texto; s.appendChild(sp);
     if(undo){ var b=document.createElement('button'); b.type='button'; b.textContent='Deshacer'; b.onclick=function(){ undo(); s.remove(); }; s.appendChild(b); }
+    if(extra){ var b2=document.createElement('button'); b2.type='button'; b2.textContent=extra.txt; b2.onclick=function(){ s.remove(); extra.fn(); }; s.appendChild(b2); }
     document.body.appendChild(s);
     setTimeout(function(){ if(s.parentNode) s.remove(); }, ms||6000);
   }
@@ -395,6 +402,7 @@
   function agregarDesdeInput(){
     var inp=document.getElementById('tr-nuevo'); if(!inp) return;
     var txt=inp.value.replace(/\s+/g,' ').trim(); if(!txt) return;
+    if(fechaPorDefecto()==='bandeja'){ capturarIdea(txt); inp.value=''; inp.focus(); return; }
     var f = resolverFecha(fechaPorDefecto());
     var r = leerFechaEnTexto(txt);
     if(r.fecha){ txt=r.titulo; f=r.fecha; }
@@ -477,6 +485,14 @@
     }
     else if(act==='foco'){ abrirFoco(); }
     else if(act==='nueva'){ abrirNueva(); }
+    else if(act==='isave'){ guardarDesdeCampo(); }
+    else if(act==='iconv'){ convertirIdea(id); }
+    else if(act==='iarch'){ archivarIdea(id); }
+    else if(act==='irest'){ restaurarIdea(id); }
+    else if(act==='idesc'){ descartarIdea(id); }
+    else if(act==='ied'){ editarIdea(id); }
+    else if(act==='irbandeja'){ st.vista='bandeja'; ls('tr_vista','bandeja'); pintar(); }
+    else if(act==='iverarch'){ st.verArch=!st.verArch; pintarContenido(); }
     else if(act==='empezar'){ empezarTarea(id); }
     else if(act==='otra'){ st.saltadas.push(id); pintarContenido(); }
     else if(act==='planear'){ abrirPlan(); }
@@ -504,6 +520,64 @@
       tp.pasos[i].d=el.checked; if(el.checked && tp.estado==='pendiente') tp.estado='curso';
       guardar(); pintar();
     }
+  }
+
+  // ===================== BANDEJA DE ENTRADA (ideas sin clasificar) =====================
+  function capturarIdea(texto, desdeBandeja){
+    var it={id:'i'+Date.now().toString(36)+Math.random().toString(36).slice(2,5), texto:texto, creada:new Date().toISOString(), archivada:false};
+    B.push(it); guardarB();
+    if(st.vista==='bandeja'){ pintarContenido(); pintarTabs(); } else pintarTabs();
+    snack('Guardada en la Bandeja ✓', function(){ B=B.filter(function(x){return x.id!==it.id;}); guardarB(); pintar(); }, 3000);
+    return it;
+  }
+  function fechaCaptura(iso){ var d=new Date(iso); if(isNaN(d)) return ''; return etiquetaDia(ymd(d))+' '+d.toLocaleTimeString('es-CO',{hour:'numeric',minute:'2-digit'}); }
+  function filaIdea(it, arch){
+    var id=esc(it.id);
+    return '<div class="tr-row" data-id="'+id+'" style="align-items:flex-start;flex-wrap:wrap"><div class="tr-main" data-act="ied" data-id="'+id+'" style="min-width:60%"><div class="tr-tit">'+esc(it.texto)+'</div><div class="tr-meta"><span>🕒 '+esc(fechaCaptura(it.creada))+'</span></div></div>'
+      +'<div style="display:flex;gap:6px;flex-wrap:wrap;width:100%;margin-top:6px">'
+      +(arch ? '<button class="tr-mini" data-act="irest" data-id="'+id+'">↩ Restaurar</button><button class="tr-mini" data-act="idesc" data-id="'+id+'">🗑 Eliminar</button>'
+             : '<button class="tr-mini pri" data-act="iconv" data-id="'+id+'">✅ Convertir en tarea</button><button class="tr-mini" data-act="iarch" data-id="'+id+'">📦 Archivar</button><button class="tr-mini" data-act="idesc" data-id="'+id+'">🗑 Descartar</button>')
+      +'</div></div>';
+  }
+  function vistaBandeja(){
+    var act=ideasActivas().sort(function(a,b){ return String(b.creada).localeCompare(String(a.creada)); });
+    var arch=B.filter(function(x){return x.archivada;}).sort(function(a,b){ return String(b.archivadaEn||b.creada).localeCompare(String(a.archivadaEn||a.creada)); });
+    var html='<div class="tr-add" style="position:static"><div class="tr-add-row"><input type="text" id="tr-idea" placeholder="¿Qué necesitas recordar o hacer?" autocomplete="off" enterkeyhint="done"><button class="tr-nueva" data-act="isave" style="min-height:46px;padding:0 18px">Guardar</button></div>'
+      +'<div class="tr-chips"><button class="tr-chip" disabled style="opacity:.55;cursor:default" title="Llegará en una versión futura">🎙 Nota de voz · próximamente</button></div></div>'
+      +'<div class="tr-hint" style="margin:0 2px 8px">Solo escribe y guarda; sin área, prioridad ni fecha. Revísala cuando quieras: aquí no hay hora obligatoria.</div>';
+    html+='<div class="tr-sec"><span>📥 Ideas por revisar · '+act.length+'</span></div>';
+    html+= act.length ? act.map(function(it){ return filaIdea(it,false); }).join('') : '<div class="tr-vacio"><b>Bandeja vacía ✨</b>Cuando recuerdes algo, escríbelo arriba y sigue con lo tuyo.</div>';
+    if(arch.length){
+      html+='<div style="margin-top:10px"><button class="tr-link" data-act="iverarch">'+(st.verArch?'Ocultar':'Ver')+' archivadas ('+arch.length+')</button></div>';
+      if(st.verArch) html+=arch.map(function(it){ return filaIdea(it,true); }).join('');
+    }
+    return html;
+  }
+  function convertirIdea(id){
+    var it=ideaPorId(id); if(!it) return;
+    var ls_=listas(), area=(st.addLista && ls_.some(function(l){return l.id===st.addLista;})) ? st.addLista : (st.filtro!=='todas' ? st.filtro : ls_[0].id);
+    var t=normalizar({id:nuevoId(), titulo:it.texto, lista:area, fecha:'', hora:'', notas:'', pasos:[], rep:'', hecha:false, creada:it.creada});
+    T.push(t); B=B.filter(function(x){return x.id!==id;}); guardar(); guardarB(); pintar();
+    snack('Convertida en tarea ✓ (en Pendientes, sin fecha)', function(){ T=T.filter(function(x){return x.id!==t.id;}); B.push(it); guardar(); guardarB(); pintar(); }, 8000, {txt:'Completar datos', fn:function(){ abrirEditor(t.id); }});
+  }
+  function archivarIdea(id){
+    var it=ideaPorId(id); if(!it) return; it.archivada=true; it.archivadaEn=new Date().toISOString(); guardarB(); pintar();
+    snack('Archivada', function(){ it.archivada=false; delete it.archivadaEn; guardarB(); pintar(); }, 5000);
+  }
+  function restaurarIdea(id){ var it=ideaPorId(id); if(!it) return; it.archivada=false; delete it.archivadaEn; guardarB(); pintar(); }
+  function descartarIdea(id){
+    var it=ideaPorId(id); if(!it) return; var i=B.indexOf(it); B.splice(i,1); guardarB(); pintar();
+    snack('Descartada', function(){ B.splice(Math.min(i,B.length),0,it); guardarB(); pintar(); }, 6000);
+  }
+  function editarIdea(id){
+    var it=ideaPorId(id); if(!it) return;
+    preguntar('✎ Editar idea','Texto','' ,true,function(v){ if(v){ it.texto=v; guardarB(); pintar(); } });
+    var q=document.getElementById('trq'); if(q) q.value=it.texto;
+  }
+  function guardarDesdeCampo(){
+    var inp=document.getElementById('tr-idea'); if(!inp) return;
+    var v=inp.value.replace(/\s+/g,' ').trim(); if(!v) return;
+    capturarIdea(v); var n=document.getElementById('tr-idea'); if(n){ n.value=''; n.focus(); }
   }
 
   // ===================== SECCIÓN TAREAS =====================
@@ -751,6 +825,8 @@
           return '<div class="md-opt"><div class="m"><div class="tt">'+esc(t.titulo)+'</div><div class="md-sub">'+(t.punto?'⏸ '+esc(t.punto):'<span class="tr-dot" style="background:'+esc(l.color)+'"></span>'+esc(l.nombre))+(t.actualizada?' · '+esc(ultimaTxt(t)):'')+'</div></div><button class="tr-mini pri" data-act="empezar" data-id="'+esc(t.id)+'">▶ Retomar</button></div>'; }).join('');
     }
 
+    var nid=ideasActivas().length;
+    if(nid) html+='<div class="md-sub" style="margin-top:14px;text-align:center">📥 Tienes '+nid+' idea'+(nid>1?'s':'')+' guardada'+(nid>1?'s':'')+' en la Bandeja. <button class="md-lnk" data-act="irbandeja">Revisar cuando quieras</button></div>';
     // Pendientes para después: guardados, fuera del centro
     if(despues.length){
       html+='<div class="md-h">Pendientes para después</div><div class="md-sub" style="margin:-4px 2px 6px">Siguen guardados. No hace falta hacerlos hoy.</div>'
@@ -1135,7 +1211,7 @@
     var t=porId(foco.id); if(!t) return;
     preguntar('💡 Guardar otra idea','Anótala y sigue con lo tuyo: va a tu Bandeja.','',false,function(v){
       v=v.replace(/\s+/g,' ').trim(); if(!v) return;
-      T.push(normalizar({id:nuevoId(), titulo:v, lista:t.lista||'consultorio', fecha:'', hora:'', notas:'', pasos:[], rep:'', hecha:false, creada:ahoraISO()}));
+      B.push({id:'i'+Date.now().toString(36)+Math.random().toString(36).slice(2,5), texto:v, creada:ahoraISO(), archivada:false}); guardarB();
       guardar(); snack('Idea guardada en la Bandeja ✓',null,2500);
     });
   }
@@ -1164,7 +1240,8 @@
     var page=document.getElementById('page-tareas');
     if(!page || !page.classList.contains('active')) return;
     if(document.getElementById('tr-modal') || document.getElementById('tr-foco')) return;   // no interrumpir
-    var ae=document.activeElement; if(ae && ae.id==='tr-nuevo' && ae.value) return;
+    if(document.getElementById('tr-sheet')) return;
+    var ae=document.activeElement; if(ae && (ae.id==='tr-nuevo'||ae.id==='tr-idea') && ae.value) return;
     if(typeof DB==='undefined' || !DB.loadAll) return;
     DB.loadAll().then(function(ok){ if(ok){ cargar(); pintar(); } }).catch(function(){});
   }
