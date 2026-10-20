@@ -273,7 +273,7 @@
 '  #ag-tab-cumple{display:flex!important;flex-direction:column;gap:2px}',
 '  .ag-ico{font-size:1.2rem;line-height:1.1;display:block;margin:0}',
 '  .ag-lb{display:block}',
-'  #main .agg-scroll > div{min-width:520px!important}',
+'  #main .agg-scroll > div[style*="min-width"]{min-width:520px!important}',
 '  #main .agg-side{width:190px}',
 '}',
 '@media(max-width:1024px){',
@@ -1568,10 +1568,10 @@
     var oSw=window.agSwitchTab;
     if(typeof oSw==='function') window.agSwitchTab=function(tab, el){
       volverRoot();
-      if(tab==='semana'){
+      if(tab==='semana' || tab==='hoy'){
         var h=document.querySelector('.ag-tab[data-tab="horario"]');
         oSw.call(this,'horario',h||el);
-        try { window.agGView='semana'; window.agGFecha=new Date(); window.agGFecha.setHours(0,0,0,0); } catch(e){}
+        try { window.agGView=(tab==='hoy'?'dia':'semana'); window.agGFecha=new Date(); window.agGFecha.setHours(0,0,0,0); } catch(e){}
         [].forEach.call(document.querySelectorAll('.ag-tab-nav .ag-tab'), function(b){ b.classList.toggle('active', b===el); });
         if(typeof renderAgenda==='function') renderAgenda();
         return;
@@ -1581,6 +1581,23 @@
   }
   montarTabsAgenda();
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', montarTabsAgenda);
+  // Al abrir una cita desde la rejilla (Hoy/Semana) se conserva «Imagen recordatorio», que antes estaba en la tarjeta de Hoy
+  (function(){
+    var oEd=window.agEditarEvento; if(typeof oEd!=='function' || oEd._agx) return;
+    window.agEditarEvento=function(id){
+      var r=oEd.apply(this, arguments);
+      try{
+        var ov=document.getElementById('ag-edit-overlay'), row=ov && ov.querySelector('.btn-row'); if(!row) return r;
+        var b=document.getElementById('agx-img-btn');
+        if(!b){ b=document.createElement('button'); b.type='button'; b.id='agx-img-btn'; b.className='btn'; b.textContent='📅 Imagen recordatorio'; row.insertBefore(b, row.firstChild.nextSibling); }
+        var e=(window.agEventos||[]).filter(function(x){return x.id===id;})[0];
+        b.style.display=(e && e.tipo!=='admin' && typeof window.abrirImagenCita==='function')?'':'none';
+        b.onclick=function(){ try{ window._agEventMap=window._agEventMap||{}; if(e) window._agEventMap[e.id]=e; }catch(_){} ov.classList.remove('open'); window.abrirImagenCita(id); };
+      }catch(err){}
+      return r;
+    };
+    window.agEditarEvento._agx=true;
+  })();
 
   // ---------- integración con la navegación de la app ----------
   window.tareasAbrir = abrir;
