@@ -278,6 +278,28 @@
 '  .ag-tab{color:var(--strong)}',
 '  .ag-tab.active{color:var(--text)}',
 '}',
+'@media (pointer:coarse){',
+'  /* pantallas táctiles (iPhone/iPad): botones y zonas de toque de tamaño cómodo (≈44 px) */',
+'  html body .tr-chip,html body .tr-sel{min-height:42px}',
+'  html body .tr-mini{min-height:40px;padding:8px 14px;font-size:.84rem}',
+'  html body .tr-est,html body .tr-areab{min-height:36px;padding:6px 11px;font-size:.78rem}',
+'  html body .tr-link,html body .md-lnk{min-height:42px;padding:9px 8px;font-size:.88rem}',
+'  html body .tr-chk{position:relative}',
+'  html body .tr-chk::before,html body .tr-star::before{content:"";position:absolute;inset:-6px}',
+'  html body .tr-star{position:relative;width:44px;height:44px}',
+'  html body .tr-nueva{min-height:48px}',
+'  html body .agg-btn{min-height:40px;padding:8px 16px}',
+'  html body .agg-icon{width:44px;height:44px}',
+'  html body .agg-mini-btn{min-width:42px;min-height:42px}',
+'  html body .agg-cal-item label{min-height:42px}',
+'  html body .agg-cal-item input[type=checkbox]{width:20px;height:20px}',
+'  html body .agg-link,html body .agg-crear-m{min-height:42px}',
+'  html body .page-header .btn{min-height:42px}',
+'  html body #ag-form-card input,html body #ag-form-card select,html body #ag-form-card textarea{min-height:44px;font-size:16px}',
+'  html body .tr-estopt{min-height:48px}',
+'  html body #ag-prev,html body #ag-next{min-width:44px;min-height:44px}',
+'  html body #ag-form-card .btn{min-height:44px}',
+'}',
 '@media(max-width:1024px){',
 '  /* en iPhone/iPad, letra de 16px en los campos evita que Safari acerque la pantalla al escribir */',
 '  .agg-f input,.agg-f select,.agg-f textarea,.agg-in-titulo,.tr-f input,.tr-f select,.tr-f textarea,#tr-nuevo,#tr-idea,#trq,.tr-sel,.tr-add input[type=text]{font-size:16px}',
@@ -301,6 +323,9 @@
 '  .tr-wrap{padding-left:0;padding-right:0}',
 '  .page-header{margin-bottom:12px}',
 '  #ag-panel-tareas .tr-h1{display:none}',
+'  #page-agenda.ag-embed .page-header > div + div,#page-agenda.ag-embed .page-header p{display:none!important}',
+'  #tr-idea::placeholder{font-size:13px}',
+'  #page-agenda.ag-embed .page-header{margin-bottom:6px}',
 '  .tr-top{gap:8px;align-items:center}',
 '  .tr-foco-btn{padding:10px 12px;font-size:.84rem;white-space:nowrap}',
 '  #main .tr-filtros,#main .tr-vistas,.tr-add .tr-chips{flex-wrap:nowrap;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}',
@@ -393,7 +418,7 @@
   function pintarFiltros(){
     var el=document.getElementById('tr-filtros'); if(!el) return;
     var ls_=listas();
-    if(ls_.length<2 || st.vista==='areas'){ el.innerHTML=''; return; }
+    if(ls_.length<2 || st.vista==='areas' || st.vista==='bandeja'){ el.innerHTML=''; return; }
     el.innerHTML = '<button class="tr-chip'+(st.filtro==='todas'?' on':'')+'" data-act="filtro" data-v="todas">Todas</button>'
       + ls_.map(function(l){ return '<button class="tr-chip'+(st.filtro===l.id?' on':'')+'" data-act="filtro" data-v="'+esc(l.id)+'"><span class="tr-dot" style="background:'+esc(l.color)+'"></span>'+esc(l.nombre)+'</button>'; }).join('');
   }
@@ -1490,7 +1515,7 @@
   // ---------- Tareas dentro de la Agenda (pestañas del calendario) ----------
   var TABS_AG = [['t-hoy','hoy','☀️ Mi día'],['t-tareas','tareas','✅ Tareas'],['t-areas','areas','🗂 Áreas']];
   function enAgenda(){ var r=document.getElementById('tareas-root'); return !!(r && r.parentNode && r.parentNode.id==='ag-panel-tareas'); }
-  function volverRoot(){ var r=document.getElementById('tareas-root'), pg=document.getElementById('page-tareas'); if(r && pg && r.parentNode!==pg) pg.appendChild(r); var p=document.getElementById('ag-panel-tareas'); if(p) p.style.display='none'; }
+  function volverRoot(){ var pa=document.getElementById('page-agenda'); if(pa) pa.classList.remove('ag-embed'); var r=document.getElementById('tareas-root'), pg=document.getElementById('page-tareas'); if(r && pg && r.parentNode!==pg) pg.appendChild(r); var p=document.getElementById('ag-panel-tareas'); if(p) p.style.display='none'; }
   function marcarTabAgenda(){
     if(!enAgenda()) return;
     var m = st.vista==='hoy' ? 't-hoy' : st.vista==='areas' ? 't-areas' : 't-tareas';
@@ -1507,6 +1532,7 @@
     if(el) el.classList.add('active');
     ['ag-nav-card','ag-container','ag-form-card','ag-panel-cumple'].forEach(function(id){ var e=document.getElementById(id); if(e) e.style.display='none'; });
     panel.style.display=''; if(root.parentNode!==panel) panel.appendChild(root);
+    var pa=document.getElementById('page-agenda'); if(pa) pa.classList.add('ag-embed');
     if(vista!=='areas' || !st.area) {} 
     window.tareasIr(vista); abrir(); marcarTabAgenda();
   };
