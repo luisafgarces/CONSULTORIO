@@ -8,7 +8,7 @@
 
   var KEY = 'tareas';
   var T = [];                                   // todas las tareas
-  var st = { fPrio:'todas', fFecha:'todas', verFiltros:false, verTodas:false, abiertas:{}, estadoV:'curso', estadoElegido:false, vista:'hoy', filtro:'todas', verAtrasadas:false, verMasHoy:false, addFecha:null, addLista:'', foco:null, sync:null };
+  var st = { fPrio:'todas', fFecha:'todas', verFiltros:false, saltadas:[], verDespues:false, verTodas:false, abiertas:{}, estadoV:'curso', estadoElegido:false, vista:'hoy', filtro:'todas', verAtrasadas:false, verMasHoy:false, addFecha:null, addLista:'', foco:null, sync:null };
   try { st.estadoV = localStorage.getItem('tr_estadoV') || 'curso'; st.vista = localStorage.getItem('tr_vista') || 'hoy'; if(st.vista==='hechas'){ st.vista='tareas'; st.estadoV='completada'; st.estadoElegido=true; } st.filtro = localStorage.getItem('tr_filtro') || 'todas'; st.addLista = localStorage.getItem('tr_lista') || ''; } catch(e){}
   var MAX_HOY = 8;
 
@@ -195,7 +195,31 @@
 '.tr-foco-mut div{padding:3px 4px}',
 '.tr-foco-sec{display:flex;gap:4px 14px;justify-content:center;flex-wrap:wrap;margin-top:16px}',
 '.tr-foco-sec button{border:none;background:none;color:#8a7279;font-size:.82rem;text-decoration:underline;cursor:pointer;padding:6px}',
-'.tr-foco-b.chico button{min-height:38px;padding:0 14px;font-size:.85rem}'
+'.tr-foco-b.chico button{min-height:38px;padding:0 14px;font-size:.85rem}',
+'.md-h{font-size:.74rem;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:#a0536a;margin:18px 2px 8px}',
+'.md-card{background:#fff;border:1.5px solid #f1dde2;border-radius:16px;padding:12px 14px}',
+'.md-res{font-size:.92rem;line-height:1.5;color:#4a3a3f}',
+'.md-res b{color:#7a3c4b}',
+'.md-g{display:inline-block;background:#eaf6ee;border:1px solid #bfe0c6;color:#2d6a3e;border-radius:12px;padding:2px 9px;margin:4px 5px 0 0;font-size:.76rem}',
+'.md-ev{display:flex;gap:10px;align-items:flex-start;padding:9px 0;border-bottom:1px dashed #f1dde2}',
+'.md-ev:last-child{border-bottom:none}',
+'.md-ev.past{opacity:.5}',
+'.md-ev.now{background:#fbe9ee;border-radius:10px;padding:9px 8px}',
+'.md-t{flex:0 0 96px;font-size:.8rem;color:#7a3c4b;font-weight:700}',
+'.md-sub{font-size:.74rem;color:#8a7279;margin-top:2px}',
+'.md-step{background:#fff7f9;border:2px solid #cd8e9d;border-radius:18px;padding:16px}',
+'.md-step .tit{font-size:1.15rem;font-weight:700;color:#3b2430;line-height:1.3;word-break:break-word}',
+'.md-step .acc{font-size:.98rem;color:#5b4549;margin-top:8px}',
+'.md-why{font-size:.76rem;color:#8a7279;margin-top:8px}',
+'.md-alerta{background:#fff4e5;border:1.5px solid #f3d29a;border-radius:12px;padding:9px 12px;margin-bottom:10px;font-size:.86rem;color:#8a5a00}',
+'.md-opt{display:flex;gap:10px;align-items:center;padding:9px 12px;background:#fff;border:1.5px solid #f1dde2;border-radius:14px;margin-bottom:8px}',
+'.md-opt .m{flex:1;min-width:0}',
+'.md-opt .tt{font-size:.92rem;color:#4a3a3f;word-break:break-word}',
+'.md-lnk{background:none;border:none;color:#a0536a;text-decoration:underline;cursor:pointer;font-size:.8rem;padding:6px 2px}',
+'.md-plan{display:flex;gap:8px;align-items:center;padding:9px 0;border-bottom:1px dashed #f1dde2}',
+'.md-plan .m{flex:1;min-width:0;font-size:.9rem;word-break:break-word}',
+'.md-plan button{border:1.5px solid #ecd3d9;background:#fff;color:#7a3c4b;border-radius:12px;padding:6px 10px;font-size:.76rem;cursor:pointer}',
+'.md-plan button.on{background:#cd8e9d;border-color:#cd8e9d;color:#fff;font-weight:700}'
     ].join('\n');
     document.head.appendChild(s);
   }
@@ -242,15 +266,10 @@
   function pintarHead(){
     var el=document.getElementById('tr-head'); if(!el) return;
     var act=tareaActiva(), banner='';
-    if(act) banner='<div class="tr-activa">🎯 <b>En foco: '+esc(act.titulo)+'</b><button class="tr-mini pri" data-act="empezar" data-id="'+esc(act.id)+'">▶ Continuar</button><button class="tr-mini" data-act="pausarb" data-id="'+esc(act.id)+'">Guardar y pausar</button></div>';
+    if(act && st.vista!=='hoy') banner='<div class="tr-activa">🎯 <b>En foco: '+esc(act.titulo)+'</b><button class="tr-mini pri" data-act="empezar" data-id="'+esc(act.id)+'">▶ Continuar</button><button class="tr-mini" data-act="pausarb" data-id="'+esc(act.id)+'">Guardar y pausar</button></div>';
     if(st.vista==='tareas'){ el.innerHTML=banner; return; }
     var h=hoy();
-    var hechasHoy = T.filter(function(t){ return t.hecha && t.hechaEn && t.hechaEn.slice(0,10)===h; }).length;
-    var pend = pendientes().filter(function(t){ var f=fechaEf(t); return f && f<=h; }).length;
-    var total = hechasHoy+pend;
-    var pct = total ? Math.round(hechasHoy*100/total) : 0;
-    var msg = !total ? 'Día libre de tareas. Respira. 🌿' : pend===0 ? '¡Todo hecho por hoy! 🎉' : hechasHoy===0 ? 'Elige solo UNA para empezar.' : 'Vas bien: '+hechasHoy+' hecha'+(hechasHoy>1?'s':'')+'. Sigue con la siguiente.';
-    el.innerHTML = banner+'<div class="tr-prog"><div class="tr-prog-t"><span>'+esc(msg)+'</span><span>'+hechasHoy+' / '+total+'</span></div><div class="tr-bar"><i style="width:'+pct+'%"></i></div></div>';
+    el.innerHTML = banner;
   }
 
   function pintarAddChips(){
@@ -331,29 +350,7 @@
     if(st.vista==='tareas'){
       html = vistaTareas();
     } else if(st.vista==='hoy'){
-      var atr = pen.filter(function(t){ var f=fechaEf(t); return f && f<h; }).sort(function(a,b){ return fechaEf(a)<fechaEf(b)?-1:fechaEf(a)>fechaEf(b)?1:ordenar(a,b); });
-      var hoyT = pen.filter(function(t){ return fechaEf(t)===h; });
-      var hoyOrd = hoyT.concat(atr).sort(ordenar);
-      var imp = hoyOrd.filter(function(t){return t.prio;}).slice(0,3);
-      var resto = hoyT.filter(function(t){ return imp.indexOf(t)<0; }).sort(ordenar);
-      if(atr.length){
-        html += '<div class="tr-atr">⏰ <b>'+atr.length+' atrasada'+(atr.length>1?'s':'')+'.</b> Sin culpa: decide qué hacer con ellas.'
-          + '<div class="tr-atr-b"><button class="tr-mini" data-act="atr-hoy">Pasarlas a hoy</button><button class="tr-mini" data-act="atr-ver">'+(st.verAtrasadas?'Ocultar':'Verlas')+'</button></div></div>';
-        if(st.verAtrasadas) html += atr.map(function(t){ return fila(t,{mover:true}); }).join('');
-      }
-      if(imp.length){
-        html += '<div class="tr-sec"><span>⭐ Lo más importante hoy</span></div>' + imp.map(function(t){ return fila(t,{big:true}); }).join('');
-      }
-      if(resto.length){
-        var vis = st.verMasHoy ? resto : resto.slice(0,MAX_HOY);
-        html += '<div class="tr-sec"><span>Para hoy</span></div>' + vis.map(function(t){ return fila(t); }).join('');
-        if(resto.length>MAX_HOY) html += '<div style="text-align:center"><button class="tr-link" data-act="vermas">'+(st.verMasHoy?'Ver menos':'Ver '+(resto.length-MAX_HOY)+' más')+'</button></div>';
-      }
-      if(!imp.length && !resto.length && !atr.length){
-        html += '<div class="tr-vacio"><b>Nada pendiente para hoy 🎉</b>Escribe arriba lo que tengas en mente, o revisa tu Bandeja.</div>';
-      } else if(!imp.length){
-        html += '<div class="tr-vacio" style="padding:10px">Toca ☆ en hasta 3 tareas para fijarlas como lo más importante.</div>';
-      }
+      html = vistaMiDia();
     } else if(st.vista==='bandeja'){
       var b = pen.filter(function(t){return !fechaEf(t);}).sort(ordenar);
       html += '<div class="tr-sec"><span>📥 Ideas y pendientes sin fecha</span></div>';
@@ -481,6 +478,11 @@
     else if(act==='foco'){ abrirFoco(); }
     else if(act==='nueva'){ abrirNueva(); }
     else if(act==='empezar'){ empezarTarea(id); }
+    else if(act==='otra'){ st.saltadas.push(id); pintarContenido(); }
+    else if(act==='planear'){ abrirPlan(); }
+    else if(act==='reorg'){ reorganizarDia(); }
+    else if(act==='vercal'){ goPage('agenda'); }
+    else if(act==='pdespues'){ st.verDespues=!st.verDespues; pintarContenido(); }
     else if(act==='pausarb'){ var tb=porId(id); if(tb) pausarTarea(tb); }
     else if(act==='estado'){ abrirEstado(id); }
     else if(act==='setest'){ var te=porId(id); if(te) aplicarEstado(te,v); }
@@ -602,6 +604,210 @@
       t.pasos=(t.pasos||[]).concat(lines.map(function(x){ return {t:x,d:false}; }));
       st.abiertas[t.id]=true; guardar(); pintar(); snack('Tarea dividida en '+lines.length+' paso'+(lines.length>1?'s':''),null,3000);
     });
+  }
+
+  // ===================== MI DÍA =====================
+  var H0_DIA=6*60, H1_DIA=21*60;
+  function minDe(iso){ var d=new Date(iso); return d.getHours()*60+d.getMinutes(); }
+  function finMinEv(e){
+    var ini=new Date(e.inicio), fin=e.fin?new Date(e.fin):null;
+    if(!fin||isNaN(fin)||fin<=ini) fin=new Date(ini.getTime()+50*60000);
+    return fin.toDateString()===ini.toDateString() ? fin.getHours()*60+fin.getMinutes() : 24*60;
+  }
+  function eventosHoy(){ var h=hoy(); return evs().filter(function(e){ return e.inicio && String(e.inicio).slice(0,10)===h; }).sort(function(a,b){ return String(a.inicio).localeCompare(String(b.inicio)); }); }
+  function ocupadosHoy(){
+    return eventosHoy().map(function(e){ return {ini:minDe(e.inicio)-(parseInt(e.viajeAntes,10)||0), fin:finMinEv(e)+(parseInt(e.viajeDespues,10)||0), e:e}; });
+  }
+  function ahoraMin(){ var n=new Date(); return n.getHours()*60+n.getMinutes(); }
+  function huecosHoy(minimo){
+    var oc=ocupadosHoy(), ahora=ahoraMin(), cur=Math.max(H0_DIA, Math.ceil(ahora/5)*5), gaps=[];
+    oc.forEach(function(o){ if(o.ini-cur>=minimo && cur<H1_DIA) gaps.push([cur, Math.min(o.ini,H1_DIA)]); if(o.fin>cur) cur=o.fin; });
+    if(H1_DIA-cur>=minimo) gaps.push([cur,H1_DIA]);
+    return gaps;
+  }
+  function estadoAhora(){      // {libre:bool, hasta:min, e:evento|null}
+    var oc=ocupadosHoy(), a=ahoraMin();
+    for(var i=0;i<oc.length;i++){ if(a>=oc[i].ini && a<oc[i].fin) return {libre:false, hasta:oc[i].fin, e:oc[i].e}; }
+    var sig=oc.filter(function(o){return o.ini>a;})[0];
+    return {libre:true, hasta:sig?sig.ini:null, e:sig?sig.e:null};
+  }
+  function durMin(m){ var h=Math.floor(m/60), mi=m%60; return (h?h+' h':'')+(h&&mi?' ':'')+(mi?mi+' min':'')||'0 min'; }
+  function hm(m){ var h=Math.floor(m/60), mi=m%60; return ((h%12)||12)+':'+p2(mi)+' '+(h<12?'a. m.':'p. m.'); }
+  function horaIso(iso){ var m=minDe(iso); return hm(m); }
+
+  function eligibles(){
+    var h=hoy(), lim=sumarDias(h,7);
+    return pendientes().filter(function(t){
+      if(t.estado==='espera') return false;
+      if(t.planDia===h && t.plan) return true;
+      if(t.enfoque||t.estado==='curso'||t.estado==='pausada') return true;
+      if(t.fecha && t.fecha<=h) return true;
+      if(t.limite && t.limite<=lim) return true;
+      return false;
+    });
+  }
+  function puntuar(t, disp){
+    var h=hoy(), sc=0, why=[];
+    if(t.limite){
+      var d=Math.round((desdeYMD(t.limite)-desdeYMD(h))/864e5);
+      if(d<=0){ sc+=100; why.push(d<0?'su fecha límite ya pasó':'vence hoy'); }
+      else if(d===1){ sc+=80; why.push('vence mañana'); }
+      else if(d<=3){ sc+=60; why.push('vence en '+d+' días'); }
+      else if(d<=7){ sc+=30; why.push('vence en '+d+' días'); }
+    }
+    if(t.prioridad==='alta'){ sc+=40; why.push('prioridad alta'); } else if(t.prioridad==='normal') sc+=15;
+    if(t.fecha===h) sc+=10;
+    var need=t.minutos||15;
+    if(disp>0){ if(disp>=need){ sc+=20; if(disp<900) why.push('cabe en tu espacio libre'); } else sc-=30; }
+    return {sc:sc, why:why};
+  }
+  function dispAntes(){ var e=estadoAhora(); if(!e.libre) return 0; return e.hasta==null ? 999 : e.hasta-ahoraMin(); }
+  function urgente(){
+    var a=ahoraMin(), oc=ocupadosHoy().filter(function(o){ return !o.e.tareaId && o.ini>a && o.ini-a<=20; })[0];
+    return oc ? {e:oc.e, en:oc.ini-a} : null;
+  }
+  // Reglas: 1) en foco/en curso se retoma primero  2) la que elegiste como importante
+  // 3) por fecha límite, prioridad y tiempo disponible. Nunca por ser fácil ni por antigüedad.
+  function recomendar(){
+    var h=hoy(), c=eligibles().filter(function(t){ return st.saltadas.indexOf(t.id)<0; }), urg=urgente();
+    var act=tareaActiva(); if(act) return {t:act, modo:'continuar', why:['la dejaste en foco: lo natural es continuar donde ibas'], urg:urg};
+    var curso=c.filter(function(t){return t.estado==='curso';}).sort(function(a,b){ return String(b.actualizada||'').localeCompare(String(a.actualizada||'')); })[0];
+    if(curso) return {t:curso, modo:'retomar', why:['ya está en curso, conviene retomarla primero'], urg:urg};
+    var pr=c.filter(function(t){return t.planDia===h && t.plan==='principal';})[0];
+    if(pr) return {t:pr, modo:'plan', why:['la elegiste como tu tarea importante de hoy'], urg:urg};
+    var disp=dispAntes();
+    var lst=c.map(function(t){ var p=puntuar(t,disp); return {t:t, sc:p.sc, why:p.why}; }).sort(function(a,b){ return b.sc-a.sc || a.t.titulo.localeCompare(b.t.titulo); });
+    if(!lst.length) return {t:null, why:[], urg:urg};
+    return {t:lst[0].t, modo:'nueva', why:lst[0].why, urg:urg};
+  }
+  function opcionalesHoy(rec){
+    var h=hoy(), c=eligibles().filter(function(t){ return (!rec.t||t.id!==rec.t.id) && t.estado==='pendiente' && st.saltadas.indexOf(t.id)<0; });
+    var sec=c.filter(function(t){return t.planDia===h && t.plan==='secundaria';});
+    if(sec.length) return sec.slice(0,2);
+    var disp=dispAntes();
+    return c.map(function(t){ var p=puntuar(t,disp); return {t:t,sc:p.sc}; }).sort(function(a,b){ return b.sc-a.sc || a.t.titulo.localeCompare(b.t.titulo); }).slice(0,2).map(function(x){return x.t;});
+  }
+
+  function vistaMiDia(){
+    var h=hoy(), evh=eventosHoy(), ahora=ahoraMin(), html='';
+    var rec=recomendar(), opc=opcionalesHoy(rec);
+    var pausadas=pendientes().filter(function(t){ return (t.estado==='pausada'||(t.estado==='curso'&&!t.enfoque)) && (!rec.t||t.id!==rec.t.id); }).sort(function(a,b){ return String(b.actualizada||'').localeCompare(String(a.actualizada||'')); }).slice(0,3);
+    var mostrados=[rec.t?rec.t.id:''].concat(opc.map(function(t){return t.id;}),pausadas.map(function(t){return t.id;}));
+    var despues=eligibles().filter(function(t){ return mostrados.indexOf(t.id)<0; });
+
+    // BLOQUE 1: cómo está tu día
+    var fixed=evh.filter(function(e){return !e.tareaId;}), bloques=evh.filter(function(e){return e.tareaId;});
+    var ocup=ocupadosHoy().reduce(function(a,o){ return a+Math.max(0,Math.min(o.fin,H1_DIA)-Math.max(o.ini,H0_DIA)); },0);
+    var gaps=huecosHoy(30), libre=gaps.reduce(function(a,g){return a+(g[1]-g[0]);},0), ea=estadoAhora();
+    var ahoraTxt = ea.libre ? (ea.hasta!=null ? 'Ahora estás libre hasta las <b>'+hm(ea.hasta)+'</b> ('+durMin(Math.max(0,ea.hasta-ahora))+').' : (ahora<H1_DIA?'Ahora estás libre y no tienes más compromisos hoy.':'Ya terminó el horario de hoy.'))
+                        : 'Ahora estás en <b>'+esc(ea.e.titulo)+'</b> hasta las '+hm(ea.hasta);
+    var hechasHoy=T.filter(function(t){ return t.hecha && t.hechaEn && t.hechaEn.slice(0,10)===h; }).length, mh=minHoy();
+    var logro=(hechasHoy||mh)?'<div class="md-sub" style="margin-top:6px">Hoy llevas'+(hechasHoy?' ✔ '+hechasHoy+' hecha'+(hechasHoy>1?'s':''):'')+(hechasHoy&&mh?' ·':'')+(mh?' ⏱ '+mh+' min de enfoque':'')+'. Todo suma.</div>':'';
+    html+='<div class="md-h" style="margin-top:4px">1 · Cómo está tu día</div><div class="md-card md-res">'
+      +'<b>'+fixed.length+'</b> compromiso'+(fixed.length===1?'':'s')+(bloques.length?' + '+bloques.length+' bloque'+(bloques.length>1?'s':'')+' de tarea':'')+' · ocupado <b>'+durMin(ocup)+'</b> · libre <b>'+(ahora<H1_DIA?durMin(libre):'0 min')+'</b>'
+      +'<div style="margin-top:4px">'+ahoraTxt+'</div>'
+      +(gaps.length?'<div>'+gaps.slice(0,4).map(function(g){ return '<span class="md-g">'+hm(g[0])+' – '+hm(g[1])+' · '+durMin(g[1]-g[0])+'</span>'; }).join('')+'</div>':'')
+      +logro
+      +'<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap"><button class="tr-mini" data-act="planear">📝 Planear mi día</button><button class="tr-mini" data-act="reorg">🔄 Reorganizar lo que queda del día</button></div></div>';
+
+    // BLOQUE 2: compromisos de hoy
+    html+='<div class="md-h">2 · Compromisos de hoy</div><div class="md-card">';
+    if(!evh.length) html+='<div class="md-sub" style="font-size:.88rem">Sin compromisos con hora hoy. Tu día está abierto.</div>';
+    else html+=evh.map(function(e){
+      var ini=minDe(e.inicio), fin=finMinEv(e), cls=fin<=ahora?' past':(ini<=ahora&&ahora<fin?' now':'');
+      var l=lista(e.calendario||'consultorio'), v=[];
+      if(parseInt(e.viajeAntes,10)) v.push('🚗 '+e.viajeAntes+' min antes'); if(parseInt(e.viajeDespues,10)) v.push('🚗 '+e.viajeDespues+' min después');
+      return '<div class="md-ev'+cls+'"><div class="md-t">'+hm(ini)+'<br><span style="font-weight:400;color:#8a7279">'+hm(fin)+'</span></div><div><div class="tr-tit">'+(e.tareaId?'📌 ':'')+esc(e.titulo)+'</div><div class="md-sub"><span class="tr-dot" style="background:'+esc(l.color)+'"></span>'+esc(l.nombre)+(e.tareaId?' · bloque de trabajo (flexible)':'')+(v.length?' · '+esc(v.join(' · ')):'')+(cls===' now'?' · <b>ahora</b>':'')+'</div></div></div>';
+    }).join('');
+    html+='<div style="text-align:right"><button class="md-lnk" data-act="vercal">Ver calendario</button></div></div>';
+
+    // BLOQUE 3: tu siguiente paso
+    html+='<div class="md-h">3 · Tu siguiente paso</div>';
+    if(rec.urg) html+='<div class="md-alerta">⏰ Tienes <b>'+esc(rec.urg.e.titulo)+'</b> en '+rec.urg.en+' min. Prepárate con calma; la tarea de abajo puede esperar.</div>';
+    if(rec.t){
+      var t=rec.t, l=lista(t.lista||'consultorio'), na=proximaAccion(t), tm=totalMin(t);
+      var bt = rec.modo==='continuar' ? '▶ Continuar' : rec.modo==='retomar' ? '▶ Retomar tarea' : '▶ Empezar tarea';
+      html+='<div class="md-step"><div class="tit">'+esc(t.titulo)+'</div>'
+        +'<div class="md-sub"><span class="tr-dot" style="background:'+esc(l.color)+'"></span>'+esc(l.nombre)+(t.minutos?' · ⏱ '+t.minutos+' min orientativos':'')+(tm?' · llevas '+tm+' min':'')+(t.limite?' · ⛔ límite '+esc(etiquetaDia(t.limite)):'')+'</div>'
+        +'<div class="acc">'+(na?'→ '+esc(na):'<span style="opacity:.7">Aún no tiene siguiente acción: al empezar la defines.</span>')+'</div>'
+        +((t.estado==='pausada'||t.estado==='curso')&&t.punto?'<div class="tr-next tr-punto" style="margin-top:8px">⏸ Al volver: '+esc(t.punto)+'</div>':'')
+        +'<div style="margin-top:12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap"><button class="tr-nueva" data-act="empezar" data-id="'+esc(t.id)+'">'+bt+'</button><button class="md-lnk" data-act="otra" data-id="'+esc(t.id)+'">Ahora no, otra</button></div>'
+        +(rec.why.length?'<div class="md-why">Por qué esta: '+esc(rec.why.join(' · '))+'</div>':'')+'</div>';
+    } else {
+      html+='<div class="md-card tr-vacio" style="padding:18px"><b>Nada que necesite tu atención ahora 🌿</b>Descansa o revisa tu Bandeja. Si quieres avanzar algo, elige una tarea en «Planear mi día».</div>';
+    }
+
+    // BLOQUE 4: opcionales
+    if(opc.length){
+      html+='<div class="md-h">4 · Si tienes más energía o tiempo</div><div class="md-sub" style="margin:-4px 2px 8px">Opcional: no son obligaciones adicionales.</div>'
+        +opc.map(function(t){ var l=lista(t.lista||'consultorio'), na=proximaAccion(t);
+          return '<div class="md-opt"><div class="m"><div class="tt">'+esc(t.titulo)+'</div><div class="md-sub"><span class="tr-dot" style="background:'+esc(l.color)+'"></span>'+esc(l.nombre)+(t.minutos?' · ⏱ '+t.minutos+' min':'')+(na?' · → '+esc(na):'')+'</div></div><button class="tr-mini" data-act="empezar" data-id="'+esc(t.id)+'">Empezar</button></div>'; }).join('');
+    }
+
+    // BLOQUE 5: retomar
+    if(pausadas.length){
+      html+='<div class="md-h">5 · Retomar lo pendiente</div>'
+        +pausadas.map(function(t){ var l=lista(t.lista||'consultorio');
+          return '<div class="md-opt"><div class="m"><div class="tt">'+esc(t.titulo)+'</div><div class="md-sub">'+(t.punto?'⏸ '+esc(t.punto):'<span class="tr-dot" style="background:'+esc(l.color)+'"></span>'+esc(l.nombre))+(t.actualizada?' · '+esc(ultimaTxt(t)):'')+'</div></div><button class="tr-mini pri" data-act="empezar" data-id="'+esc(t.id)+'">▶ Retomar</button></div>'; }).join('');
+    }
+
+    // Pendientes para después: guardados, fuera del centro
+    if(despues.length){
+      html+='<div class="md-h">Pendientes para después</div><div class="md-sub" style="margin:-4px 2px 6px">Siguen guardados. No hace falta hacerlos hoy.</div>'
+        +'<button class="md-lnk" data-act="pdespues">'+(st.verDespues?'Ocultar':'Ver las '+despues.length+' tareas')+'</button>'
+        +(st.verDespues?despues.sort(ordenTareas).map(function(t){ return fila(t,{}); }).join(''):'');
+    }
+    return html;
+  }
+
+  // ---------- Planear mi día: 1 importante + hasta 2 opcionales (orientación, no obligación) ----------
+  function abrirPlan(){
+    var h=hoy();
+    function lista_(){
+      var disp=dispAntes();
+      return pendientes().filter(function(t){return t.estado!=='espera';}).map(function(t){ return {t:t, sc:puntuar(t,disp).sc}; }).sort(function(a,b){ return b.sc-a.sc || a.t.titulo.localeCompare(b.t.titulo); }).slice(0,40).map(function(x){return x.t;});
+    }
+    function pinta(){
+      var ts=lista_(), pr=ts.filter(function(t){return t.planDia===h&&t.plan==='principal';}).length, se=ts.filter(function(t){return t.planDia===h&&t.plan==='secundaria';}).length;
+      var m=document.getElementById('tr-sheet'); var cont=m? m.querySelector('.tr-modal'):null; if(!cont) return;
+      cont.innerHTML='<h3 style="margin:0 0 4px;font-family:\'Playfair Display\',serif;color:#7a3c4b">📝 Planear mi día</h3><div style="font-size:.84rem;color:#6b5459;margin-bottom:8px">Elige <b>1 tarea importante</b> y hasta <b>2 opcionales</b>. Es una orientación, no un límite ('+pr+'/1 · '+se+'/2).</div>'
+        +(ts.length?ts.map(function(t){ var l=lista(t.lista||'consultorio'), a=t.planDia===h?t.plan:'';
+          return '<div class="md-plan"><div class="m">'+esc(t.titulo)+'<div class="md-sub"><span class="tr-dot" style="background:'+esc(l.color)+'"></span>'+esc(l.nombre)+(t.limite?' · ⛔ '+esc(etiquetaDia(t.limite)):'')+'</div></div><button data-id="'+esc(t.id)+'" data-p="principal" class="'+(a==='principal'?'on':'')+'">⭐ Importante</button><button data-id="'+esc(t.id)+'" data-p="secundaria" class="'+(a==='secundaria'?'on':'')+'">Opcional</button></div>'; }).join('')
+          :'<div class="tr-vacio">No tienes tareas pendientes.</div>')
+        +'<div class="tr-acc"><button type="button" class="tr-pri" id="trpl-ok">Listo</button></div>';
+      cont.querySelector('#trpl-ok').onclick=function(){ cerrarSheet(); pintar(); };
+      [].slice.call(cont.querySelectorAll('[data-p]')).forEach(function(b){ b.onclick=function(){
+        var t=porId(b.getAttribute('data-id')), tipo=b.getAttribute('data-p'); if(!t) return;
+        if(t.planDia===h && t.plan===tipo){ t.plan=''; t.planDia=''; }
+        else {
+          if(tipo==='principal') T.forEach(function(x){ if(x.planDia===h && x.plan==='principal'){ x.plan=''; x.planDia=''; } });
+          else if(T.filter(function(x){return x.planDia===h && x.plan==='secundaria' && x.id!==t.id;}).length>=2){ snack('Ya tienes 2 opcionales. Quita una para elegir otra.',null,3000); return; }
+          t.plan=tipo; t.planDia=h;
+        }
+        guardar(); pinta();
+      }; });
+    }
+    sheet(''); pinta();
+  }
+
+  // ---------- Reorganizar lo que queda del día: recalcula lo que cabe; el resto sigue guardado, sin moverse ----------
+  function reorganizarDia(){
+    var h=hoy(), prev=T.map(function(t){ return [t,t.plan,t.planDia]; });
+    var gaps=huecosHoy(15), cap=gaps.reduce(function(a,g){return a+(g[1]-g[0]);},0);
+    T.forEach(function(t){ if(t.planDia===h){ t.plan=''; t.planDia=''; } });
+    var msg;
+    if(cap<10){ msg='Hoy casi no queda espacio libre. Descansa: todo lo demás sigue guardado, nada se movió.'; }
+    else {
+      var disp=dispAntes(), act=tareaActiva();
+      var c=eligibles().filter(function(t){return st.saltadas.indexOf(t.id)<0;}), curso=c.filter(function(t){return t.enfoque||t.estado==='curso';});
+      var otros=c.filter(function(t){return curso.indexOf(t)<0;}).map(function(t){ return {t:t,sc:puntuar(t,disp).sc}; }).sort(function(a,b){ return b.sc-a.sc || a.t.titulo.localeCompare(b.t.titulo); }).map(function(x){return x.t;});
+      var orden=curso.concat(otros), elegidas=[], resto=cap;
+      orden.forEach(function(t){ if(elegidas.length>=3) return; var need=t.minutos||15; if(need<=resto || !elegidas.length){ elegidas.push(t); resto-=need; } });
+      elegidas.forEach(function(t,i){ t.plan = i===0?'principal':'secundaria'; t.planDia=h; });
+      msg='Listo: con tus '+durMin(cap)+' libres dejé '+(elegidas.length?'1 importante'+(elegidas.length>1?' y '+(elegidas.length-1)+' opcional'+(elegidas.length>2?'es':''):''):'nada')+'. El resto sigue guardado, sin cambiar de fecha.';
+    }
+    guardar(); st.saltadas=[]; pintar();
+    snack(msg, function(){ prev.forEach(function(p){ p[0].plan=p[1]; p[0].planDia=p[2]; }); guardar(); pintar(); }, 9000);
   }
 
   // ---------- estados ----------
@@ -766,33 +972,48 @@
     t.punto=v; t.actualizada=ahoraISO(); guardar();
     var u=document.getElementById('trf-ult'); if(u) u.textContent='Guardado · última actualización: '+ultimaTxt(t);
   }
-  window.addEventListener('pagehide', flushNota);
+  window.addEventListener('pagehide', function(){ flushNota(); try{ registrarFoco(); }catch(e){} });
   document.addEventListener('visibilitychange', function(){ if(document.hidden) flushNota(); });
 
+  // Conserva el tiempo trabajado (aunque haya sido poco): solo suma, nunca penaliza
+  function registrarFoco(){
+    if(!foco) return 0;
+    var t=porId(foco.id); var seg=(Date.now()-(foco.t0||Date.now()))/1000;
+    foco.t0=Date.now();
+    if(!t || seg<30) return 0;
+    var m=Math.min(240, Math.max(1, Math.round(seg/60)));
+    if(!Array.isArray(t.avance)) t.avance=[];
+    var h=hoy(), e=t.avance.filter(function(x){return x.d===h;})[0];
+    if(e) e.m+=m; else t.avance.push({d:h,m:m});
+    if(t.avance.length>90) t.avance=t.avance.slice(-90);
+    t.actualizada=ahoraISO(); guardar();
+    return m;
+  }
+  function totalMin(t){ return (t.avance||[]).reduce(function(a,x){return a+(x.m||0);},0); }
+  function minHoy(){ var h=hoy(); return T.reduce(function(a,t){ return a+(t.avance||[]).filter(function(x){return x.d===h;}).reduce(function(b,x){return b+(x.m||0);},0); },0); }
+
   function cerrarFoco(){
-    flushNota();
+    flushNota(); try{ registrarFoco(); }catch(e){}
     var f=document.getElementById('tr-foco'); if(f) f.remove();
     clearInterval(focoTimer); focoTimer=null; foco=null; pintar();
   }
   // Guardar y pausar: conserva acción, nota, pasos y hora de la última actualización
-  function pausarTarea(t, nota){
+  function pausarTarea(t, nota, mins){
     if(nota!==undefined) t.punto=nota;
     t.ultimaAccion=proximaAccion(t); t.estado='pausada'; t.enfoque=false; t.actualizada=ahoraISO(); guardar(); pintar();
-    snack('Guardado ✓ Cuando regreses, sigues desde aquí.',null,4000);
+    snack('Guardado ✓'+(mins?' · '+mins+' min de avance conservados':'')+'. Cuando regreses, sigues desde aquí.',null,4500);
   }
   function pausarFoco(){
     flushNota(); var t=porId(foco.id); if(!t) return;
-    var ta=document.getElementById('trf-nota');
-    pausarTarea(t, ta?ta.value.trim():undefined);
+    var ta=document.getElementById('trf-nota'), mins=registrarFoco();
+    pausarTarea(t, ta?ta.value.trim():undefined, mins);
     var f=document.getElementById('tr-foco'); if(f) f.remove(); clearInterval(focoTimer); focoTimer=null; foco=null; pintar();
   }
-  function abrirFoco(){          // botón de arriba: continúa la tarea en foco o propone una
+  function abrirFoco(){          // botón de arriba: la tarea que recomienda «Mi día»
     var act=tareaActiva(); if(act){ empezarTarea(act.id); return; }
-    var h=hoy(), c=pendientes().filter(function(t){ return t.estado!=='espera'; });
-    var hoyC=c.filter(function(t){ var f=fechaEf(t); return f && f<=h; }).sort(ordenar);
-    var cand=(hoyC.length?hoyC:c.sort(ordenTareas))[0];
-    if(!cand){ snack('No hay tareas por empezar. Crea una con ＋ Nueva tarea.',null,3500); return; }
-    empezarTarea(cand.id);
+    var r=recomendar();
+    if(!r.t){ snack('No hay tareas por empezar. Crea una con ＋ Nueva tarea.',null,3500); return; }
+    empezarTarea(r.t.id);
   }
   function empezarTarea(id){
     var t=porId(id); if(!t||t.hecha) return;
@@ -811,7 +1032,7 @@
   function abrirPantalla(t){
     if(foco) cerrarFoco();
     t.estado='curso'; t.enfoque=true; t.actualizada=ahoraISO(); guardar();
-    foco={id:t.id, dur:0, fin:0, restante:0, corriendo:false};
+    foco={id:t.id, dur:0, fin:0, restante:0, corriendo:false, t0:Date.now()};
     pintarFoco(); pintar();
   }
   function pintarFoco(){
@@ -861,8 +1082,8 @@
     f.querySelector('#trf-aj').onclick=ajustarSiguiente;
     f.querySelector('#trf-idea').onclick=guardarIdea;
     f.querySelector('#trf-cambiar').onclick=cambiarTarea;
-    f.querySelector('#trf-note').onclick=function(){ opcionesSinTerminar('Está bien no haber terminado', 'Elige cómo seguir. Tu avance está guardado.', false); };
-    f.querySelector('#trf-fin').onclick=function(){ flushNota(); intentarCompletar(t.id,false,function(){ var o=document.getElementById('tr-foco'); if(o) o.remove(); clearInterval(focoTimer); focoTimer=null; foco=null; pintar(); }); };
+    f.querySelector('#trf-note').onclick=function(){ var mm=registrarFoco(); opcionesSinTerminar('Está bien no haber terminado', 'Tu avance está guardado'+(mm?' ('+mm+' min más sumados)':'')+'. Elige cómo seguir.', false); };
+    f.querySelector('#trf-fin').onclick=function(){ flushNota(); registrarFoco(); intentarCompletar(t.id,false,function(){ var o=document.getElementById('tr-foco'); if(o) o.remove(); clearInterval(focoTimer); focoTimer=null; foco=null; pintar(); }); };
     f.querySelector('#trf-cerrar').onclick=cerrarFoco;
     if(foco.corriendo && !focoTimer) focoTimer=setInterval(tick,500);
   }
@@ -870,7 +1091,7 @@
   function tick(){
     if(!foco||!foco.corriendo) return;
     var r=(foco.fin-Date.now())/1000, el=document.getElementById('trf-time');
-    if(r<=0){ foco.corriendo=false; foco.dur=0; clearInterval(focoTimer); focoTimer=null; beep(); flushNota(); pintarFoco(); opcionesSinTerminar('Se acabó el tiempo orientativo','Sin presión. ¿Cómo quieres seguir?', true); return; }
+    if(r<=0){ foco.corriendo=false; foco.dur=0; clearInterval(focoTimer); focoTimer=null; beep(); flushNota(); registrarFoco(); pintarFoco(); opcionesSinTerminar('Se acabó el tiempo orientativo','Sin presión. ¿Cómo quieres seguir?', true); return; }
     if(el) el.textContent=fmtT(r);
   }
   // Tres salidas, sin mensajes de fracaso: continuar, guardar y pausar, o ajustar el siguiente paso
@@ -906,7 +1127,7 @@
     m.querySelector('#trs-ok').onclick=function(){ var v=m.querySelector('#trs-sig').value.replace(/\s+/g,' ').trim(); if(!v){ m.querySelector('#trs-sig').focus(); return; } t.siguiente=v; t.actualizada=ahoraISO(); guardar(); cerrarSheet(); pintarFoco(); };
     m.querySelector('#trs-sig').addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); m.querySelector('#trs-ok').click(); } });
     m.querySelector('#trs-pausa').onclick=function(){ cerrarSheet(); pausarFoco(); };
-    m.querySelector('#trs-fin').onclick=function(){ cerrarSheet(); intentarCompletar(t.id,false,function(){ var o=document.getElementById('tr-foco'); if(o) o.remove(); clearInterval(focoTimer); focoTimer=null; foco=null; pintar(); }); };
+    m.querySelector('#trs-fin').onclick=function(){ cerrarSheet(); registrarFoco(); intentarCompletar(t.id,false,function(){ var o=document.getElementById('tr-foco'); if(o) o.remove(); clearInterval(focoTimer); focoTimer=null; foco=null; pintar(); }); };
     setTimeout(function(){ var i=m.querySelector('#trs-sig'); if(i) i.focus(); },50);
   }
   // Otra idea → Bandeja, sin tocar la tarea activa
