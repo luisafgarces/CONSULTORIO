@@ -176,7 +176,26 @@
 '.tr-estopt{display:block;width:100%;text-align:left;border:1.5px solid #ecd3d9;background:#fff;border-radius:12px;padding:13px 14px;margin-bottom:8px;font-size:1rem;cursor:pointer;color:#4a3a3f}',
 '.tr-estopt.on{background:#fbe9ee;border-color:#cd8e9d;font-weight:700}',
 '.tr-summ{cursor:pointer;font-weight:700;color:#7a3c4b;padding:10px 0;font-size:.92rem}',
-'.tr-foco-next{font-size:1.05rem;color:#7a3c4b;max-width:520px;margin:2px auto 8px;font-weight:700}'
+'.tr-foco-next{font-size:1.05rem;color:#7a3c4b;max-width:520px;margin:2px auto 8px;font-weight:700}',
+'.tr-mini.pri{background:#cd8e9d;border-color:#cd8e9d;color:#fff;font-weight:700}',
+'.tr-activa{background:#eaf6ee;border:1.5px solid #bfe0c6;border-radius:14px;padding:10px 12px;margin-bottom:10px;font-size:.88rem;color:#2d6a3e;display:flex;gap:8px;align-items:center;flex-wrap:wrap}',
+'.tr-activa b{flex:1;min-width:120px}',
+'.tr-foco{overflow:auto;justify-content:flex-start}',
+'.tr-foco-in{margin:auto;width:100%;max-width:560px;padding:8px 0 24px;text-align:center}',
+'.tr-foco-top{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;margin-bottom:14px}',
+'.tr-foco-badge{background:#cd8e9d;color:#fff;border-radius:14px;padding:4px 12px;font-size:.78rem;font-weight:700}',
+'.tr-foco-badge.soft{background:#fff;color:#7a3c4b;border:1.5px solid #ecd3d9}',
+'.tr-foco-area{font-size:.85rem;color:#7a6a6f;margin-bottom:18px}',
+'.tr-foco-accion{font-size:1.45rem;line-height:1.35;color:#3b2430;font-weight:700;background:#fff;border:2px solid #cd8e9d;border-radius:18px;padding:20px 18px;margin:6px 0 4px;word-break:break-word}',
+'.tr-foco-aj{border:none;background:none;color:#a0536a;text-decoration:underline;font-size:.8rem;cursor:pointer;padding:6px}',
+'#trf-nota{width:100%;box-sizing:border-box;border:1.5px solid #ecd3d9;border-radius:12px;padding:10px;font-size:.95rem;font-family:inherit;background:#fffdfd;color:#4a3a3f;resize:vertical}',
+'.tr-foco-ult{font-size:.72rem;color:#8a7279;margin-top:4px}',
+'.tr-foco-mut{margin-top:12px;font-size:.84rem;color:#9a8b8f;text-align:left}',
+'.tr-foco-mut summary{cursor:pointer;text-align:center;color:#8a7279}',
+'.tr-foco-mut div{padding:3px 4px}',
+'.tr-foco-sec{display:flex;gap:4px 14px;justify-content:center;flex-wrap:wrap;margin-top:16px}',
+'.tr-foco-sec button{border:none;background:none;color:#8a7279;font-size:.82rem;text-decoration:underline;cursor:pointer;padding:6px}',
+'.tr-foco-b.chico button{min-height:38px;padding:0 14px;font-size:.85rem}'
     ].join('\n');
     document.head.appendChild(s);
   }
@@ -189,7 +208,7 @@
       var d = new Date();
       root.innerHTML =
         '<div class="tr-wrap">'
-        + '<div class="tr-top"><div><h1 class="tr-h1">✅ Tareas</h1><div class="tr-fecha" id="tr-fecha"></div></div><button class="tr-foco-btn" data-act="foco">🎯 Modo foco</button></div>'
+        + '<div class="tr-top"><div><h1 class="tr-h1">✅ Tareas</h1><div class="tr-fecha" id="tr-fecha"></div></div><button class="tr-foco-btn" data-act="foco">🎯 Empezar tarea</button></div>'
         + '<div id="tr-head"></div>'
         + '<div class="tr-add"><div class="tr-add-row"><input type="text" id="tr-nuevo" placeholder="Escribe una tarea y Enter…" autocomplete="off" enterkeyhint="done"><button class="tr-add-btn" data-act="add" aria-label="Agregar tarea">+</button></div>'
         + '<div class="tr-chips" id="tr-addchips"></div></div>'
@@ -222,14 +241,16 @@
 
   function pintarHead(){
     var el=document.getElementById('tr-head'); if(!el) return;
-    if(st.vista==='tareas'){ el.innerHTML=''; return; }
+    var act=tareaActiva(), banner='';
+    if(act) banner='<div class="tr-activa">🎯 <b>En foco: '+esc(act.titulo)+'</b><button class="tr-mini pri" data-act="empezar" data-id="'+esc(act.id)+'">▶ Continuar</button><button class="tr-mini" data-act="pausarb" data-id="'+esc(act.id)+'">Guardar y pausar</button></div>';
+    if(st.vista==='tareas'){ el.innerHTML=banner; return; }
     var h=hoy();
     var hechasHoy = T.filter(function(t){ return t.hecha && t.hechaEn && t.hechaEn.slice(0,10)===h; }).length;
     var pend = pendientes().filter(function(t){ var f=fechaEf(t); return f && f<=h; }).length;
     var total = hechasHoy+pend;
     var pct = total ? Math.round(hechasHoy*100/total) : 0;
     var msg = !total ? 'Día libre de tareas. Respira. 🌿' : pend===0 ? '¡Todo hecho por hoy! 🎉' : hechasHoy===0 ? 'Elige solo UNA para empezar.' : 'Vas bien: '+hechasHoy+' hecha'+(hechasHoy>1?'s':'')+'. Sigue con la siguiente.';
-    el.innerHTML = '<div class="tr-prog"><div class="tr-prog-t"><span>'+esc(msg)+'</span><span>'+hechasHoy+' / '+total+'</span></div><div class="tr-bar"><i style="width:'+pct+'%"></i></div></div>';
+    el.innerHTML = banner+'<div class="tr-prog"><div class="tr-prog-t"><span>'+esc(msg)+'</span><span>'+hechasHoy+' / '+total+'</span></div><div class="tr-bar"><i style="width:'+pct+'%"></i></div></div>';
   }
 
   function pintarAddChips(){
@@ -286,12 +307,14 @@
     }
     var extra = '', na = proximaAccion(t), accs = '';
     if(na) extra += '<div class="tr-next">→ '+esc(na)+'</div>';
-    if(t.estado==='pausada' && t.punto) extra += '<div class="tr-next tr-punto">⏸ Al volver: '+esc(t.punto)+'</div>';
+    if((t.estado==='pausada'||t.estado==='curso') && t.punto) extra += '<div class="tr-next tr-punto">⏸ Al volver: '+esc(t.punto)+(t.actualizada?' <span style="opacity:.7">· '+esc(ultimaTxt(t))+'</span>':'')+'</div>';
     if(t.estado==='espera' && t.esperaDe) extra += '<div class="tr-next tr-punto">⏳ Esperando: '+esc(t.esperaDe)+'</div>';
     if(np && nd===np) extra += '<div class="tr-next" style="color:#2d6a3e">✅ Pasos listos: revisa si se cumple el criterio y complétala.</div>';
     if(!na && !np) accs += '<button type="button" class="tr-mini" data-act="dividir" data-id="'+ide+'">✂ Dividir en pasos</button>';
-    if(t.estado==='pendiente' && full) accs += '<button type="button" class="tr-mini" data-act="setest" data-v="curso" data-id="'+ide+'">▶ Empezar</button>';
-    if(t.estado==='pausada') accs += '<button type="button" class="tr-mini" data-act="setest" data-v="curso" data-id="'+ide+'">▶ Retomar</button>';
+    if(t.enfoque) accs += '<button type="button" class="tr-mini pri" data-act="empezar" data-id="'+ide+'">▶ Continuar</button>';
+    else if(t.estado==='pendiente') accs += '<button type="button" class="tr-mini pri" data-act="empezar" data-id="'+ide+'">▶ Empezar tarea</button>';
+    else if(t.estado==='pausada') accs += '<button type="button" class="tr-mini pri" data-act="empezar" data-id="'+ide+'">▶ Retomar tarea</button>';
+    else if(t.estado==='curso') accs += '<button type="button" class="tr-mini pri" data-act="empezar" data-id="'+ide+'">▶ Continuar</button>';
     if(t.estado==='espera') accs += '<button type="button" class="tr-mini" data-act="setest" data-v="curso" data-id="'+ide+'">✔ Ya llegó</button>';
     if(np) accs += '<button type="button" class="tr-mini" data-act="expand" data-id="'+ide+'">'+(st.abiertas[t.id]?'▴':'▾')+' Pasos</button>';
     if(opts.mover) accs += '<button class="tr-mini" data-act="mover" data-id="'+ide+'" data-v="hoy">Hacer hoy</button><button class="tr-mini" data-act="mover" data-id="'+ide+'" data-v="manana">Mañana</button>';
@@ -397,7 +420,7 @@
     var t=porId(id); if(!t || t.hecha) return;
     var fn=function(){
       var prevE=t.estado;
-      t.hecha=true; t.estado='completada'; t.hechaEn=new Date().toISOString();
+      t.hecha=true; t.estado='completada'; t.enfoque=false; t.hechaEn=new Date().toISOString();
       var sig=null, fut=bloquesFuturos(t.id); quitarBloques(fut);
       if(t.rep){
         var nf=siguienteFecha(t);
@@ -457,6 +480,8 @@
     }
     else if(act==='foco'){ abrirFoco(); }
     else if(act==='nueva'){ abrirNueva(); }
+    else if(act==='empezar'){ empezarTarea(id); }
+    else if(act==='pausarb'){ var tb=porId(id); if(tb) pausarTarea(tb); }
     else if(act==='estado'){ abrirEstado(id); }
     else if(act==='setest'){ var te=porId(id); if(te) aplicarEstado(te,v); }
     else if(act==='dividir'){ dividirTarea(id); }
@@ -491,6 +516,7 @@
     if(t.hecha) t.estado='completada'; else if(!t.estado || t.estado==='completada') t.estado='pendiente';
     if(t.prioridad!=='alta' && t.prioridad!=='baja' && t.prioridad!=='normal') t.prioridad = t.prio ? 'alta' : 'normal';
     t.prio = (t.prioridad==='alta');
+    if(t.hecha || t.estado!=='curso') t.enfoque=false;
     ['limite','siguiente','punto','criterio','esperaDe'].forEach(function(k){ if(t[k]==null) t[k]=''; });
     t.minutos = parseInt(t.minutos,10)||0;
     if(!Array.isArray(t.pasos)) t.pasos=[];
@@ -579,9 +605,9 @@
   }
 
   // ---------- estados ----------
-  function instantanea(t){ return {estado:t.estado,punto:t.punto,esperaDe:t.esperaDe}; }
+  function instantanea(t){ return {estado:t.estado,punto:t.punto,esperaDe:t.esperaDe,enfoque:t.enfoque}; }
   function cambiarEstado(t, nuevo, datos){
-    var prev=instantanea(t); t.estado=nuevo; if(datos) Object.keys(datos).forEach(function(k){ t[k]=datos[k]; });
+    var prev=instantanea(t); t.estado=nuevo; if(nuevo!=='curso') t.enfoque=false; if(datos) Object.keys(datos).forEach(function(k){ t[k]=datos[k]; });
     guardar(); pintar();
     snack('Estado: '+ESTADO_TXT[nuevo], function(){ Object.keys(prev).forEach(function(k){ t[k]=prev[k]; }); guardar(); pintar(); }, 5000);
   }
@@ -708,7 +734,7 @@
       setPrioridad(t, document.getElementById('tre-prio').value); t.rep=rep; t.notas=document.getElementById('tre-notas').value.trim();
       t.siguiente=document.getElementById('tre-sig').value.replace(/\s+/g,' ').trim(); t.punto=document.getElementById('tre-punto').value.trim(); t.criterio=document.getElementById('tre-crit').value.trim();
       t.esperaDe=document.getElementById('tre-esp').value.trim(); t.minutos=parseInt(document.getElementById('tre-min').value,10)||0;
-      var es=document.getElementById('tre-estado'); if(es && !t.hecha) t.estado=es.value;
+      var es=document.getElementById('tre-estado'); if(es && !t.hecha){ t.estado=es.value; if(t.estado!=='curso') t.enfoque=false; }
       t.pasos=pasos.filter(function(p){return String(p.t).trim();}).map(function(p){return {t:String(p.t).trim(),d:!!p.d};});
       var bls=bloquesDe(t.id); if(bls.length){ bls.forEach(function(e){ e.titulo=t.titulo; e.calendario=t.lista||e.calendario; }); if(typeof agGuardar==='function') agGuardar(); }
       guardar(); cerrarModal(); pintar();
@@ -721,64 +747,195 @@
     };
   }
 
-  // ---------- modo foco ----------
-  var foco=null, focoTimer=null;
-  function cerrarFoco(){ var f=document.getElementById('tr-foco'); if(f) f.remove(); clearInterval(focoTimer); focoTimer=null; foco=null; pintar(); }
-  function abrirFoco(){
-    var h=hoy(), pen=pendientes().filter(function(t){ var f=fechaEf(t); return f && f<=h; }).sort(ordenar);
-    var imp=pen.filter(function(t){return t.prio;});
-    var cola=imp.concat(pen.filter(function(t){return !t.prio;}));
-    if(!cola.length){ snack('No hay tareas para hoy. Agrega una o mira tu Bandeja.',null,3500); return; }
-    foco={cola:cola.map(function(t){return t.id;}), i:0, dur:25*60, restante:25*60, fin:0, corriendo:false};
-    pintarFoco();
-  }
-  function beep(){
-    try{ var C=window.AudioContext||window.webkitAudioContext; var c=new C(); [0,0.25,0.5].forEach(function(d){ var o=c.createOscillator(), g=c.createGain(); o.connect(g); g.connect(c.destination); o.frequency.value=660; g.gain.value=0.15; o.start(c.currentTime+d); o.stop(c.currentTime+d+0.18); }); }catch(e){}
-    try{ if(navigator.vibrate) navigator.vibrate([200,100,200]); }catch(e){}
-  }
+  // ---------- EMPEZAR TAREA: una sola acción en pantalla ----------
+  var foco=null, focoTimer=null, notaTimer=null;
+  function ahoraISO(){ return new Date().toISOString(); }
+  function tareaActiva(){ return T.filter(function(t){ return t.enfoque && !t.hecha; })[0]; }
+  function ultimaTxt(t){ if(!t.actualizada) return ''; var d=new Date(t.actualizada); if(isNaN(d)) return ''; return etiquetaDia(ymd(d))+' '+d.toLocaleTimeString('es-CO',{hour:'numeric',minute:'2-digit'}); }
   function fmtT(s){ s=Math.max(0,Math.round(s)); return p2(Math.floor(s/60))+':'+p2(s%60); }
-  function pintarFoco(){
-    var f=document.getElementById('tr-foco'); if(!f){ f=document.createElement('div'); f.id='tr-foco'; f.className='tr-foco'; document.body.appendChild(f); }
-    var t=porId(foco.cola[foco.i]);
-    if(!t || t.hecha){ // la siguiente que siga pendiente
-      while(foco.i<foco.cola.length && (!porId(foco.cola[foco.i]) || porId(foco.cola[foco.i]).hecha)) foco.i++;
-      t=porId(foco.cola[foco.i]);
+  function beep(){
+    try{ var C=window.AudioContext||window.webkitAudioContext; var c=new C(); [0,0.3].forEach(function(d){ var o=c.createOscillator(), g=c.createGain(); o.connect(g); g.connect(c.destination); o.frequency.value=520; g.gain.value=0.08; o.start(c.currentTime+d); o.stop(c.currentTime+d+0.2); }); }catch(e){}
+    try{ if(navigator.vibrate) navigator.vibrate([150,80,150]); }catch(e){}
+  }
+  // Guarda lo escrito en "continúa aquí" (también al cerrar o cambiar de pestaña)
+  function flushNota(){
+    clearTimeout(notaTimer);
+    var ta=document.getElementById('trf-nota'); if(!ta||!foco) return;
+    var t=porId(foco.id); if(!t) return;
+    var v=ta.value.trim(); if(v===(t.punto||'')) return;
+    t.punto=v; t.actualizada=ahoraISO(); guardar();
+    var u=document.getElementById('trf-ult'); if(u) u.textContent='Guardado · última actualización: '+ultimaTxt(t);
+  }
+  window.addEventListener('pagehide', flushNota);
+  document.addEventListener('visibilitychange', function(){ if(document.hidden) flushNota(); });
+
+  function cerrarFoco(){
+    flushNota();
+    var f=document.getElementById('tr-foco'); if(f) f.remove();
+    clearInterval(focoTimer); focoTimer=null; foco=null; pintar();
+  }
+  // Guardar y pausar: conserva acción, nota, pasos y hora de la última actualización
+  function pausarTarea(t, nota){
+    if(nota!==undefined) t.punto=nota;
+    t.ultimaAccion=proximaAccion(t); t.estado='pausada'; t.enfoque=false; t.actualizada=ahoraISO(); guardar(); pintar();
+    snack('Guardado ✓ Cuando regreses, sigues desde aquí.',null,4000);
+  }
+  function pausarFoco(){
+    flushNota(); var t=porId(foco.id); if(!t) return;
+    var ta=document.getElementById('trf-nota');
+    pausarTarea(t, ta?ta.value.trim():undefined);
+    var f=document.getElementById('tr-foco'); if(f) f.remove(); clearInterval(focoTimer); focoTimer=null; foco=null; pintar();
+  }
+  function abrirFoco(){          // botón de arriba: continúa la tarea en foco o propone una
+    var act=tareaActiva(); if(act){ empezarTarea(act.id); return; }
+    var h=hoy(), c=pendientes().filter(function(t){ return t.estado!=='espera'; });
+    var hoyC=c.filter(function(t){ var f=fechaEf(t); return f && f<=h; }).sort(ordenar);
+    var cand=(hoyC.length?hoyC:c.sort(ordenTareas))[0];
+    if(!cand){ snack('No hay tareas por empezar. Crea una con ＋ Nueva tarea.',null,3500); return; }
+    empezarTarea(cand.id);
+  }
+  function empezarTarea(id){
+    var t=porId(id); if(!t||t.hecha) return;
+    var act=tareaActiva();
+    if(act && act.id!==t.id){
+      var m=sheet('<h3 style="margin:0 0 10px;font-family:\'Playfair Display\',serif;color:#7a3c4b">Ya tienes una tarea en foco</h3>'
+        +'<div class="tr-panel">«'+esc(act.titulo)+'»</div>'
+        +'<div style="font-size:.9rem;margin-bottom:6px">¿Quieres guardarla y pausarla antes de abrir «'+esc(t.titulo)+'»? No pierdes nada: queda justo donde la dejaste.</div>'
+        +'<div class="tr-acc" style="flex-wrap:wrap"><button type="button" class="tr-sec2" id="trw-no">Seguir con la actual</button><button type="button" class="tr-pri" id="trw-si">Guardar y pausar, abrir la otra</button></div>');
+      m.querySelector('#trw-no').onclick=function(){ cerrarSheet(); empezarTarea(act.id); };
+      m.querySelector('#trw-si').onclick=function(){ cerrarSheet(); var ta=document.getElementById('trf-nota'); if(foco) cerrarFoco(); pausarTarea(act); abrirPantalla(t); };
+      return;
     }
-    if(!t){ f.innerHTML='<div class="tr-foco-tit">¡Terminaste todo! 🎉</div><div class="tr-foco-lbl">Descansa un momento</div><div class="tr-foco-b"><button class="main" id="trf-salir">Cerrar</button></div>'; f.querySelector('#trf-salir').onclick=cerrarFoco; clearInterval(focoTimer); return; }
-    var restantes=foco.cola.length-foco.i;
-    f.innerHTML = '<div class="tr-foco-lbl">Ahora solo esto · '+restantes+' en la cola</div>'
+    abrirPantalla(t);
+  }
+  function abrirPantalla(t){
+    if(foco) cerrarFoco();
+    t.estado='curso'; t.enfoque=true; t.actualizada=ahoraISO(); guardar();
+    foco={id:t.id, dur:0, fin:0, restante:0, corriendo:false};
+    pintarFoco(); pintar();
+  }
+  function pintarFoco(){
+    var t=porId(foco&&foco.id); if(!t){ cerrarFoco(); return; }
+    flushNota();
+    var f=document.getElementById('tr-foco'); if(!f){ f=document.createElement('div'); f.id='tr-foco'; f.className='tr-foco'; document.body.appendChild(f); }
+    var l=lista(t.lista||'consultorio'), accion=proximaAccion(t), pasos=t.pasos||[];
+    var sigs=pasos.filter(function(p){return !p.d;}); if(!t.siguiente && sigs.length) sigs=sigs.slice(1);
+    var hechos=pasos.filter(function(p){return p.d;});
+    var orient=foco.dur?Math.round(foco.dur/60):t.minutos;
+    var crono;
+    if(foco.dur){
+      crono='<div class="tr-time" id="trf-time" style="font-size:2.6rem;margin:10px 0 4px">'+fmtT(foco.corriendo?(foco.fin-Date.now())/1000:foco.restante)+'</div>'
+        +'<div class="tr-foco-b chico"><button id="trf-play">'+(foco.corriendo?'⏸ Pausar cronómetro':'▶ '+(foco.restante<foco.dur?'Reanudar':'Iniciar')+' cronómetro')+'</button><button id="trf-nocrono">Quitar cronómetro</button></div>';
+    } else {
+      crono='<div class="tr-foco-lbl" style="margin-top:14px">Cronómetro (opcional)</div><div class="tr-foco-b chico"><button data-m="5">5 min</button><button data-m="15">15 min</button><button data-m="25">25 min</button><button data-m="otro">Otro…</button></div>';
+    }
+    f.innerHTML='<div class="tr-foco-in">'
+      +'<div class="tr-foco-top"><span class="tr-foco-badge">● En curso</span>'+(orient?'<span class="tr-foco-badge soft">'+orient+' minutos orientativos</span>':'')+'</div>'
       +'<div class="tr-foco-tit">'+esc(t.titulo)+'</div>'
-      +(proximaAccion(t)?'<div class="tr-foco-next">→ '+esc(proximaAccion(t))+'</div>':'')
-      +(t.punto?'<div style="max-width:520px;color:#7a5a00;background:#fff8e6;border-radius:10px;padding:6px 10px;font-size:.88rem;margin-bottom:6px">Al volver: '+esc(t.punto)+'</div>':'')
-      +(t.notas?'<div style="max-width:520px;color:#6b5459;font-size:.9rem;margin-bottom:6px">'+esc(t.notas)+'</div>':'')
-      +((t.pasos&&t.pasos.length)?'<div class="tr-foco-pasos">'+t.pasos.map(function(p,i){return '<label><input type="checkbox" data-fp="'+i+'"'+(p.d?' checked':'')+'> '+esc(p.t)+'</label>';}).join('')+'</div>':'')
-      +'<div class="tr-time" id="trf-time">'+fmtT(foco.corriendo?(foco.fin-Date.now())/1000:foco.restante)+'</div>'
-      +'<div class="tr-foco-b"><button data-d="10">10 min</button><button data-d="25">25 min</button><button data-d="45">45 min</button></div>'
-      +'<div class="tr-foco-b"><button class="main" id="trf-play">'+(foco.corriendo?'⏸ Pausar':'▶ Empezar')+'</button><button class="ok" id="trf-ok">✔ Hecha</button></div>'
-      +'<div class="tr-foco-b"><button id="trf-sig">Siguiente ⏭</button><button id="trf-salir">Salir</button></div>';
-    [].slice.call(f.querySelectorAll('[data-d]')).forEach(function(b){ b.onclick=function(){ foco.dur=foco.restante=(+b.getAttribute('data-d'))*60; foco.corriendo=false; clearInterval(focoTimer); pintarFoco(); }; });
-    [].slice.call(f.querySelectorAll('[data-fp]')).forEach(function(c){ c.onchange=function(){ t.pasos[+c.getAttribute('data-fp')].d=c.checked; guardar(); }; });
-    f.querySelector('#trf-play').onclick=function(){
-      if(foco.corriendo){ foco.restante=Math.max(0,(foco.fin-Date.now())/1000); foco.corriendo=false; clearInterval(focoTimer); }
+      +'<div class="tr-foco-area"><span class="tr-dot" style="background:'+esc(l.color)+'"></span>'+esc(l.nombre)+'</div>'
+      +'<div class="tr-foco-lbl">Tu siguiente acción</div>'
+      +'<div class="tr-foco-accion">'+(accion?esc(accion):'<span style="opacity:.6;font-weight:400;font-size:1.05rem">Aún no hay siguiente acción. Escríbela con «Ajustar».</span>')+'</div>'
+      +'<button class="tr-foco-aj" id="trf-aj">✎ Ajustar siguiente paso</button>'
+      +'<div class="tr-foco-lbl" style="margin-top:14px">Cuando regreses, continúa aquí</div>'
+      +'<textarea id="trf-nota" rows="3" placeholder="Dónde te quedaste y qué harás al volver…">'+esc(t.punto||'')+'</textarea>'
+      +'<div class="tr-foco-ult" id="trf-ult">'+(t.actualizada?'Se guarda solo · última actualización: '+esc(ultimaTxt(t)):'Se guarda solo mientras escribes')+'</div>'
+      +crono
+      +'<div class="tr-foco-b"><button class="main" id="trf-pausa">Guardar y pausar</button><button class="ok" id="trf-paso">Completar paso</button></div>'
+      +((sigs.length||hechos.length)?'<details class="tr-foco-mut"><summary>Pasos del proyecto ('+hechos.length+' de '+pasos.length+' hechos)</summary>'+hechos.map(function(p){return '<div style="text-decoration:line-through">✓ '+esc(p.t)+'</div>';}).join('')+sigs.map(function(p){return '<div>○ '+esc(p.t)+'</div>';}).join('')+'</details>':'')
+      +'<div class="tr-foco-sec"><button id="trf-idea">💡 Guardar otra idea</button><button id="trf-cambiar">Cambiar de tarea</button><button id="trf-note">No terminé</button><button id="trf-fin">Terminé toda la tarea</button><button id="trf-cerrar">Cerrar (sigue en curso)</button></div>'
+      +'</div>';
+    var ta=f.querySelector('#trf-nota'); ta.addEventListener('input',function(){ clearTimeout(notaTimer); notaTimer=setTimeout(flushNota,800); }); ta.addEventListener('blur',flushNota);
+    [].slice.call(f.querySelectorAll('[data-m]')).forEach(function(b){ b.onclick=function(){
+      var v=b.getAttribute('data-m');
+      if(v==='otro') preguntar('⏱ Otro tiempo','¿Cuántos minutos? (1 a 240)','',false,function(x){ var n=parseInt(x,10); if(n>=1&&n<=240) iniciarCrono(n); });
+      else iniciarCrono(+v);
+    }; });
+    var pl=f.querySelector('#trf-play'); if(pl) pl.onclick=function(){
+      if(foco.corriendo){ foco.restante=Math.max(0,(foco.fin-Date.now())/1000); foco.corriendo=false; clearInterval(focoTimer); focoTimer=null; }
       else { foco.fin=Date.now()+foco.restante*1000; foco.corriendo=true; clearInterval(focoTimer); focoTimer=setInterval(tick,500); }
       pintarFoco();
     };
-    f.querySelector('#trf-ok').onclick=function(){
-      intentarCompletar(t.id,false,function(){
-        clearInterval(focoTimer); focoTimer=null; foco.corriendo=false; foco.restante=foco.dur; foco.i++; pintarFoco();
-      });
-    };
-    f.querySelector('#trf-sig').onclick=function(){ clearInterval(focoTimer); foco.corriendo=false; foco.restante=foco.dur;
-      // la tarea saltada pasa al final de la cola
-      var id=foco.cola.splice(foco.i,1)[0]; foco.cola.push(id); pintarFoco(); };
-    f.querySelector('#trf-salir').onclick=cerrarFoco;
+    var nc=f.querySelector('#trf-nocrono'); if(nc) nc.onclick=function(){ foco.dur=0; foco.corriendo=false; clearInterval(focoTimer); focoTimer=null; pintarFoco(); };
+    f.querySelector('#trf-pausa').onclick=pausarFoco;
+    f.querySelector('#trf-paso').onclick=completarPaso;
+    f.querySelector('#trf-aj').onclick=ajustarSiguiente;
+    f.querySelector('#trf-idea').onclick=guardarIdea;
+    f.querySelector('#trf-cambiar').onclick=cambiarTarea;
+    f.querySelector('#trf-note').onclick=function(){ opcionesSinTerminar('Está bien no haber terminado', 'Elige cómo seguir. Tu avance está guardado.', false); };
+    f.querySelector('#trf-fin').onclick=function(){ flushNota(); intentarCompletar(t.id,false,function(){ var o=document.getElementById('tr-foco'); if(o) o.remove(); clearInterval(focoTimer); focoTimer=null; foco=null; pintar(); }); };
+    f.querySelector('#trf-cerrar').onclick=cerrarFoco;
     if(foco.corriendo && !focoTimer) focoTimer=setInterval(tick,500);
   }
+  function iniciarCrono(min){ foco.dur=min*60; foco.restante=foco.dur; foco.fin=Date.now()+foco.restante*1000; foco.corriendo=true; clearInterval(focoTimer); focoTimer=setInterval(tick,500); pintarFoco(); }
   function tick(){
     if(!foco||!foco.corriendo) return;
     var r=(foco.fin-Date.now())/1000, el=document.getElementById('trf-time');
-    if(r<=0){ foco.corriendo=false; foco.restante=foco.dur; clearInterval(focoTimer); focoTimer=null; beep(); if(el) el.textContent='¡Tiempo! 👏'; var p=document.getElementById('trf-play'); if(p) p.textContent='▶ Empezar'; return; }
+    if(r<=0){ foco.corriendo=false; foco.dur=0; clearInterval(focoTimer); focoTimer=null; beep(); flushNota(); pintarFoco(); opcionesSinTerminar('Se acabó el tiempo orientativo','Sin presión. ¿Cómo quieres seguir?', true); return; }
     if(el) el.textContent=fmtT(r);
+  }
+  // Tres salidas, sin mensajes de fracaso: continuar, guardar y pausar, o ajustar el siguiente paso
+  function opcionesSinTerminar(titulo, sub, deCrono){
+    var m=sheet('<h3 style="margin:0 0 6px;font-family:\'Playfair Display\',serif;color:#7a3c4b">'+esc(titulo)+'</h3><div style="font-size:.88rem;color:#6b5459;margin-bottom:12px">'+esc(sub)+'</div>'
+      +'<button type="button" class="tr-estopt" id="trn1">▶ '+(deCrono?'Continuar 5 minutos más':'Continuar')+'</button>'
+      +'<button type="button" class="tr-estopt" id="trn2">⏸ Guardar y pausar</button>'
+      +'<button type="button" class="tr-estopt" id="trn3">✎ Ajustar el siguiente paso</button>');
+    m.querySelector('#trn1').onclick=function(){ cerrarSheet(); if(deCrono) iniciarCrono(5); };
+    m.querySelector('#trn2').onclick=function(){ cerrarSheet(); pausarFoco(); };
+    m.querySelector('#trn3').onclick=function(){ cerrarSheet(); ajustarSiguiente(); };
+  }
+  function ajustarSiguiente(){
+    flushNota(); var t=porId(foco.id); if(!t) return;
+    var pend=(t.pasos||[]).filter(function(p){return !p.d;})[0], viaPaso=!t.siguiente && pend;
+    preguntar('✎ Ajustar el siguiente paso','Siguiente acción (con un verbo concreto)',proximaAccion(t),false,function(v){
+      if(!v) return;
+      if(viaPaso) pend.t=v; else t.siguiente=v;
+      t.actualizada=ahoraISO(); guardar(); if(foco) pintarFoco();
+    });
+  }
+  function completarPaso(){
+    flushNota(); var t=porId(foco.id); if(!t) return;
+    var pend=(t.pasos||[]).filter(function(p){return !p.d;});
+    if(t.siguiente) t.siguiente='';
+    else if(pend.length) pend[0].d=true;
+    t.actualizada=ahoraISO(); guardar();
+    var next=proximaAccion(t);
+    if(next){ pintarFoco(); snack('Paso completado ✓',null,2500); return; }
+    var m=sheet('<h3 style="margin:0 0 6px;font-family:\'Playfair Display\',serif;color:#7a3c4b">Paso completado ✓</h3><div style="font-size:.88rem;color:#6b5459;margin-bottom:10px">¿Qué sigue?</div>'
+      +'<div class="tr-f"><label>Siguiente acción</label><input id="trs-sig" type="text" placeholder="Empieza con un verbo: Revisar, Enviar…"></div>'
+      +'<div class="tr-acc" style="flex-wrap:wrap"><button type="button" class="tr-sec2" id="trs-pausa">Guardar y pausar</button><button type="button" class="tr-sec2" id="trs-fin">Ya terminé la tarea</button><button type="button" class="tr-pri" id="trs-ok">Guardar siguiente acción</button></div>');
+    m.querySelector('#trs-ok').onclick=function(){ var v=m.querySelector('#trs-sig').value.replace(/\s+/g,' ').trim(); if(!v){ m.querySelector('#trs-sig').focus(); return; } t.siguiente=v; t.actualizada=ahoraISO(); guardar(); cerrarSheet(); pintarFoco(); };
+    m.querySelector('#trs-sig').addEventListener('keydown',function(e){ if(e.key==='Enter'){ e.preventDefault(); m.querySelector('#trs-ok').click(); } });
+    m.querySelector('#trs-pausa').onclick=function(){ cerrarSheet(); pausarFoco(); };
+    m.querySelector('#trs-fin').onclick=function(){ cerrarSheet(); intentarCompletar(t.id,false,function(){ var o=document.getElementById('tr-foco'); if(o) o.remove(); clearInterval(focoTimer); focoTimer=null; foco=null; pintar(); }); };
+    setTimeout(function(){ var i=m.querySelector('#trs-sig'); if(i) i.focus(); },50);
+  }
+  // Otra idea → Bandeja, sin tocar la tarea activa
+  function guardarIdea(){
+    var t=porId(foco.id); if(!t) return;
+    preguntar('💡 Guardar otra idea','Anótala y sigue con lo tuyo: va a tu Bandeja.','',false,function(v){
+      v=v.replace(/\s+/g,' ').trim(); if(!v) return;
+      T.push(normalizar({id:nuevoId(), titulo:v, lista:t.lista||'consultorio', fecha:'', hora:'', notas:'', pasos:[], rep:'', hecha:false, creada:ahoraISO()}));
+      guardar(); snack('Idea guardada en la Bandeja ✓',null,2500);
+    });
+  }
+  // Cambiar de tarea: primero se guarda y se pausa la actual
+  function cambiarTarea(){
+    flushNota(); var t=porId(foco.id); if(!t) return;
+    var m=sheet('<h3 style="margin:0 0 8px;font-family:\'Playfair Display\',serif;color:#7a3c4b">Cambiar de tarea</h3><div style="font-size:.9rem;margin-bottom:10px">¿Guardar y pausar «'+esc(t.titulo)+'» antes de abrir otra? No se borra nada de tu avance.</div>'
+      +'<div class="tr-acc" style="flex-wrap:wrap"><button type="button" class="tr-sec2" id="trx-no">Seguir con esta</button><button type="button" class="tr-pri" id="trx-si">Guardar y pausar</button></div>');
+    m.querySelector('#trx-no').onclick=cerrarSheet;
+    m.querySelector('#trx-si').onclick=function(){
+      cerrarSheet(); var id0=t.id; pausarFoco();
+      var h=hoy(), c=pendientes().filter(function(x){ return x.id!==id0 && x.estado!=='espera'; });
+      var hoyC=c.filter(function(x){ var f=fechaEf(x); return f && f<=h; }).sort(ordenar), otras=c.filter(function(x){ return hoyC.indexOf(x)<0; }).sort(ordenTareas);
+      var lst=hoyC.concat(otras).slice(0,6);
+      if(!lst.length) return;
+      var m2=sheet('<h3 style="margin:0 0 10px;font-family:\'Playfair Display\',serif;color:#7a3c4b">¿Con cuál sigues?</h3>'
+        +lst.map(function(x){ return '<button type="button" class="tr-estopt" data-id="'+esc(x.id)+'">'+esc(x.titulo)+'<br><span style="font-size:.78rem;color:#8a7279">'+esc(lista(x.lista||'consultorio').nombre)+(proximaAccion(x)?' · → '+esc(proximaAccion(x)):'')+'</span></button>'; }).join('')
+        +'<div class="tr-acc"><button type="button" class="tr-sec2" id="trx-cerrar">Ahora no</button></div>');
+      m2.querySelector('#trx-cerrar').onclick=cerrarSheet;
+      [].slice.call(m2.querySelectorAll('[data-id]')).forEach(function(b){ b.onclick=function(){ cerrarSheet(); empezarTarea(b.getAttribute('data-id')); }; });
+    };
   }
 
   // ---------- sincronización entre dispositivos ----------
