@@ -268,7 +268,7 @@
 '.ag-ico{margin-right:6px}',
 '@media(max-width:1280px){',
 '  /* pestañas de la Agenda: una fila, con el ícono arriba y la palabra abajo */',
-'  .ag-tab-nav{display:grid;grid-template-columns:repeat(9,1fr);gap:0}',
+'  .ag-tab-nav{display:grid;grid-template-columns:repeat(8,1fr);gap:0}',
 '  .ag-tab{padding:9px 2px;font-size:.66rem;letter-spacing:.02em;text-align:center;white-space:normal;line-height:1.25;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}',
 '  #ag-tab-cumple{display:flex!important;flex-direction:column;gap:2px}',
 '  .ag-ico{font-size:1.2rem;line-height:1.1;display:block;margin:0}',
@@ -324,7 +324,7 @@
 '  #main .agg-title{font-size:1.02rem;margin:0 4px}',
 '}',
 '@media(max-width:700px){',
-'  .ag-tab-nav{display:grid;grid-template-columns:repeat(5,1fr);gap:0}',
+'  .ag-tab-nav{display:grid;grid-template-columns:repeat(4,1fr);gap:0}',
 '  .ag-ico{font-size:1.2rem;line-height:1.1;display:block;margin:0}',
 '  .ag-lb{display:block;font-size:.64rem}',
 '  .ag-tab{padding:8px 1px;font-size:.64rem;letter-spacing:0;text-align:center;white-space:normal;line-height:1.25;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}',
@@ -1562,6 +1562,8 @@
       var m2=/^(\S+)\s+(.*)$/.exec(b.textContent.trim()); if(m2 && /[^\w\s]/.test(m2[1]) && !/^[A-Za-zÁÉÍÓÚáéíóú]/.test(m2[1])) b.innerHTML='<span class="ag-ico">'+m2[1]+'</span><span class="ag-lb">'+m2[2]+'</span>';
     });
     var cu=document.getElementById('ag-tab-cumple'); if(cu && !cu.querySelector('.ag-ico')){ var tn=cu.firstChild; if(tn && tn.nodeType===3){ var m3=/^(\S+)\s+(.*)$/.exec(tn.textContent.trim()); if(m3){ var w=document.createElement('span'); w.innerHTML='<span class="ag-ico">'+m3[1]+'</span><span class="ag-lb">'+m3[2]+'</span>'; cu.replaceChild(w,tn); } } }
+    // «Hoy» era igual a Calendario > Día: se quita la pestaña (no se borra ningún dato)
+    var tHoy=n.querySelector('.ag-tab[data-tab="hoy"]'); if(tHoy && tHoy.parentNode) tHoy.parentNode.removeChild(tHoy);
     contadorBandeja();
     var panel=document.createElement('div'); panel.id='ag-panel-tareas'; panel.style.display='none'; cp.parentNode.insertBefore(panel, cp);
     // «Semana» pasa a ser el calendario tipo Google (rejilla por horas); Hoy y Mes siguen como estaban
@@ -1581,6 +1583,15 @@
   }
   montarTabsAgenda();
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded', montarTabsAgenda);
+  // Tocar un día en la vista antigua del mes lleva al Día del calendario (antes llevaba a «Hoy»)
+  (function(){
+    var o=window.agIrAFechaMes; if(typeof o!=='function' || o._agx) return;
+    window.agIrAFechaMes=function(y,m,d){
+      try{ var h=document.querySelector('.ag-tab[data-tab="horario"]'); if(h && typeof window.agSwitchTab==='function'){ window.agSwitchTab('horario',h); window.agGView='dia'; window.agGFecha=new Date(y,m,d); if(typeof renderAgenda==='function') renderAgenda(); return; } }catch(e){}
+      return o.apply(this, arguments);
+    };
+    window.agIrAFechaMes._agx=true;
+  })();
   // Al abrir una cita desde la rejilla (Hoy/Semana) se conserva «Imagen recordatorio», que antes estaba en la tarjeta de Hoy
   (function(){
     var oEd=window.agEditarEvento; if(typeof oEd!=='function' || oEd._agx) return;
