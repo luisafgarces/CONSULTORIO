@@ -507,10 +507,14 @@
   var KEY='datos_pago';
   function $(i){ return document.getElementById(i); }
   function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  var POR_DEFECTO=[{medio:'Nequi',dato:'321 202 1836',detalle:''},{medio:'Bancolombia',dato:'58000082803',detalle:'Cuenta de ahorros · a nombre de Luisa Fernanda Garcés García'}];
   function leer(){
     var v=null; try{ v=DB.get(KEY); }catch(e){}
-    if(!v || !Array.isArray(v.medios)) v={medios:[{medio:'Nequi',dato:'',detalle:''},{medio:'Bancolombia',dato:'',detalle:'Cuenta de ahorros · a nombre de '}],nota:'',titulo:'Cuentas'};
-    if(typeof v.titulo!=='string') v.titulo='Cuentas';
+    // si aún no hay nada guardado (o solo hay campos vacíos), arranca con tus cuentas ya escritas
+    if(!v || !Array.isArray(v.medios) || !v.medios.some(function(m){ return m && m.dato; })){
+      v={medios:POR_DEFECTO.map(function(m){ return {medio:m.medio,dato:m.dato,detalle:m.detalle}; }),nota:(v&&v.nota)||'',titulo:(v&&v.titulo)||'Cuentas'};
+    }
+    if(typeof v.titulo!=='string' || !v.titulo) v.titulo='Cuentas';
     return v;
   }
   function guardar(v){ try{ DB.set(KEY,v); }catch(e){} }
@@ -532,7 +536,7 @@
   }
   function pintar(){
     var cont=$('fin-pagos'); if(!cont) return; var v=leer();
-    var h='<div class="dp-aviso">💳 Escribe tus cuentas una sola vez. Se guardan en tu cuenta (no en el código de la página). Con ellas armo una imagen para mandar por WhatsApp cuando un paciente pregunte dónde pagar.</div>';
+    var h='<div class="dp-aviso">💳 Tus cuentas ya vienen escritas; cambia o agrega las que necesites y se guardan en tu cuenta. Con ellas armo una imagen para mandar por WhatsApp cuando un paciente pregunte dónde pagar.</div>';
     h+='<div class="dp-card"><h4>Título de la imagen</h4><div class="dp-f"><input id="dp-titulo" value="'+esc(v.titulo)+'" placeholder="Cuentas"></div></div>';
     v.medios.forEach(function(m,i){
       h+='<div class="dp-card" data-i="'+i+'"><h4>Cuenta '+(i+1)+'</h4>'
