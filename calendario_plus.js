@@ -496,3 +496,153 @@
   // ---------- todas las listas de alarmas con las mismas opciones ----------
   safe(function(){ reconstruirAlarma($('ag-nuevo-alarma')); reconstruirAlarma($('ag-edit-alarma')); })();
 })();
+
+/* ===========================================================================
+   Finanzas › «💳 Mis cuentas»: tus cuentas (Nequi, Bancolombia, etc.) en una
+   imagen lista para mandar por WhatsApp. Los datos NO están en el código (la
+   página es pública): los escribes una vez aquí y se guardan en tu cuenta.
+   =========================================================================== */
+(function(){
+  'use strict';
+  var KEY='datos_pago';
+  function $(i){ return document.getElementById(i); }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  function leer(){
+    var v=null; try{ v=DB.get(KEY); }catch(e){}
+    if(!v || !Array.isArray(v.medios)) v={medios:[{medio:'Nequi',dato:'',detalle:''},{medio:'Bancolombia',dato:'',detalle:'Cuenta de ahorros · a nombre de '}],nota:'',titulo:'Cuentas'};
+    if(typeof v.titulo!=='string') v.titulo='Cuentas';
+    return v;
+  }
+  function guardar(v){ try{ DB.set(KEY,v); }catch(e){} }
+  function toastS(m){ try{ if(typeof toast==='function') toast(m); }catch(e){} }
+
+  // ---------- pantalla ----------
+  function css(){
+    if($('dp-css')) return; var s=document.createElement('style'); s.id='dp-css';
+    s.textContent='#fin-pagos .dp-card{background:#fff;border:1.5px solid #f0d8de;border-radius:16px;padding:14px;margin-bottom:12px}'
+    +'#fin-pagos .dp-card h4{margin:0 0 8px;font-size:.8rem;letter-spacing:.06em;text-transform:uppercase;color:#a0536a}'
+    +'#fin-pagos .dp-f{display:flex;flex-direction:column;gap:3px;margin-bottom:8px}#fin-pagos .dp-f label{font-size:.72rem;color:#a0536a}'
+    +'#fin-pagos input,#fin-pagos textarea{font-size:16px;padding:10px 12px;border:1.5px solid #f0d8de;border-radius:10px;font-family:inherit;width:100%;box-sizing:border-box}'
+    +'#fin-pagos .dp-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}'
+    +'#fin-pagos .dp-b{border:1.5px solid #cd8e9d;background:#fff;color:#7a3c4b;border-radius:20px;padding:10px 16px;font-size:.85rem;cursor:pointer;min-height:44px}'
+    +'#fin-pagos .dp-b.p{background:#cd8e9d;color:#fff}#fin-pagos .dp-x{color:#b0455b;border-color:#e8a0a0}'
+    +'@media (max-width:820px){.fin-tab-nav{flex-wrap:wrap}.fin-tab{padding:12px 14px;flex:1 1 auto;min-height:44px}}'
+    +'#fin-pagos .dp-aviso{font-size:.78rem;color:#7a3c4b;background:#fbf1e8;border-radius:10px;padding:8px 10px;margin-bottom:12px}';
+    document.head.appendChild(s);
+  }
+  function pintar(){
+    var cont=$('fin-pagos'); if(!cont) return; var v=leer();
+    var h='<div class="dp-aviso">💳 Escribe tus cuentas una sola vez. Se guardan en tu cuenta (no en el código de la página). Con ellas armo una imagen para mandar por WhatsApp cuando un paciente pregunte dónde pagar.</div>';
+    h+='<div class="dp-card"><h4>Título de la imagen</h4><div class="dp-f"><input id="dp-titulo" value="'+esc(v.titulo)+'" placeholder="Cuentas"></div></div>';
+    v.medios.forEach(function(m,i){
+      h+='<div class="dp-card" data-i="'+i+'"><h4>Cuenta '+(i+1)+'</h4>'
+      +'<div class="dp-f"><label>Nombre (Nequi, Bancolombia, Daviplata…)</label><input data-k="medio" value="'+esc(m.medio)+'"></div>'
+      +'<div class="dp-f"><label>Número de celular o de cuenta</label><input data-k="dato" inputmode="numeric" value="'+esc(m.dato)+'"></div>'
+      +'<div class="dp-f"><label>Detalle (tipo de cuenta, a nombre de…)</label><input data-k="detalle" value="'+esc(m.detalle)+'"></div>'
+      +'<div class="dp-row"><button type="button" class="dp-b" data-a="copiar">📋 Copiar número</button><button type="button" class="dp-b dp-x" data-a="quitar">Quitar</button></div></div>';
+    });
+    h+='<div class="dp-row"><button type="button" class="dp-b" data-a="agregar">＋ Agregar otra cuenta</button></div>'
+    +'<div class="dp-card" style="margin-top:12px"><h4>Mensaje al pie (opcional)</h4><div class="dp-f"><textarea id="dp-nota" rows="2" placeholder="Ej.: Cuando pagues, envíame el comprobante por este chat.">'+esc(v.nota)+'</textarea></div></div>'
+    +'<div class="dp-row"><button type="button" class="dp-b p" data-a="imagen">🖼 Generar imagen</button><button type="button" class="dp-b" data-a="texto">📋 Copiar como texto</button></div>';
+    cont.innerHTML=h;
+  }
+  function recoger(){
+    var v=leer(), cont=$('fin-pagos'); if(!cont) return v;
+    var ms=[]; [].forEach.call(cont.querySelectorAll('.dp-card[data-i]'),function(c){
+      var o={}; [].forEach.call(c.querySelectorAll('input[data-k]'),function(i){ o[i.getAttribute('data-k')]=i.value.trim(); }); ms.push(o);
+    });
+    if(ms.length) v.medios=ms; var n=$('dp-nota'); if(n) v.nota=n.value.trim(); var t=$('dp-titulo'); if(t) v.titulo=t.value.trim()||'Cuentas'; return v;
+  }
+  function llenos(v){ return v.medios.filter(function(m){ return m.medio && m.dato; }); }
+  function texto(v){
+    var t='🌸 Hola! Estas son mis cuentas:\n'; llenos(v).forEach(function(m){ t+='\n*'+m.medio+'*\n'+m.dato+(m.detalle?'\n'+m.detalle:'')+'\n'; });
+    if(v.nota) t+='\n'+v.nota+'\n'; return t+'\n*Luisa Fernanda Garcés García*\n_Psicóloga · TP 174366_';
+  }
+  function copiar(txt, ok){
+    function f(){ try{ var a=document.createElement('textarea'); a.value=txt; a.style.position='fixed'; a.style.opacity='0'; document.body.appendChild(a); a.select(); document.execCommand('copy'); a.remove(); toastS(ok); }catch(e){ toastS('No pude copiar'); } }
+    if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(function(){ toastS(ok); },f); else f();
+  }
+
+  // ---------- imagen ----------
+  function envolver(ctx, txt, maxW){
+    var pal=String(txt).split(/\s+/), ls=[], l=''; pal.forEach(function(p){ var t=l?l+' '+p:p; if(ctx.measureText(t).width>maxW && l){ ls.push(l); l=p; } else l=t; }); if(l) ls.push(l); return ls;
+  }
+  function dibujar(v, canvas){
+    var W=800, ms=llenos(v), PAD=46, cardW=W-2*PAD;
+    var tmp=document.createElement('canvas').getContext('2d'); tmp.font='600 16px Lato,Arial,sans-serif';
+    var filas=ms.map(function(m){ var d=m.detalle?envolver(tmp,m.detalle,cardW-70):[]; return {m:m,d:d,h:76+d.length*22}; });
+    var notaL=v.nota?envolver(tmp,v.nota,cardW-40):[];
+    var cardH=30+filas.reduce(function(a,f){ return a+f.h; },0)+(notaL.length?24+notaL.length*22:0)+10;
+    var topH=190, H=topH+28+cardH+88;
+    canvas.width=W; canvas.height=H; var ctx=canvas.getContext('2d');
+    var g=ctx.createLinearGradient(0,0,0,H); g.addColorStop(0,'#fdf5f7'); g.addColorStop(1,'#fadae1'); ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+    var fg=ctx.createLinearGradient(0,0,W,0); fg.addColorStop(0,'#b87082'); fg.addColorStop(.5,'#cd8e9d'); fg.addColorStop(1,'#b87082'); ctx.fillStyle=fg; ctx.fillRect(0,0,W,topH);
+    var logo=$('logo-img');
+    if(logo && logo.complete && logo.naturalWidth){ try{ var sc=Math.min(240/logo.naturalWidth,100/logo.naturalHeight), lw=logo.naturalWidth*sc, lh=logo.naturalHeight*sc; ctx.save(); ctx.globalAlpha=.96; ctx.drawImage(logo,W/2-lw/2,10+(100-lh)/2,lw,lh); ctx.restore(); }catch(e){} }
+    else { ctx.save(); ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,.92)'; ctx.font='bold italic 18px "Playfair Display",Georgia,serif'; ctx.fillText('Luisa Fernanda Garcés García',W/2,62); ctx.font='13px Lato,Arial'; ctx.fillText('Psicóloga · TP 174366',W/2,84); ctx.restore(); }
+    ctx.save(); ctx.strokeStyle='rgba(255,255,255,.35)'; ctx.beginPath(); ctx.moveTo(W/2-140,124); ctx.lineTo(W/2+140,124); ctx.stroke(); ctx.restore();
+    ctx.save(); ctx.textAlign='center'; ctx.fillStyle='rgba(255,255,255,.96)'; ctx.font='italic 22px "Playfair Display",Georgia,serif'; ctx.fillText((v.titulo||'Cuentas')+'  ✿',W/2,163); ctx.restore();
+    var cY=topH+28;
+    ctx.save(); ctx.fillStyle='rgba(255,255,255,.97)'; ctx.shadowColor='rgba(140,70,90,.14)'; ctx.shadowBlur=30; ctx.shadowOffsetY=8; rrect(ctx,PAD,cY,cardW,cardH,20); ctx.fill(); ctx.restore();
+    var y=cY+30;
+    filas.forEach(function(f,i){
+      if(i){ ctx.save(); ctx.strokeStyle='#f0d8de'; ctx.lineWidth=1.5; ctx.beginPath(); ctx.moveTo(PAD+30,y-12); ctx.lineTo(PAD+cardW-30,y-12); ctx.stroke(); ctx.restore(); }
+      ctx.save(); ctx.textAlign='left';
+      ctx.fillStyle='#cd8e9d'; ctx.font='700 13px Lato,Arial,sans-serif'; ctx.letterSpacing='1px'; ctx.fillText(f.m.medio.toUpperCase(),PAD+30,y+8); ctx.letterSpacing='0px';
+      ctx.fillStyle='#643000'; ctx.font='bold 30px "Playfair Display",Georgia,serif'; ctx.fillText(f.m.dato,PAD+30,y+46);
+      ctx.fillStyle='#7a3d20'; ctx.font='600 16px Lato,Arial,sans-serif'; f.d.forEach(function(l,k){ ctx.fillText(l,PAD+30,y+72+k*22); });
+      ctx.restore(); y+=f.h;
+    });
+    if(notaL.length){ ctx.save(); ctx.textAlign='center'; ctx.fillStyle='#a0536a'; ctx.font='italic 15px "Playfair Display",Georgia,serif'; notaL.forEach(function(l,k){ ctx.fillText(l,W/2,y+8+k*22); }); ctx.restore(); }
+    var pY=cY+cardH;
+    ctx.save(); ctx.textAlign='center'; ctx.fillStyle='#cd8e9d'; ctx.font='13px Lato,Arial'; ctx.fillText('Luisa Fernanda Garcés García · Psicóloga · TP 174366',W/2,pY+36); ctx.restore();
+  }
+  function modal(){
+    var o=$('dp-img-overlay'); if(o) return o;
+    o=document.createElement('div'); o.id='dp-img-overlay'; o.className='cita-img-overlay'; o.style.zIndex=10002;
+    o.innerHTML='<div class="cita-img-modal"><div class="cita-img-canvas-wrap"><canvas id="dp-img-canvas" width="800" height="600"></canvas></div><div class="cita-img-footer"><button class="btn-cita-dl" data-a="dl">⬇️ Descargar</button><button class="btn-cita-wa" data-a="wa">📱 Compartir / WhatsApp</button><button class="btn-cita-close" data-a="cerrar">Cerrar</button></div></div>';
+    o.addEventListener('click',function(e){
+      if(e.target===o){ o.classList.remove('open'); return; }
+      var a=e.target.getAttribute && e.target.getAttribute('data-a'); if(!a) return;
+      var c=$('dp-img-canvas');
+      if(a==='cerrar') o.classList.remove('open');
+      if(a==='dl'){ var l=document.createElement('a'); l.download='Cuentas_para_pagar.png'; l.href=c.toDataURL('image/png'); l.click(); }
+      if(a==='wa'){
+        var msg=texto(leer());
+        if(navigator.share && navigator.canShare){
+          c.toBlob(function(b){
+            var f=b && new File([b],'Cuentas_para_pagar.png',{type:'image/png'});
+            if(f && navigator.canShare({files:[f]})){ navigator.share({files:[f],text:msg}).catch(function(){}); }
+            else { var l=document.createElement('a'); l.download='Cuentas_para_pagar.png'; l.href=c.toDataURL('image/png'); l.click(); window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank'); }
+          },'image/png');
+        } else { var l2=document.createElement('a'); l2.download='Cuentas_para_pagar.png'; l2.href=c.toDataURL('image/png'); l2.click(); toastS('Imagen descargada: adjúntala en el chat de WhatsApp'); window.open('https://wa.me/?text='+encodeURIComponent(msg),'_blank'); }
+      }
+    });
+    document.body.appendChild(o); return o;
+  }
+
+  // ---------- eventos de la pantalla ----------
+  function clic(e){
+    var b=e.target.closest && e.target.closest('[data-a]'); if(!b || !$('fin-pagos') || !$('fin-pagos').contains(b)) return;
+    var a=b.getAttribute('data-a'), v=recoger(), card=b.closest('.dp-card'), i=card?+card.getAttribute('data-i'):-1;
+    if(a==='agregar'){ v.medios.push({medio:'',dato:'',detalle:''}); guardar(v); pintar(); return; }
+    if(a==='quitar'){ if(v.medios.length>1) v.medios.splice(i,1); else v.medios=[{medio:'',dato:'',detalle:''}]; guardar(v); pintar(); return; }
+    if(a==='copiar'){ var m=v.medios[i]; if(m && m.dato) copiar(m.dato,'Número copiado ✓'); else toastS('Escribe primero el número'); return; }
+    if(a==='texto'){ if(!llenos(v).length){ toastS('Escribe al menos un medio con su número'); return; } guardar(v); copiar(texto(v),'Texto copiado ✓ (pégalo en WhatsApp)'); return; }
+    if(a==='imagen'){
+      if(!llenos(v).length){ toastS('Escribe al menos un medio con su número'); return; }
+      guardar(v); var o=modal(); o.classList.add('open'); setTimeout(function(){ dibujar(v,$('dp-img-canvas')); },60);
+    }
+  }
+  function montar(){
+    var nav=document.querySelector('.fin-tab-nav'), pg=$('page-finanzas'); if(!nav || !pg || $('fin-pagos')) return;
+    css();
+    var b=document.createElement('button'); b.className='fin-tab'; b.textContent='💳 Mis cuentas';
+    b.onclick=function(){ pintar(); finSwitchTab('pagos',b); }; nav.appendChild(b);
+    var s=document.createElement('div'); s.className='fin-screen'; s.id='fin-pagos'; s.addEventListener('click',clic);
+    s.addEventListener('change',function(){ guardar(recoger()); });
+    var ref=$('fin-revision')||pg.querySelector('.fin-screen:last-of-type'); if(ref && ref.parentNode) ref.parentNode.insertBefore(s,ref.nextSibling); else pg.appendChild(s);
+  }
+  montar();
+  if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',montar);
+})();
