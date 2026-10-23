@@ -655,8 +655,10 @@
 /* Agenda con Tomás (solo lectura): se carga aparte. Si el archivo no está o falla, la Suite sigue igual. */
 (function(){
   try {
-    var s = document.createElement('script'); s.src = 'agenda_familia.js?v=1'; s.async = false;
-    s.onerror = function(){ console.warn('[familia] agenda_familia.js no se pudo cargar'); };
-    document.body.appendChild(s);
+    ['agenda_familia.js?v=1', 'migrar_imagenes.js?v=1'].forEach(function(src){
+      var s = document.createElement('script'); s.src = src; s.async = false;
+      s.onerror = function(){ console.warn('[carga] no se pudo cargar', src); };
+      document.body.appendChild(s);
+    });
   } catch(e){}
 })();
