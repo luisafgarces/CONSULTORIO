@@ -116,7 +116,7 @@
     if(isNaN(ini)) return [];
     if(isNaN(fin) || fin<=ini) fin = new Date(ini.getTime()+50*60000);
     var a = intervalo(ini, fin, va, vd);
-    return agEventos.filter(function(e){
+    return (typeof agEventosConFamilia==='function' ? agEventosConFamilia() : agEventos).filter(function(e){
       if(e.id===ignorarId || !e.inicio) return false;
       var b = intervalo(new Date(e.inicio), finEv(e), e.viajeAntes, e.viajeDespues);
       return a[0] < b[1] && b[0] < a[1];
@@ -360,7 +360,7 @@
     if(typeof agGView === 'undefined' || agGView==='mes') return;
     var PX = window.AG_PX_HORA || 48;
     var oc = []; try { oc = agCalOcultos(); } catch(e){}
-    var vis = agEventos.filter(function(e){ return oc.indexOf(e.calendario||'consultorio')<0; });
+    var vis = (typeof agEventosVisibles==='function') ? agEventosVisibles() : agEventos.filter(function(e){ return oc.indexOf(e.calendario||'consultorio')<0; });
     [].forEach.call(cont.querySelectorAll('.agg-col'), function(col){
       var ymd = col.getAttribute('data-ymd');
       var delDia = vis.filter(function(e){ return e.inicio && String(e.inicio).slice(0,10)===ymd; });
@@ -649,4 +649,14 @@
   }
   montar();
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',montar);
+})();
+
+
+/* Agenda con Tomás (solo lectura): se carga aparte. Si el archivo no está o falla, la Suite sigue igual. */
+(function(){
+  try {
+    var s = document.createElement('script'); s.src = 'agenda_familia.js?v=1'; s.async = false;
+    s.onerror = function(){ console.warn('[familia] agenda_familia.js no se pudo cargar'); };
+    document.body.appendChild(s);
+  } catch(e){}
 })();
