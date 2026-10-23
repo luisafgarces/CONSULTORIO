@@ -655,7 +655,7 @@
 /* Agenda con Tomás (solo lectura): se carga aparte. Si el archivo no está o falla, la Suite sigue igual. */
 (function(){
   try {
-    ['agenda_familia.js?v=1', 'migrar_imagenes.js?v=1'].forEach(function(src){
+    ['agenda_familia.js?v=1'].forEach(function(src){
       var s = document.createElement('script'); s.src = src; s.async = false;
       s.onerror = function(){ console.warn('[carga] no se pudo cargar', src); };
       document.body.appendChild(s);
