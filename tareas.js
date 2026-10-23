@@ -367,6 +367,11 @@
       var inp = document.getElementById('tr-nuevo');
       inp.addEventListener('keydown', function(e){ if(e.key==='Enter'){ e.preventDefault(); agregarDesdeInput(); } });
       root.addEventListener('keydown', function(e){ if(e.key==='Enter' && e.target && e.target.id==='tr-idea'){ e.preventDefault(); guardarDesdeCampo(); } });
+      root.addEventListener('input', function(e){
+        if(!e.target || e.target.id!=='tr-idea') return;
+        var b=document.getElementById('tr-ical-live'); if(!b) return; var r=fechaDeIdea(e.target.value);
+        if(r){ b.style.display=''; b.textContent='📅 Poner en calendario · '+window.agxEtiquetaFecha(r); } else b.style.display='none';
+      });
       root.addEventListener('click', clickRoot);
       root.addEventListener('change', changeRoot);
     }
@@ -608,6 +613,8 @@
     else if(act==='foco'){ abrirFoco(); }
     else if(act==='nueva'){ abrirNueva(); }
     else if(act==='isave'){ guardarDesdeCampo(); }
+    else if(act==='ical'){ ponerIdeaEnCalendario(id); }
+    else if(act==='icallive'){ var ii=document.getElementById('tr-idea'); if(ii && ii.value.trim() && typeof window.agxPonerEnCalendario==='function') window.agxPonerEnCalendario(ii.value, fechaDeIdea(ii.value)); }
     else if(act==='iconv'){ convertirIdea(id); }
     else if(act==='iarch'){ archivarIdea(id); }
     else if(act==='irest'){ restaurarIdea(id); }
@@ -662,10 +669,23 @@
     return it;
   }
   function fechaCaptura(iso){ var d=new Date(iso); if(isNaN(d)) return ''; return etiquetaDia(ymd(d))+' '+d.toLocaleTimeString('es-CO',{hour:'numeric',minute:'2-digit'}); }
+  // «📅 Poner en calendario»: si la idea trae una fecha (cita, vuelo…), un toque abre la cita ya rellenada
+  function fechaDeIdea(txt){ try{ var r=window.agxDetectarFechas ? window.agxDetectarFechas(txt) : []; return r.length?r[0]:null; }catch(e){ return null; } }
+  function chipCal(it){
+    if(it.cal) return '<span class="tr-mini" style="opacity:.75;cursor:default">📅 Ya está en el calendario ✓</span>';
+    var r=fechaDeIdea(it.texto); if(!r) return '';
+    return '<button class="tr-mini pri" data-act="ical" data-id="'+esc(it.id)+'">📅 Poner en calendario · '+esc(window.agxEtiquetaFecha(r))+'</button>';
+  }
+  function ponerIdeaEnCalendario(id){
+    var it=ideaPorId(id); if(!it || typeof window.agxPonerEnCalendario!=='function') return;
+    var r=fechaDeIdea(it.texto);
+    if(window.agxPonerEnCalendario(it.texto, r)) window._agxIdea=id;
+  }
   function filaIdea(it, arch){
     var id=esc(it.id);
     return '<div class="tr-row" data-id="'+id+'" style="align-items:flex-start;flex-wrap:wrap"><div class="tr-main" data-act="ied" data-id="'+id+'" style="min-width:60%"><div class="tr-tit">'+esc(it.texto)+'</div><div class="tr-meta"><span>🕒 '+esc(fechaCaptura(it.creada))+'</span></div></div>'
       +'<div style="display:flex;gap:6px;flex-wrap:wrap;width:100%;margin-top:6px">'
+      +(arch ? '' : chipCal(it))
       +(arch ? '<button class="tr-mini" data-act="irest" data-id="'+id+'">↩ Restaurar</button><button class="tr-mini" data-act="idesc" data-id="'+id+'">🗑 Eliminar</button>'
              : '<button class="tr-mini pri" data-act="iconv" data-id="'+id+'">✅ Convertir en tarea</button><button class="tr-mini" data-act="iarch" data-id="'+id+'">📦 Archivar</button><button class="tr-mini" data-act="idesc" data-id="'+id+'">🗑 Descartar</button>')
       +'</div></div>';
@@ -674,7 +694,7 @@
     var act=ideasActivas().sort(function(a,b){ return String(b.creada).localeCompare(String(a.creada)); });
     var arch=B.filter(function(x){return x.archivada;}).sort(function(a,b){ return String(b.archivadaEn||b.creada).localeCompare(String(a.archivadaEn||a.creada)); });
     var html='<div class="tr-add" style="position:static"><div class="tr-add-row"><input type="text" id="tr-idea" placeholder="¿Qué necesitas recordar o hacer?" autocomplete="off" enterkeyhint="done"><button class="tr-nueva" data-act="isave" style="min-height:46px;padding:0 18px">Guardar</button></div>'
-      +'<div class="tr-chips"><button class="tr-chip" disabled style="opacity:.55;cursor:default" title="Llegará en una versión futura">🎙 Nota de voz · próximamente</button></div></div>'
+      +'<div class="tr-chips"><button class="tr-chip" id="tr-ical-live" data-act="icallive" style="display:none"></button><button class="tr-chip" disabled style="opacity:.55;cursor:default" title="Llegará en una versión futura">🎙 Nota de voz · próximamente</button></div></div>'
       +'<div class="tr-hint" style="margin:0 2px 8px">Solo escribe y guarda; sin área, prioridad ni fecha. Revísala cuando quieras: aquí no hay hora obligatoria.</div>';
     html+='<div class="tr-sec"><span>📥 Ideas por revisar · '+act.length+'</span></div>';
     html+= act.length ? act.map(function(it){ return filaIdea(it,false); }).join('') : '<div class="tr-vacio"><b>Bandeja vacía ✨</b>Cuando recuerdes algo, escríbelo arriba y sigue con lo tuyo.</div>';
@@ -1591,6 +1611,30 @@
       return o.apply(this, arguments);
     };
     window.agIrAFechaMes._agx=true;
+  })();
+  // Si la cita salió de una idea de la Bandeja y se guardó, la idea queda marcada («Ya está en el calendario»)
+  (function(){
+    var og=window.agGGuardarModal, oc=window.agGCerrarModal; if(typeof og!=='function' || og._agx) return;
+    var guardando=false;
+    window.agGGuardarModal=function(){
+      var id=window._agxIdea; guardando=true; var r;
+      try{ r=og.apply(this, arguments); } finally { guardando=false; }
+      if(id && !document.getElementById('agg-modal')){
+        window._agxIdea=null;
+        // la cita se guarda recién cuando confirmas la fecha y hora: se marca la idea solo si de verdad se agregó
+        var n0=(window.agEventos||[]).length, ticks=0, sinVentana=0;
+        var iv=setInterval(function(){
+          ticks++; var n1=(window.agEventos||[]).length;
+          if(n1>n0){ clearInterval(iv); var it=ideaPorId(id); if(it){ it.cal=true; guardarB(); if(document.getElementById('tr-contenido') && st.vista==='bandeja') pintar(); contadorBandeja(); } return; }
+          if(!document.getElementById('ag-confirmar-overlay')){ sinVentana++; } else sinVentana=0;
+          if(sinVentana>=3 || ticks>300) clearInterval(iv);
+        }, 400);
+      }
+      return r;
+    };
+    window.agGGuardarModal._agx=true;
+    // si se cancela (o se abre otra cita), la idea ya no queda «pendiente»
+    if(typeof oc==='function') window.agGCerrarModal=function(){ if(!guardando) window._agxIdea=null; return oc.apply(this, arguments); };
   })();
   // Al abrir una cita desde la rejilla (Hoy/Semana) se conserva «Imagen recordatorio», que antes estaba en la tarjeta de Hoy
   (function(){

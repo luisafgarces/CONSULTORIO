@@ -116,7 +116,7 @@
     if(isNaN(ini)) return [];
     if(isNaN(fin) || fin<=ini) fin = new Date(ini.getTime()+50*60000);
     var a = intervalo(ini, fin, va, vd);
-    return (typeof agEventosConFamilia==='function' ? agEventosConFamilia() : agEventos).filter(function(e){
+    return agEventos.filter(function(e){
       if(e.id===ignorarId || !e.inicio) return false;
       var b = intervalo(new Date(e.inicio), finEv(e), e.viajeAntes, e.viajeDespues);
       return a[0] < b[1] && b[0] < a[1];
@@ -347,6 +347,7 @@
     [].forEach.call(document.querySelectorAll('.agg-crear, .agg-crear-m'), function(b){ b.textContent = '＋ Nuevo compromiso'; });
     var tb = document.querySelector('.agg-toolbar');
     if(tb){
+      try{ if(window.agxBotonTexto) window.agxBotonTexto(tb); }catch(e){}
       [].forEach.call(tb.querySelectorAll('button.agg-btn'), function(b){
         var t = b.textContent.trim();
         if(t==='Hoy'){ b.textContent = 'Ver hoy'; b.onclick = function(){ window.agxVerHoy(); }; }
@@ -360,7 +361,7 @@
     if(typeof agGView === 'undefined' || agGView==='mes') return;
     var PX = window.AG_PX_HORA || 48;
     var oc = []; try { oc = agCalOcultos(); } catch(e){}
-    var vis = (typeof agEventosVisibles==='function') ? agEventosVisibles() : agEventos.filter(function(e){ return oc.indexOf(e.calendario||'consultorio')<0; });
+    var vis = agEventos.filter(function(e){ return oc.indexOf(e.calendario||'consultorio')<0; });
     [].forEach.call(cont.querySelectorAll('.agg-col'), function(col){
       var ymd = col.getAttribute('data-ymd');
       var delDia = vis.filter(function(e){ return e.inicio && String(e.inicio).slice(0,10)===ymd; });
@@ -651,14 +652,157 @@
   if(document.readyState==='loading') document.addEventListener('DOMContentLoaded',montar);
 })();
 
-
-/* Agenda con Tomás (solo lectura): se carga aparte. Si el archivo no está o falla, la Suite sigue igual. */
+/* ===========================================================================
+   «📅 Poner en calendario» desde un texto: detecta fechas y horas en español
+   (como cuando Gmail te ofrece agregar un vuelo o una cita). No lee tu correo:
+   funciona con el texto que escribes o pegas. Siempre te deja revisar antes de
+   guardar.
+   =========================================================================== */
 (function(){
-  try {
-    ['agenda_familia.js?v=1'].forEach(function(src){
-      var s = document.createElement('script'); s.src = src; s.async = false;
-      s.onerror = function(){ console.warn('[carga] no se pudo cargar', src); };
-      document.body.appendChild(s);
+  'use strict';
+  function $(i){ return document.getElementById(i); }
+  function esc(s){ return String(s==null?'':s).replace(/[&<>"']/g,function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]; }); }
+  // ---------- detector de fechas en texto (español) ----------
+  var MESES = {enero:0,ene:0,febrero:1,feb:1,marzo:2,mar:2,abril:3,abr:3,mayo:4,may:4,junio:5,jun:5,julio:6,jul:6,agosto:7,ago:7,septiembre:8,setiembre:8,sep:8,sept:8,octubre:9,oct:9,noviembre:10,nov:10,diciembre:11,dic:11};
+  var DIAS_SEM = {domingo:0,lunes:1,martes:2,miercoles:3,jueves:4,viernes:5,sabado:6};
+  function sinTildes(s){ return String(s).toLowerCase().replace(/[áä]/g,'a').replace(/[éë]/g,'e').replace(/[íï]/g,'i').replace(/[óö]/g,'o').replace(/[úü]/g,'u').replace(/ñ/g,'n'); }
+  function ymd0(d){ return new Date(d.getFullYear(), d.getMonth(), d.getDate()); }
+  function validaFecha(y,m,d){ var x=new Date(y,m,d); return x.getFullYear()===y && x.getMonth()===m && x.getDate()===d; }
+  function fechaSinAnio(m,d,hoy){ var y=hoy.getFullYear(); if(!validaFecha(y,m,d)) return null; var f=new Date(y,m,d); if(f<ymd0(hoy)) { if(!validaFecha(y+1,m,d)) return null; f=new Date(y+1,m,d); } return f; }
+  function detectarFechas(texto, ahora){
+    var hoy = ahora ? new Date(ahora) : new Date(); var T = sinTildes(texto); // misma longitud: los reemplazos son 1 a 1
+    var MES = '(enero|ene|febrero|feb|marzo|mar|abril|abr|mayo|may|junio|jun|julio|jul|agosto|ago|septiembre|setiembre|sept|sep|octubre|oct|noviembre|nov|diciembre|dic)';
+    var fechas = [], horas = [], m, re;
+    function addF(i, len, f, bruto){ if(f && !isNaN(f)) fechas.push({i:i, fin:i+len, f:ymd0(f), txt:bruto}); }
+    // 1) 5 de noviembre (de 2026) | 5 nov 2026 | 5-nov
+    re = new RegExp('(?:^|[^0-9a-z])(\\d{1,2})\\s*(?:de\\s+|-|\\/)?\\s*'+MES+'\\.?(?:\\s*(?:de|del|,|-|\\/)?\\s*(20\\d{2}))?(?![a-z0-9])','g');
+    while((m=re.exec(T))){ var d=+m[1], mo=MESES[m[2]]; if(d<1||d>31) continue; if(m[2]==='mar' && !m[3] && !/\bde\s+mar\b/.test(m[0]) && !/\d\s*mar\b/.test(m[0])) continue;
+      var y = m[3] ? +m[3] : null; var f = y ? (validaFecha(y,mo,d)?new Date(y,mo,d):null) : fechaSinAnio(mo,d,hoy);
+      var ini = m.index + m[0].indexOf(m[1]); addF(ini, m[0].length-(ini-m.index), f, texto.substr(ini, m[0].length-(ini-m.index))); }
+    // 2) 25/10/2026 | 25-10-26 | 25.10.2026
+    re = /(?:^|[^0-9])(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2}|\d{4})(?![0-9])/g;
+    while((m=re.exec(T))){ var d2=+m[1], mo2=+m[2]-1, y2=+m[3]; if(y2<100) y2+=2000; if(mo2<0||mo2>11) continue; if(!validaFecha(y2,mo2,d2)) continue; var i2=m.index+m[0].indexOf(m[1]); addF(i2, m[0].length-(i2-m.index), new Date(y2,mo2,d2), texto.substr(i2, m[0].length-(i2-m.index))); }
+    // 2b) 2026-10-25
+    re = /(?:^|[^0-9])(\d{4})-(\d{2})-(\d{2})(?![0-9])/g;
+    while((m=re.exec(T))){ var y3=+m[1], mo3=+m[2]-1, d3=+m[3]; if(validaFecha(y3,mo3,d3)){ var i3=m.index+m[0].indexOf(m[1]); addF(i3, 10, new Date(y3,mo3,d3), texto.substr(i3,10)); } }
+    // 3) 25/10 (sin año) — se ignoran fracciones como 1/2
+    re = /(?:^|[^0-9\/\-.])(\d{1,2})[\/\-](\d{1,2})(?![0-9\/\-.]\d)(?![0-9])/g;
+    while((m=re.exec(T))){ var d4=+m[1], mo4=+m[2]-1; if(mo4<0||mo4>11||d4<1||d4>31) continue; if(+m[2]<=4 && +m[1]<+m[2]) continue; var f4=fechaSinAnio(mo4,d4,hoy); var i4=m.index+m[0].indexOf(m[1]); if(fechas.some(function(x){ return i4>=x.i && i4<x.fin; })) continue; addF(i4, m[0].length-(i4-m.index), f4, texto.substr(i4, m[0].length-(i4-m.index))); }
+    // 4) pasado mañana | mañana | hoy
+    re = /(?:^|[^a-z])(pasado\s+manana|manana|hoy)(?![a-z])/g;
+    while((m=re.exec(T))){ var w=m[1].replace(/\s+/,' '); var off = w==='hoy'?0 : w==='manana'?1 : 2;
+      var iw=m.index+m[0].indexOf(m[1]); var tras = T.substr(iw+m[1].length, 12);
+      if(w==='manana' && /^\s*(en la|por la|de la|a la)\s*(manana|tarde|noche)/.test(tras)) {}
+      var base = ymd0(hoy); base.setDate(base.getDate()+off); addF(iw, m[1].length, base, texto.substr(iw,m[1].length)); }
+    // 5) lunes … domingo (con "este", "el", "próximo")
+    re = /(?:^|[^a-z])(?:(?:este|el|proximo|proxima|siguiente)\s+)*(domingo|lunes|martes|miercoles|jueves|viernes|sabado)(?![a-z])/g;
+    while((m=re.exec(T))){ var iw2=m.index+m[0].indexOf(m[1]); if(fechas.some(function(x){ return Math.abs(x.i-iw2)<14 && x.i>=iw2 && x.i-iw2<14; })) continue; // «sáb, 25 oct» ya tiene fecha exacta
+      var target=DIAS_SEM[m[1]], base2=ymd0(hoy), delta=(target-base2.getDay()+7)%7; if(delta===0 && /pr[oó]xim|siguiente/i.test(texto.substr(Math.max(0,m.index),m[0].length))) delta=7; base2.setDate(base2.getDate()+delta); addF(iw2, m[1].length, base2, texto.substr(iw2,m[1].length)); }
+    // horas
+    function addH(i,len,h,mi,bruto){ if(h<0||h>23||mi<0||mi>59) return; horas.push({i:i, fin:i+len, h:h, m:mi, txt:bruto}); }
+    function ap(h,marca){ if(!marca) return h; if(marca==='p' && h<12) return h+12; if(marca==='a' && h===12) return 0; return h; }
+    // rango «de 2 a 3 pm» / «2:00 – 3:30 p. m.» / «10 a 11 am»
+    re = /(?:^|[^0-9:])(\d{1,2})(?::([0-5]\d))?\s*(?:a|-|–|—|hasta)\s*(?:las\s+)?(\d{1,2})(?::([0-5]\d))?\s*(a|p)\.?\s?m\.?(?![a-z])/g;
+    while((m=re.exec(T))){ var ha=+m[1], hb=+m[3]; if(ha<1||ha>12||hb<1||hb>12) continue; var hb24=ap(hb,m[5]), ha24=ap(ha,m[5]); if(ha24*60+(m[2]?+m[2]:0) >= hb24*60+(m[4]?+m[4]:0)){ ha24=ap(ha, m[5]==='p'?'a':'p'); if(ha24*60+(m[2]?+m[2]:0) >= hb24*60+(m[4]?+m[4]:0)) continue; }
+      var ir=m.index+m[0].indexOf(m[1]); var lr=m[0].length-(ir-m.index); horas.push({i:ir, fin:ir+lr, h:ha24, m:m[2]?+m[2]:0, hf:{h:hb24,m:m[4]?+m[4]:0}, txt:texto.substr(ir,lr)}); }
+    // 3:30 p. m. | 3 pm | 3pm
+    re = /(?:^|[^0-9:])(\d{1,2})(?::([0-5]\d))?\s*(a|p)\.?\s?m\.?(?![a-z])/g;
+    while((m=re.exec(T))){ var h1=+m[1]; if(h1<1||h1>12) continue; var i5=m.index+m[0].indexOf(m[1]); if(horas.some(function(x){ return i5>=x.i && i5<x.fin; })) continue; addH(i5, m[0].length-(i5-m.index), ap(h1,m[3]), m[2]?+m[2]:0, texto.substr(i5, m[0].length-(i5-m.index))); }
+    // 15:30 (24 h) — solo si no quedó ya cubierto por un am/pm
+    re = /(?:^|[^0-9:])([01]?\d|2[0-3]):([0-5]\d)(?![0-9])(?!\s?(?:a|p)\.?\s?m)/g;
+    while((m=re.exec(T))){ var i6=m.index+m[0].indexOf(m[1]); if(horas.some(function(x){ return i6>=x.i && i6<x.fin; })) continue; addH(i6, m[1].length+1+2, +m[1], +m[2], texto.substr(i6, m[1].length+3)); }
+    // 15h30 | 18h05
+    re = /(?:^|[^0-9:])([01]?\d|2[0-3])h([0-5]\d)(?![0-9])/g;
+    while((m=re.exec(T))){ var iq=m.index+m[0].indexOf(m[1]); if(horas.some(function(x){ return iq>=x.i && iq<x.fin; })) continue; addH(iq, m[1].length+3, +m[1], +m[2], texto.substr(iq, m[1].length+3)); }
+    // hora militar sin dos puntos: 1530 hrs | a las 0645 | 0800 | 1830 horas
+    re = /(?:^|[^0-9:])(?:(a\s+las?|las|hora:?|hrs?\.?:?|salida:?|llegada:?)\s*)?((?:[01]\d|2[0-3])([0-5]\d))(?![0-9])(\s*(?:hrs?\b|h\b|horas\b))?/g;
+    while((m=re.exec(T))){ var raw=m[2], hh4=+raw.slice(0,2), mm4=+raw.slice(2); var marcado=!!(m[1]||m[4]); var ini4=m.index+m[0].indexOf(raw);
+      if(!marcado && !(raw.charAt(0)==='0') ){ // sin marca: solo si va pegada a una fecha ya encontrada y no parece un año
+        if(/^20\d\d$/.test(raw)) continue; if(!fechas.some(function(x){ return ini4>=x.fin && ini4-x.fin<=3; })) continue; }
+      if(!marcado && raw.charAt(0)==='0' && !fechas.some(function(x){ return ini4>=x.fin && ini4-x.fin<=3; }) && !/(?:salida|llegada|hora)/.test(T.substr(Math.max(0,ini4-12),12))) continue;
+      if(fechas.some(function(x){ return ini4>=x.i && ini4<x.fin; })) continue; if(horas.some(function(x){ return ini4>=x.i && ini4<x.fin; })) continue;
+      addH(ini4, raw.length, hh4, mm4, texto.substr(ini4, raw.length)); }
+    // 15h | 15 horas | 3 de la tarde | a las 3
+    re = /(?:^|[^0-9:])(\d{1,2})\s*(?:h(?:oras?)?(?![a-z])|de la\s+(manana|tarde|noche|madrugada))/g;
+    while((m=re.exec(T))){ var h7=+m[1]; var i7=m.index+m[0].indexOf(m[1]); if(horas.some(function(x){ return i7>=x.i && i7<x.fin; })) continue; var hh=h7; if(m[2]){ if(h7<1||h7>12) continue; if((m[2]==='tarde'||m[2]==='noche') && h7<12) hh=h7+12; if(m[2]==='manana' && h7===12) hh=0; } addH(i7, m[0].length-(i7-m.index), hh, 0, texto.substr(i7, m[0].length-(i7-m.index))); }
+    re = /(?:^|[^a-z])a\s+las?\s+(\d{1,2})(?![0-9:])(?!\s*(?:de|\/|-)\s*\d)(?!\s*(?:a|p)\.?\s?m)(?!\s*(?:h|de la))/g;
+    while((m=re.exec(T))){ var h8=+m[1]; if(h8<1||h8>23) continue; var i8=m.index+m[0].indexOf(m[1]); if(horas.some(function(x){ return i8>=x.i && i8<x.fin; })) continue; var h24 = h8>12 ? h8 : h8===12 ? 12 : (h8>=1 && h8<=6) ? h8+12 : h8; addH(i8, String(m[1]).length, h24, 0, texto.substr(i8,String(m[1]).length)); }
+    re = /(?:^|[^a-z])(mediodia|medio dia)(?![a-z])/g;
+    while((m=re.exec(T))){ var i9=m.index+m[0].indexOf(m[1]); addH(i9, m[1].length, 12, 0, texto.substr(i9,m[1].length)); }
+    fechas.sort(function(a,b){ return a.i-b.i; }); horas.sort(function(a,b){ return a.i-b.i; });
+    // quitar fechas repetidas en la misma posición
+    var uniq=[]; fechas.forEach(function(f){ if(!uniq.some(function(u){ return Math.abs(u.i-f.i)<3; })) uniq.push(f); }); fechas=uniq;
+    var res = [];
+    fechas.forEach(function(f, k){
+      var sig = fechas[k+1] ? fechas[k+1].i : T.length, ant = fechas[k-1] ? fechas[k-1].fin : 0;
+      var cand = horas.filter(function(h){ return !h.usada && ((h.i>=f.fin && h.i<sig && h.i-f.fin<=70) || (h.fin<=f.i && h.fin>ant && f.i-h.fin<=40)); });
+      cand.sort(function(a,b){ var da = a.i>=f.fin ? a.i-f.fin : f.i-a.fin+25, db = b.i>=f.fin ? b.i-f.fin : f.i-b.fin+25; return da-db; });
+      var h = cand[0], hf = h && h.hf ? h.hf : null; if(h){ h.usada = true;
+        // rango «de 2 a 3 pm» / «2:00 – 3:00 pm»
+        var resto = hf ? '' : T.substr(h.fin, 22); var r2 = /^\s*(?:a|hasta|-|–|—)\s*(?:las\s+)?(\d{1,2})(?::([0-5]\d))?\s*(?:(a|p)\.?\s?m\.?)?/.exec(resto);
+        if(r2){ var he=+r2[1], me=r2[2]?+r2[2]:0; if(r2[3]) he=ap(he,r2[3]); else if(he<=12 && h.h>=12 && he<h.h-12+1) he = he<12?he+12:he; if(he>=0 && he<24 && (he*60+me) > (h.h*60+h.m)) hf = {h:he,m:me}; }
+      }
+      var inicio = new Date(f.f.getFullYear(), f.f.getMonth(), f.f.getDate(), h?h.h:9, h?h.m:0, 0, 0);
+      var fin = hf ? new Date(f.f.getFullYear(), f.f.getMonth(), f.f.getDate(), hf.h, hf.m) : null;
+      res.push({inicio:inicio, fin:fin, conHora:!!h, texto:texto.substr(Math.max(0,f.i-0), Math.max(f.fin-f.i,0)), pos:f.i});
     });
-  } catch(e){}
+    return res;
+  }
+  function etiquetaFecha(r){
+    var D=['dom','lun','mar','mié','jue','vie','sáb'], M=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'];
+    var d=r.inicio, h=d.getHours(), mi=d.getMinutes();
+    var s=D[d.getDay()]+' '+d.getDate()+' '+M[d.getMonth()]+(d.getFullYear()!==new Date().getFullYear()?' '+d.getFullYear():'');
+    if(!r.conHora) return s+' · sin hora';
+    return s+' · '+(h%12===0?12:h%12)+':'+(mi<10?'0':'')+mi+' '+(h<12?'a. m.':'p. m.');
+  }
+  window.agxDetectarFechas = detectarFechas; window.agxEtiquetaFecha = etiquetaFecha;
+
+  function tituloDe(texto){
+    var l=String(texto||'').replace(/[<>]/g,'').split(/\n/).map(function(x){ return x.replace(/\s+/g,' ').trim(); }).filter(Boolean)[0]||'';
+    return l.length>80 ? l.slice(0,77).replace(/\s+\S*$/,'')+'…' : l;
+  }
+  // abre el formulario de «Nuevo compromiso» ya rellenado; r puede ser null (solo texto)
+  window.agxPonerEnCalendario = function(texto, r){
+    if(typeof agGAbrirModal!=='function'){ return false; }
+    var inicio = r ? r.inicio : null;
+    agGAbrirModal(inicio && typeof agFechaLocalISO==='function' ? agFechaLocalISO(inicio) : undefined);
+    var t=$('aggm-titulo'); if(t) t.value=tituloDe(texto);
+    if(r && r.fin){ var f=$('aggm-fin'); if(f){ f.value=agFechaLocalISO(r.fin); f.dataset.manual='1'; } }
+    var d=$('aggm-desc'); if(d && String(texto).length>0 && tituloDe(texto)!==String(texto).replace(/[<>]/g,'').trim()) d.value=String(texto).replace(/[<>]/g,'').trim().slice(0,600);
+    if(r && !r.conHora && typeof toast==='function') toast('No encontré la hora: revisa la hora antes de guardar');
+    return true;
+  };
+
+  // ---------- botón «Desde un texto» y su ventanita ----------
+  function cerrar(){ var m=$('agx-txt'); if(m) m.remove(); }
+  function abrirVentana(inicial){
+    cerrar();
+    var m=document.createElement('div'); m.id='agx-txt'; m.className='agg-modal-bg'; m.style.zIndex=10003;
+    m.onclick=function(e){ if(e.target===m) cerrar(); };
+    m.innerHTML='<div class="agg-modal"><div style="font-weight:700;color:#7a3c4b;margin-bottom:6px">📋 Poner en calendario desde un texto</div>'
+      +'<div class="agg-f"><label>Pega aquí el texto del correo o del mensaje (vuelo, cita médica, reunión…)</label><textarea id="agx-t" rows="5" style="font-size:16px" placeholder="Ej.: Cita con medicina interna el martes 3 de noviembre a las 3:30 p. m."></textarea></div>'
+      +'<div id="agx-res" style="display:flex;flex-direction:column;gap:6px;margin:8px 0"></div>'
+      +'<div class="agg-acc"><button class="agg-sec" id="agx-cx">Cancelar</button><button class="agg-sec" id="agx-solo">Crear sin fecha detectada</button></div></div>';
+    document.body.appendChild(m);
+    var ta=$('agx-t'), res=$('agx-res');
+    function det(){
+      var txt=ta.value, r=txt.trim()?detectarFechas(txt):[];
+      if(!txt.trim()){ res.innerHTML=''; return; }
+      if(!r.length){ res.innerHTML='<div style="font-size:.8rem;color:#7a3c4b">No encontré una fecha. Prueba con algo como «martes 3 de noviembre a las 3 pm» o usa «Crear sin fecha detectada».</div>'; return; }
+      res.innerHTML='<div style="font-size:.78rem;color:#a0536a">Encontré esto. Toca la fecha correcta:</div>'+r.slice(0,5).map(function(x,i){
+        return '<button type="button" class="agg-pri" data-i="'+i+'" style="text-align:left;min-height:44px;border-radius:12px">📅 '+esc(etiquetaFecha(x))+(x.fin?' – '+(x.fin.getHours()%12===0?12:x.fin.getHours()%12)+':'+('0'+x.fin.getMinutes()).slice(-2)+(x.fin.getHours()<12?' a. m.':' p. m.'):'')+'</button>'; }).join('');
+      [].forEach.call(res.querySelectorAll('button[data-i]'),function(b){ b.onclick=function(){ var x=r[+b.getAttribute('data-i')], tx=ta.value; cerrar(); window.agxPonerEnCalendario(tx,x); }; });
+    }
+    ta.addEventListener('input',det); ta.addEventListener('paste',function(){ setTimeout(det,30); });
+    $('agx-cx').onclick=cerrar; $('agx-solo').onclick=function(){ var tx=ta.value; cerrar(); window.agxPonerEnCalendario(tx,null); };
+    if(inicial){ ta.value=inicial; det(); }
+    setTimeout(function(){ ta.focus(); },60);
+  }
+  window.agxAbrirDesdeTexto = abrirVentana;
+  window.agxBotonTexto = function(tb){
+    if(!tb || tb.querySelector('.agx-btn-txt')) return;
+    var b=document.createElement('button'); b.type='button'; b.className='agg-btn agx-btn-txt'; b.textContent='📋 Desde un texto'; b.title='Pega un correo o mensaje y lo pongo en el calendario';
+    b.onclick=function(){ abrirVentana(); };
+    var seg=tb.querySelector('.agg-seg'); if(seg) tb.insertBefore(b,seg); else tb.appendChild(b);
+  };
 })();
