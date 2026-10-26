@@ -3,7 +3,23 @@
 <head>
 <meta charset="UTF-8">
 <title>Cargar escalas virtuales — Suite Clínica (uso único)</title>
-<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js">
+async function cargarSoloMSIBPD(){
+  const log = document.getElementById("log");
+  const btn = document.getElementById("btn-msibpd");
+  btn.disabled = true;
+  log.textContent = "Cargando solo el MSI-BPD...\n";
+  try{
+    await db.collection("escalas_virtuales").doc("msibpd").set(ESCALA_MSIBPD);
+    log.textContent += "✔ MSI-BPD guardado correctamente. Ya puedes generarlo desde el panel de Tests virtuales.";
+  }catch(e){
+    log.textContent += "\n✖ Error: " + e.message;
+    console.error(e);
+  }finally{
+    btn.disabled = false;
+  }
+}
+</script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <style>
   body{ font-family: sans-serif; padding: 30px; max-width: 700px; margin: 0 auto; color:#643000; }
@@ -16,7 +32,7 @@
 </head>
 <body>
 
-<h1>Cargar escalas virtuales (PHQ-9, GAD-7, YSQ-L3, ASRS-v1.1 e ITQ)</h1>
+<h1>Cargar escalas virtuales (PHQ-9, GAD-7, YSQ-L3, ASRS-v1.1, ITQ y MSI-BPD)</h1>
 <p>Esta página es de <strong>uso único</strong>: crea/actualiza los documentos
 <code>phq9</code>, <code>gad7</code>, <code>ysql3</code>, <code>asrs</code> e <code>itq</code> en la colección
 <code>escalas_virtuales</code> de tu Firestore, usando exactamente las mismas preguntas y rangos que ya usa
@@ -24,7 +40,9 @@ Suite Clínica (PHQ-9/GAD-7) o los baremos/algoritmos oficiales del resto.</p>
 <p>Después de correrla una vez, puedes archivar este archivo (no se necesita
 de nuevo, salvo que quieras agregar otra escala con este método).</p>
 
-<button id="btn-cargar" onclick="cargarEscalas()">Cargar escalas en Firestore</button>
+<button id="btn-msibpd" onclick="cargarSoloMSIBPD()">Cargar solo el MSI-BPD (nuevo)</button>
+<p style="font-size:.85rem">O, si prefieres recargar todas las escalas (vuelve a escribir las 6, es seguro):</p>
+<button id="btn-cargar" onclick="cargarEscalas()">Cargar todas las escalas en Firestore</button>
 
 <pre id="log">— esperando —</pre>
 
@@ -481,6 +499,40 @@ const ESCALA_ITQ = {
   }
 };
 
+const OPCIONES_MSIBPD = [
+  { texto: "Sí", valor: 1 },
+  { texto: "No", valor: 0 }
+];
+
+const ESCALA_MSIBPD = {
+  id: "msibpd",
+  nombre: "MSI-BPD · Cribado de rasgos límite (McLean)",
+  descripcion: "Durante este último año, responde Sí o No a cada una de las siguientes preguntas. No hay respuestas correctas o incorrectas; responde lo que mejor te describa.",
+  opciones_respuesta: OPCIONES_MSIBPD,
+  preguntas: [
+    { id: "p1", texto: "¿Alguna de tus relaciones más cercanas se ha visto afectada por muchas discusiones o por rupturas repetidas?" },
+    { id: "p2", texto: "¿Te has hecho daño físico a propósito (por ejemplo, golpeándote, cortándote, quemándote)? ¿Y has hecho algún intento de suicidio?" },
+    { id: "p3", texto: "¿Has tenido al menos otros dos problemas de impulsividad (por ejemplo, atracones de comida y gastos descontrolados, beber demasiado y arrebatos verbales)?" },
+    { id: "p4", texto: "¿Has estado extremadamente malhumorado/a?" },
+    { id: "p5", texto: "¿Te has sentido muy enfadado/a la mayor parte del tiempo? ¿Has actuado con frecuencia de forma furiosa o sarcástica?" },
+    { id: "p6", texto: "¿Has desconfiado a menudo de otras personas?" },
+    { id: "p7", texto: "¿Te has sentido con frecuencia irreal, o como si las cosas a tu alrededor no fueran reales?" },
+    { id: "p8", texto: "¿Te has sentido vacío/a de forma crónica?" },
+    { id: "p9", texto: "¿Has sentido a menudo que no sabes quién eres o que no tienes identidad?" },
+    { id: "p10", texto: "¿Has hecho esfuerzos desesperados para evitar sentirte abandonado/a o ser abandonado/a (por ejemplo, llamar repetidamente a alguien para asegurarte de que le importas, rogarle que no te deje, aferrarte físicamente a esa persona)?" }
+  ],
+  calificacion: {
+    tipo: "suma_simple",
+    rangos: [
+      { min: 0, max: 6,  etiqueta: "Cribado negativo (menos de 7); no descarta TLP" },
+      { min: 7, max: 10, etiqueta: "Cribado positivo (7 o más): se sugiere evaluación clínica; no es un diagnóstico" }
+    ],
+    alertas: [
+      { pregunta_id: "p2", condicion: "valor > 0", mensaje: "Pregunta 2 positiva (autolesión o intento de suicidio) - explorar riesgo" }
+    ]
+  }
+};
+
 async function cargarEscalas(){
   const btn = document.getElementById("btn-cargar");
   const log = document.getElementById("log");
@@ -503,7 +555,10 @@ async function cargarEscalas(){
     await db.collection("escalas_virtuales").doc("itq").set(ESCALA_ITQ);
     log.textContent += "✔ ITQ guardado correctamente (18 ítems, algoritmo TEPT/TEPTC).\n";
 
-    log.textContent += "\nListo. Ya puedes generar links de test virtual para PHQ-9, GAD-7, YSQ-L3, ASRS-v1.1 e ITQ.";
+    await db.collection("escalas_virtuales").doc("msibpd").set(ESCALA_MSIBPD);
+    log.textContent += "✔ MSI-BPD guardado correctamente (10 ítems, cribado de TLP).\n";
+
+    log.textContent += "\nListo. Ya puedes generar links de test virtual para PHQ-9, GAD-7, YSQ-L3, ASRS-v1.1, ITQ y MSI-BPD.";
   }catch(e){
     log.textContent += "\n✖ Error: " + e.message;
     console.error(e);
