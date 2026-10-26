@@ -627,6 +627,7 @@
     else if(act==='planear'){ abrirPlan(); }
     else if(act==='reorg'){ reorganizarDia(); }
     else if(act==='vercal'){ irCalendario(); }
+    else if(act==='gasto'){ if(typeof window.agxGastoRapido==='function') window.agxGastoRapido(); }
     else if(act==='otras'){ st.verOtras=!st.verOtras; pintarContenido(); }
     else if(act==='pdespues'){ st.verDespues=!st.verDespues; pintarContenido(); }
     else if(act==='pausarb'){ var tb=porId(id); if(tb) pausarTarea(tb); }
@@ -1098,7 +1099,7 @@
     var nOtras=Object.keys(otrosIds).length;
     html+='<div class="md-foot">'
       +(nOtras?'<button class="md-lnk" data-act="otras">'+(st.verOtras?'▴ Ocultar otras tareas':'▾ Retomar otras tareas ('+nOtras+')')+'</button>':'')
-      +'<button class="md-lnk" data-act="planear">📝 Planear mi día</button><button class="md-lnk" data-act="reorg">🔄 Reorganizar lo que queda del día</button></div>';
+      +'<button class="md-lnk" data-act="planear">📝 Planear mi día</button><button class="md-lnk" data-act="reorg">🔄 Reorganizar lo que queda del día</button><button class="md-lnk" data-act="gasto">💸 Anotar un gasto</button></div>';
     if(st.verOtras){
     if(opc.length){
       html+='<div class="md-h">Si tienes más energía o tiempo</div><div class="md-sub" style="margin:-4px 2px 8px">Opcional: no son obligaciones adicionales.</div>'
