@@ -467,4 +467,52 @@
   // estilos
   var st=document.createElement('style'); st.textContent='#fin-rapido .fr-pg{border-top:1px solid #f6e6ea;padding:10px 0}#fin-rapido .fr-pg:first-child{border-top:none}#fin-rapido .fr-sug{font-weight:700;color:#7a3c4b;margin-top:4px}#fin-rapido .fr-aviso{background:#fff3e6;border:1.5px solid #e8c9a0;border-radius:12px;padding:8px 10px;margin:8px 0;font-size:.85rem;color:#7a4a1c}#fin-rapido .fr-cfg{margin-top:10px;border-top:1px solid #f6e6ea;padding-top:10px}#fin-rapido .fr-f{display:flex;flex-direction:column;gap:3px;margin:6px 0}#fin-rapido .fr-f label{font-size:.74rem;color:#a0536a}#fin-rapido .fr-f input{font-size:16px;padding:10px 12px;border:1.5px solid #f0d8de;border-radius:12px;width:100%;box-sizing:border-box;font-family:inherit}#fin-rapido .fr-2{display:grid;grid-template-columns:1fr 1fr;gap:8px}#fin-rapido .fr-row{display:flex;gap:8px;margin-top:8px}#fin-rapido .fr-row input{flex:1;font-size:16px;padding:10px 12px;border:1.5px solid #f0d8de;border-radius:12px}#fin-rapido .fr-ck{display:flex;gap:8px;align-items:center;font-size:.85rem;margin:6px 0}#fin-rapido .fr-ck input{width:22px;height:22px}#fin-rapido .fr-chip[disabled]{opacity:.45}#fin-rapido .fr-nom,#fr-nom-flot .fr-nom{background:#fff8e6;border:1.5px solid #e8d49a;border-radius:14px;padding:10px;margin:0 0 10px}#fr-nom-flot{position:fixed;left:10px;right:10px;bottom:10px;z-index:9000;max-width:460px;margin:0 auto;box-shadow:0 6px 24px rgba(0,0,0,.2);border-radius:14px;background:#fff}#fr-nom-flot .fr-row{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}#fr-nom-flot .fr-row input{flex:1;min-width:0;font-size:16px;padding:10px 12px;border:1.5px solid #f0d8de;border-radius:12px}#fr-nom-flot .fr-go,#fin-rapido .fr-go{padding:10px 14px}#fr-nom-flot .fr-chip{border:1.5px solid #f0d8de;border-radius:20px;background:#fff;padding:6px 14px}#fr-nom-flot .fr-sub{font-size:.76rem;color:#a0536a;margin-top:4px}#fin-rapido .fr-it{gap:8px;min-width:0}#fin-rapido .fr-it>div:first-child{min-width:0;flex:1;overflow-wrap:anywhere}#fin-rapido .fr-row{flex-wrap:wrap}#fin-rapido .fr-row input{min-width:0}#fin-rapido .fr-go{max-width:100%}';
   document.head.appendChild(st);
+
+  // ---- pagos en el Calendario (franja de «todo el día», arriba, como Google Calendar) ----
+  window._frPagosRango=function(d0,d1){
+    var c=cfg(), plan=armarPlan(c), mp={}, out=[];
+    plan.items.forEach(function(it){ mp[it.key]=it; });
+    c.pagos.forEach(function(p){
+      var fs = p.frec==='unico' ? (parseY(p.fecha)?[parseY(p.fecha)]:[]) : ocurr(p.dias||[], d0, d1);
+      fs.forEach(function(f){ if(f<d0||f>d1) return; var key=p.id+'|'+yy(f); if(c.pagados[key]) return;
+        var it=mp[key], m=p.donde==='consultorio'?'consultorio':(it&&it.medio&&it.medio!=='?'?it.medio:'');
+        out.push({ymd:yy(f),nombre:p.nombre||'Pago',monto:+p.monto||0,medio:m}); });
+    });
+    return out;
+  };
+  function chipPago(x){
+    var ic=x.medio==='tarjeta'?'💳':x.medio==='efectivo'?'💵':x.medio==='consultorio'?'🏥':'📅';
+    return '<div class="frp-chip" data-frp="1" title="'+esc(x.nombre+' · '+pesos(x.monto)+(x.medio==='tarjeta'?' · sugerido: tarjeta':x.medio==='efectivo'?' · sugerido: tu plata':''))+'">'+ic+' '+esc(x.nombre)+' '+pesos(x.monto)+'</div>';
+  }
+  function pagosEnCalendario(){
+    try{
+      var cont=document.getElementById('ag-container'); if(!cont) return;
+      var c=cfg(); if(!c.pagos.length) return;
+      var cols=cont.querySelectorAll('.agg-head .agg-dh'), celdas=cont.querySelectorAll('.agg-mes .agg-mc:not(.fuera)'), fechas=[];
+      var F=(typeof agGFecha!=='undefined')?agGFecha:new Date();
+      if(cols.length){
+        if(cols.length===1) fechas=[new Date(F.getFullYear(),F.getMonth(),F.getDate())];
+        else { var l=agGLunes(); for(var i=0;i<cols.length;i++) fechas.push(new Date(l.getFullYear(),l.getMonth(),l.getDate()+i)); }
+        var pg=window._frPagosRango(fechas[0],fechas[fechas.length-1]);
+        if(!pg.length) return;
+        var head=cont.querySelector('.agg-head'); if(!head) return;
+        var tpl=head.style.gridTemplateColumns||('56px repeat('+cols.length+',minmax(0,1fr))');
+        var h='<div class="frp-row" style="grid-column:1/-1;display:grid;grid-template-columns:'+tpl+'"><div class="frp-lbl">pagos</div>';
+        fechas.forEach(function(d){ var k=yy(d); h+='<div class="frp-cell">'+pg.filter(function(x){return x.ymd===k;}).map(chipPago).join('')+'</div>'; });
+        var w=document.createElement('div'); w.innerHTML=h+'</div>'; head.appendChild(w.firstChild);
+      } else if(celdas.length){
+        var y=F.getFullYear(), m=F.getMonth(), pm=window._frPagosRango(new Date(y,m,1),new Date(y,m+1,0));
+        celdas.forEach(function(cel,i){ var k=yy(new Date(y,m,i+1)), l=pm.filter(function(x){return x.ymd===k;}); if(!l.length) return;
+          var n=cel.querySelector('.agg-mn'); var d=document.createElement('div'); d.innerHTML=l.map(chipPago).join(''); while(d.firstChild){ if(n&&n.nextSibling) cel.insertBefore(d.firstChild,n.nextSibling); else cel.appendChild(d.firstChild); } });
+      }
+    }catch(e){ console.warn('[pagos cal]',e); }
+  }
+  var oRH=window.agRenderHorario;
+  if(typeof oRH==='function') window.agRenderHorario=function(){ var r=oRH.apply(this,arguments); pagosEnCalendario(); return r; };
+  document.addEventListener('click',function(e){
+    var b=e.target.closest&&e.target.closest('[data-frp]'); if(!b) return; e.stopPropagation();
+    var t=document.querySelector('.ag-tab[data-tab="t-gastos"]'); if(t) t.click();
+  },true);
+  var st2=document.createElement('style'); st2.textContent='.frp-lbl{font-size:.6rem;color:#70757a;text-align:right;padding:3px 6px 0 0;align-self:start}.frp-cell{border-left:1px solid #e8eaed;padding:2px;min-width:0}.frp-row{border-top:1px solid #f1f3f4}.frp-chip{background:#ffe3b8;color:#5a3a00;border-radius:4px;font-size:.66rem;padding:2px 4px;margin:1px 0;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;cursor:pointer}.agg-mc .frp-chip{margin-bottom:2px}';
+  document.head.appendChild(st2);
 })();
