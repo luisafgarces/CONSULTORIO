@@ -329,10 +329,43 @@
     return {items:items,est:est,aviso:aviso,listo:listo,t:t};
   }
 
+
+  // ---- nómina: te pregunto el día que toca y dejo de preguntar cuando dices «sí» ----
+  function nomPend(c){
+    var n=c.nomina; if(!(+n.monto>0)||!(n.dias&&n.dias.length)) return [];
+    var hoy=hoy0(), ini=new Date(hoy.getFullYear(),hoy.getMonth(),hoy.getDate()-10), d0=parseY(n.desde)||hoy; if(d0>ini) ini=d0;
+    c.nominaOk=(c.nominaOk&&typeof c.nominaOk==='object')?c.nominaOk:{};
+    return ocurr(n.dias,ini,hoy).filter(function(f){ return !c.nominaOk['nom|'+yy(f)]; }).reverse();
+  }
+  function htmlNom(c,conId){
+    var l=nomPend(c); if(!l.length) return '';
+    var f=l[0], k=yy(f);
+    return '<div class="fr-nom"><b>💰 ¿Ya te entró la nómina del '+lab(f)+'?</b>'+(l.length>1?'<div class="fr-sub">Tienes '+l.length+' por confirmar</div>':'')
+      +'<div class="fr-row"><input type="text" id="'+conId+'" inputmode="numeric" value="'+(+c.nomina.monto)+'"><button class="fr-go" data-a="pg-nomsi" data-k="'+k+'" data-inp="'+conId+'">Sí, ya entró</button></div>'
+      +'<div class="fr-chips" style="margin:6px 0 0"><button class="fr-chip" data-a="pg-nomno" style="min-height:40px;font-size:.84rem">Todavía no</button></div>'
+      +'<div class="fr-sub">Si cambió el valor, corrígelo antes de tocar «Sí». Al decir «Sí» lo anoto como ingreso y no te vuelvo a preguntar por esa fecha.</div></div>';
+  }
+  function nomSi(k,inpId){
+    var c=cfg(), m=num((document.getElementById(inpId)||{}).value)||+c.nomina.monto; if(!m){ A.toast('Escribe el monto'); return; }
+    c.nominaOk=c.nominaOk||{}; if(c.nominaOk['nom|'+k]) return; c.nominaOk['nom|'+k]=true; sv(c);
+    var P=A.leerP(); P.push({id:String(Date.now()),tipo:'ingreso',fecha:k,monto:m,desc:'Nómina'}); A.guardarP(P);
+    A.toast('✅ Nómina anotada: '+pesos(m)); banner(); A.repintar();
+  }
+  var nomOculto=false;
+  function banner(){
+    var old=document.getElementById('fr-nom-flot'); if(old) old.remove();
+    var lg=document.getElementById('login-overlay'); if(lg && lg.style.display!=='none' && getComputedStyle(lg).display!=='none') return;
+    if(nomOculto) return;
+    var root=document.getElementById('fin-rapido'); if(root && root.offsetParent) return; // ya se ve en Gastos
+    var c=cfg(), h=htmlNom(c,'pg-nmv-f'); if(!h) return;
+    var d=document.createElement('div'); d.id='fr-nom-flot'; d.innerHTML=h; document.body.appendChild(d);
+  }
+  setInterval(function(){ try{ banner(); }catch(e){} },4000); setTimeout(function(){ try{ banner(); }catch(e){} },1500);
+
   // ---- pantalla ----
   function chip(a,txt,extra){ return '<button class="fr-chip" data-a="'+a+'" '+(extra||'')+' style="min-height:40px;font-size:.84rem">'+txt+'</button>'; }
   function htmlPagos(c, plan){
-    var h='<div class="fr-card"><h4>📅 Pagos por hacer</h4>', t=c.tarjeta;
+    var h='<div class="fr-card"><h4>📅 Pagos por hacer</h4>', t=c.tarjeta; h+=htmlNom(c,'pg-nmv');
     if(!plan.listo) h+='<div class="fr-sub" style="margin-bottom:8px">Para que te diga con qué pagar, cuéntame <b>cuánto tienes hoy</b> y los datos de tu tarjeta en «⚙️ Mis números».</div>';
     else {
       h+='<div class="fr-sub">💵 Con lo que anotaste tienes hoy <b>'+pesos(plan.est.cash)+'</b></div>';
@@ -393,7 +426,7 @@
     var nuevoDebo = debo===''?(t.debo||0):num(debo);
     if(nuevoDebo!==(+t.debo||0) || !t.deboTs) t.deboTs=Date.now();
     t.cupo=cupo; t.corte=corte; t.pago=pago; t.debo=nuevoDebo;
-    c.nomina={monto:num(val('pg-nm')), dias:dias(val('pg-nd'))};
+    c.nomina={monto:num(val('pg-nm')), dias:dias(val('pg-nd')), desde:(c.nomina&&c.nomina.desde)||A.hoyLocal()};
     sv(c); A.toast('✅ Guardé tus números'); return true;
   }
   function agregarPago(){
@@ -417,9 +450,11 @@
     c.pagados[it.key]=true; sv(c); A.toast('✅ Pago anotado: '+it.p.nombre); A.repintar();
   }
   document.addEventListener('click',function(e){
-    var b=e.target.closest&&e.target.closest('[data-a^="pg-"]'); var root=document.getElementById('fin-rapido'); if(!b||!root||!root.contains(b)) return;
+    var b=e.target.closest&&e.target.closest('[data-a^="pg-"]'); var root=document.getElementById('fin-rapido'); var fl0=document.getElementById('fr-nom-flot'); if(!b||!((root&&root.contains(b))||(fl0&&fl0.contains(b)))) return;
     var a=b.getAttribute('data-a');
-    if(a==='pg-cfg'){ E.cfg=!E.cfg; A.repintar(); }
+    if(a==='pg-nomsi'){ nomSi(b.getAttribute('data-k'),b.getAttribute('data-inp')); }
+    else if(a==='pg-nomno'){ nomOculto=true; var fl=document.getElementById('fr-nom-flot'); if(fl) fl.remove(); A.toast('Vale, te pregunto de nuevo la próxima vez que entres'); }
+    else if(a==='pg-cfg'){ E.cfg=!E.cfg; A.repintar(); }
     else if(a==='pg-guardar'){ if(guardarCfg()) A.repintar(); }
     else if(a==='pg-agregar') agregarPago();
     else if(a==='pg-frec'){ E.pnFrec=b.getAttribute('data-v'); A.repintar(); }
@@ -430,6 +465,6 @@
     else if(a==='pg-ptok'){ var m=num(val('pg-pt')); if(!m){ A.toast('Escribe cuánto pagaste'); return; } var P=A.leerP(); P.push({id:String(Date.now()),tipo:'pagotarjeta',fecha:A.hoyLocal(),monto:m,desc:'Pago de la tarjeta'}); A.guardarP(P); E.pagandoTarjeta=false; A.toast('✅ Pago de tarjeta anotado'); A.repintar(); }
   },true);
   // estilos
-  var st=document.createElement('style'); st.textContent='#fin-rapido .fr-pg{border-top:1px solid #f6e6ea;padding:10px 0}#fin-rapido .fr-pg:first-child{border-top:none}#fin-rapido .fr-sug{font-weight:700;color:#7a3c4b;margin-top:4px}#fin-rapido .fr-aviso{background:#fff3e6;border:1.5px solid #e8c9a0;border-radius:12px;padding:8px 10px;margin:8px 0;font-size:.85rem;color:#7a4a1c}#fin-rapido .fr-cfg{margin-top:10px;border-top:1px solid #f6e6ea;padding-top:10px}#fin-rapido .fr-f{display:flex;flex-direction:column;gap:3px;margin:6px 0}#fin-rapido .fr-f label{font-size:.74rem;color:#a0536a}#fin-rapido .fr-f input{font-size:16px;padding:10px 12px;border:1.5px solid #f0d8de;border-radius:12px;width:100%;box-sizing:border-box;font-family:inherit}#fin-rapido .fr-2{display:grid;grid-template-columns:1fr 1fr;gap:8px}#fin-rapido .fr-row{display:flex;gap:8px;margin-top:8px}#fin-rapido .fr-row input{flex:1;font-size:16px;padding:10px 12px;border:1.5px solid #f0d8de;border-radius:12px}#fin-rapido .fr-ck{display:flex;gap:8px;align-items:center;font-size:.85rem;margin:6px 0}#fin-rapido .fr-ck input{width:22px;height:22px}#fin-rapido .fr-chip[disabled]{opacity:.45}#fin-rapido .fr-it{gap:8px;min-width:0}#fin-rapido .fr-it>div:first-child{min-width:0;flex:1;overflow-wrap:anywhere}#fin-rapido .fr-row{flex-wrap:wrap}#fin-rapido .fr-row input{min-width:0}#fin-rapido .fr-go{max-width:100%}';
+  var st=document.createElement('style'); st.textContent='#fin-rapido .fr-pg{border-top:1px solid #f6e6ea;padding:10px 0}#fin-rapido .fr-pg:first-child{border-top:none}#fin-rapido .fr-sug{font-weight:700;color:#7a3c4b;margin-top:4px}#fin-rapido .fr-aviso{background:#fff3e6;border:1.5px solid #e8c9a0;border-radius:12px;padding:8px 10px;margin:8px 0;font-size:.85rem;color:#7a4a1c}#fin-rapido .fr-cfg{margin-top:10px;border-top:1px solid #f6e6ea;padding-top:10px}#fin-rapido .fr-f{display:flex;flex-direction:column;gap:3px;margin:6px 0}#fin-rapido .fr-f label{font-size:.74rem;color:#a0536a}#fin-rapido .fr-f input{font-size:16px;padding:10px 12px;border:1.5px solid #f0d8de;border-radius:12px;width:100%;box-sizing:border-box;font-family:inherit}#fin-rapido .fr-2{display:grid;grid-template-columns:1fr 1fr;gap:8px}#fin-rapido .fr-row{display:flex;gap:8px;margin-top:8px}#fin-rapido .fr-row input{flex:1;font-size:16px;padding:10px 12px;border:1.5px solid #f0d8de;border-radius:12px}#fin-rapido .fr-ck{display:flex;gap:8px;align-items:center;font-size:.85rem;margin:6px 0}#fin-rapido .fr-ck input{width:22px;height:22px}#fin-rapido .fr-chip[disabled]{opacity:.45}#fin-rapido .fr-nom,#fr-nom-flot .fr-nom{background:#fff8e6;border:1.5px solid #e8d49a;border-radius:14px;padding:10px;margin:0 0 10px}#fr-nom-flot{position:fixed;left:10px;right:10px;bottom:10px;z-index:9000;max-width:460px;margin:0 auto;box-shadow:0 6px 24px rgba(0,0,0,.2);border-radius:14px;background:#fff}#fr-nom-flot .fr-row{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}#fr-nom-flot .fr-row input{flex:1;min-width:0;font-size:16px;padding:10px 12px;border:1.5px solid #f0d8de;border-radius:12px}#fr-nom-flot .fr-go,#fin-rapido .fr-go{padding:10px 14px}#fr-nom-flot .fr-chip{border:1.5px solid #f0d8de;border-radius:20px;background:#fff;padding:6px 14px}#fr-nom-flot .fr-sub{font-size:.76rem;color:#a0536a;margin-top:4px}#fin-rapido .fr-it{gap:8px;min-width:0}#fin-rapido .fr-it>div:first-child{min-width:0;flex:1;overflow-wrap:anywhere}#fin-rapido .fr-row{flex-wrap:wrap}#fin-rapido .fr-row input{min-width:0}#fin-rapido .fr-go{max-width:100%}';
   document.head.appendChild(st);
 })();
