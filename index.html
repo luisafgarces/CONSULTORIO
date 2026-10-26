@@ -53,6 +53,9 @@ const DB = {
 
   // Escrituras que aún no llegaron a la nube. Se guardan en este navegador para que
   // sobrevivan a cerrar la pestaña y no se pisen con datos viejos del servidor.
+  // Firestore no acepta listas dentro de listas (ni valores undefined): se envuelven al guardar y se desenvuelven al leer.
+  _enc: function(v){ var self=this; if(v===undefined) return null; if(Array.isArray(v)) return v.map(function(x){ return Array.isArray(x) ? {__na: self._enc(x)} : self._enc(x); }); if(v && typeof v==='object' && !(v instanceof Date)){ var o={}; Object.keys(v).forEach(function(k){ o[k]=self._enc(v[k]); }); return o; } return v; },
+  _dec: function(v){ var self=this; if(Array.isArray(v)) return v.map(function(x){ return self._dec(x); }); if(v && typeof v==='object'){ var ks=Object.keys(v); if(ks.length===1 && ks[0]==='__na') return self._dec(v.__na); var o={}; ks.forEach(function(k){ o[k]=self._dec(v[k]); }); return o; } return v; },
   _pend: (function(){ try { return JSON.parse(localStorage.getItem('_db_pend')||'{}') || {}; } catch(e){ return {}; } })(),
   _seq: 0,
   _guardarPend: function(){ try { localStorage.setItem('_db_pend', JSON.stringify(this._pend)); } catch(e){} this._avisoPend(); },
@@ -72,7 +75,7 @@ const DB = {
         e2.querySelector('button').onclick = function(){ DB.reintentar(); };
         document.body.appendChild(e2);
       }
-      document.getElementById('sync-pend-t').textContent = '\u26a0\ufe0f ' + m + ' cambio' + (m>1?'s':'') + ' sin guardar en la nube (est\u00e1n a salvo en este dispositivo). Se reintenta solo.';
+      document.getElementById('sync-pend-t').textContent = '\u26a0\ufe0f ' + m + ' cambio' + (m>1?'s':'') + ' sin guardar en la nube (est\u00e1n a salvo en este dispositivo). Se reintenta solo.' + (function(){ try{ var ks=Object.keys(self._pend), e=ks.filter(function(k){return self._errs&&self._errs[k];}).map(function(k){return k+': '+self._errs[k];}); return e.length?' Detalle: '+e.join(' | '):''; }catch(x){ return ''; } })();
       e2.style.display = 'flex';
     }, 4000);
   },
@@ -88,12 +91,12 @@ const DB = {
     if(_firebaseDB){
       var self = this, mi = ++this._seq;
       this._pend[k] = mi; this._guardarPend();
-      _firebaseDB.collection("suitedata").doc(k).set({ value: v })
+      _firebaseDB.collection("suitedata").doc(k).set({ value: self._enc(v) })
         .then(function(){
           if(self._pend[k] === mi){ delete self._pend[k]; self._guardarPend(); }
           showSyncBadge("\u2601\ufe0f Guardado en la nube \u2713", "#7ab87a");
         })
-        .catch(function(err){ console.warn("Error Firebase:", err); showSyncBadge("\u26a0\ufe0f Error al guardar en nube", "#e57373"); });
+        .catch(function(err){ console.warn("Error Firebase:", k, err); try{ self._errs=self._errs||{}; self._errs[k]=String((err&&(err.code||err.message))||err).slice(0,80); self._avisoPend(); }catch(e){} showSyncBadge("\u26a0\ufe0f Error al guardar en nube", "#e57373"); });
     }
   },
 
@@ -105,7 +108,7 @@ const DB = {
       .then(function(snap){
         snap.forEach(function(d){
           if(self._pend[d.id]) return;          // hay un cambio local sin enviar: no lo pises con la copia vieja del servidor
-          var v = d.data().value;
+          var v = self._dec(d.data().value);
           self._cache[d.id] = v;
           try { localStorage.setItem(d.id, JSON.stringify(v)); } catch(e){}
         });
