@@ -387,8 +387,25 @@
       } else h+='<div class="fr-chips" style="margin:6px 0 0"><button class="fr-chip" data-a="pg-pagar" data-i="'+i+'" data-m="consultorio" style="min-height:40px;font-size:.82rem">✓ Pagado</button></div>';
       h+='</div>';
     });
-    h+='</div><div class="fr-chips" style="margin-top:8px">'+chip('pg-cfg','⚙️ Mis números '+(E.cfg?'▴':'▾'))+'</div>';
+    h+='</div><div class="fr-chips" style="margin-top:8px">'+chip('pg-todos','📋 Todos mis pagos fijos ('+c.pagos.length+') '+(E.todos?'▴':'▾'))+chip('pg-cfg','⚙️ Mis números '+(E.cfg?'▴':'▾'))+'</div>';
+    if(E.todos) h+=htmlTodos(c);
     if(E.cfg) h+=htmlCfg(c);
+    return h+'</div>';
+  }
+
+  function proxFecha(p,c){
+    var hoy=hoy0(), fin=new Date(hoy.getFullYear(),hoy.getMonth(),hoy.getDate()+70);
+    var fs = p.frec==='unico' ? (parseY(p.fecha)?[parseY(p.fecha)]:[]) : ocurr(p.dias||[], new Date(hoy.getFullYear(),hoy.getMonth(),hoy.getDate()-20), fin);
+    for(var i=0;i<fs.length;i++){ var f=fs[i]; if(c.pagados[p.id+'|'+yy(f)]) continue; return f; }
+    return null;
+  }
+  function htmlTodos(c){
+    if(!c.pagos.length) return '<div class="fr-sub" style="margin-top:8px">Todavía no has agregado pagos fijos. Hazlo en «⚙️ Mis números» → «＋ Agregar un pago».</div>';
+    var lista=c.pagos.map(function(p){ return {p:p,f:proxFecha(p,c)}; }).sort(function(a,b){ return (a.f?a.f.getTime():9e15)-(b.f?b.f.getTime():9e15); });
+    var perso=0, cons=0; c.pagos.forEach(function(p){ if(p.frec==='unico') return; if(p.donde==='consultorio') cons+=+p.monto||0; else perso+=+p.monto||0; });
+    var h='<div class="fr-cfg"><div class="fr-sub"><b>Cada mes pagas</b> '+pesos(perso)+' en lo personal'+(cons?' y '+pesos(cons)+' en el consultorio':'')+'.</div>';
+    lista.forEach(function(x){ var p=x.p;
+      h+='<div class="fr-it"><div><b>'+esc(p.nombre)+'</b> · '+pesos(p.monto)+'<div class="fr-sub">'+(x.f?'próximo: '+lab(x.f):'sin fecha próxima')+' · '+(p.frec==='unico'?'una vez':'cada mes, día '+esc((p.dias||[]).join(' y ')))+(p.donde==='consultorio'?' · 🏥 consultorio':'')+(p.tarjeta?' · 💳 se puede con tarjeta':'')+'</div></div></div>'; });
     return h+'</div>';
   }
   function inp(id,lbl,val,ph,extra){ return '<div class="fr-f"><label>'+lbl+'</label><input type="text" id="'+id+'" value="'+esc(val==null?'':val)+'" placeholder="'+esc(ph||'')+'" inputmode="'+(extra||'numeric')+'"></div>'; }
@@ -452,7 +469,8 @@
   document.addEventListener('click',function(e){
     var b=e.target.closest&&e.target.closest('[data-a^="pg-"]'); var root=document.getElementById('fin-rapido'); var fl0=document.getElementById('fr-nom-flot'); if(!b||!((root&&root.contains(b))||(fl0&&fl0.contains(b)))) return;
     var a=b.getAttribute('data-a');
-    if(a==='pg-nomsi'){ nomSi(b.getAttribute('data-k'),b.getAttribute('data-inp')); }
+    if(a==='pg-todos'){ E.todos=!E.todos; A.repintar(); }
+    else if(a==='pg-nomsi'){ nomSi(b.getAttribute('data-k'),b.getAttribute('data-inp')); }
     else if(a==='pg-nomno'){ nomOculto=true; var fl=document.getElementById('fr-nom-flot'); if(fl) fl.remove(); A.toast('Vale, te pregunto de nuevo la próxima vez que entres'); }
     else if(a==='pg-cfg'){ E.cfg=!E.cfg; A.repintar(); }
     else if(a==='pg-guardar'){ if(guardarCfg()) A.repintar(); }
