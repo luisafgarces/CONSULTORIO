@@ -475,7 +475,7 @@
 
   function htmlConsMes(c){
     var R=(typeof registros!=='undefined'&&Array.isArray(registros))?registros:[], hoy=hoy0(), mes=yy(hoy).slice(0,7), ent=0, cob=0, gas=0;
-    R.forEach(function(r){ if(String(r.fecha||'').slice(0,7)!==mes) return; if(r.tipo==='ingreso'){ if(r.estado==='pagado') ent+=(+r.monto||0); else cob+=(+r.monto||0); } else if(r.tipo==='gasto') gas+=(+r.monto||0); });
+    var cor=(window._frCorte&&window._frCorte())||''; R.forEach(function(r){ if(String(r.fecha||'').slice(0,7)!==mes) return; if(cor&&String(r.fecha||'')<cor) return; if(r.tipo==='ingreso'){ if(r.estado==='pagado') ent+=(+r.monto||0); else cob+=(+r.monto||0); } else if(r.tipo==='gasto') gas+=(+r.monto||0); });
     var ini=new Date(hoy.getFullYear(),hoy.getMonth(),1), fin=new Date(hoy.getFullYear(),hoy.getMonth()+1,0), fij=0, lista=[];
     c.pagos.forEach(function(p){ var q=partes(p); if(q.cons<=0) return;
       var fs=p.frec==='unico'?(parseY(p.fecha)?[parseY(p.fecha)]:[]):ocurr(p.dias||[],ini,fin);
@@ -638,4 +638,48 @@
     }catch(e){}
   }
   add(); var n=0, iv=setInterval(function(){ add(); if(++n>30) clearInterval(iv); },500);
+})();
+
+
+/* Fecha de corte: las cuentas del consultorio cuentan desde esa fecha. Los recibos anteriores NO se borran. */
+(function(){
+  'use strict';
+  var K='finanzas_corte', filtrando=false;
+  function corte(){ try{ var v=DB.get(K); return (typeof v==='string'&&/^\d{4}-\d{2}-\d{2}$/.test(v))?v:''; }catch(e){ return ''; } }
+  function hoy(){ var d=new Date(); return d.getFullYear()+'-'+('0'+(d.getMonth()+1)).slice(-2)+'-'+('0'+d.getDate()).slice(-2); }
+  function bonito(f){ var m=['ene','feb','mar','abr','may','jun','jul','ago','sep','oct','nov','dic'],p=f.split('-'); return (+p[2])+' '+m[+p[1]-1]+' '+p[0]; }
+  window._frCorte=corte;
+  function envolver(){
+    if(typeof window.getRegistrosMes==='function' && !window.getRegistrosMes._c){
+      var g=window.getRegistrosMes; window.getRegistrosMes=function(m,a){ var r=g(m,a), c=corte(); return (filtrando&&c)?r.filter(function(x){return String(x.fecha||'')>=c;}):r; }; window.getRegistrosMes._c=1;
+    }
+    if(typeof window.renderResumen==='function' && !window.renderResumen._c){
+      var o=window.renderResumen; window.renderResumen=function(){ filtrando=true; try{ return o.apply(this,arguments); } finally{ filtrando=false; } }; window.renderResumen._c=1;
+    }
+    if(typeof window.renderAll==='function' && !window.renderAll._c){
+      var ra=window.renderAll; window.renderAll=function(){ var r=ra.apply(this,arguments); try{ barra(); }catch(e){} return r; }; window.renderAll._c=1;
+    }
+  }
+  function barra(){
+    var nav=document.querySelector('#page-finanzas .mes-nav'); if(!nav) return;
+    var b=document.getElementById('fin-corte'); if(!b){ b=document.createElement('div'); b.id='fin-corte'; b.style.cssText='background:#fff7f9;border:1.5px solid #e3c3cf;border-radius:12px;padding:10px 12px;margin:0 0 12px;font:.85rem Lato,sans-serif;color:#3b2c31'; nav.parentNode.insertBefore(b,nav); }
+    var c=corte(), h='';
+    if(c){ h='<b>🧮 Cuentas claras desde el '+bonito(c)+'.</b> Los ingresos, gastos y el neto de abajo cuentan solo desde esa fecha. Los recibos anteriores siguen guardados en el historial y los pendientes por cobrar se siguen mostrando.'
+        +'<div style="margin-top:8px;display:flex;gap:6px;flex-wrap:wrap;align-items:center"><input type="date" id="fin-corte-f" value="'+c+'" style="border:1.5px solid #e3c3cf;border-radius:8px;padding:5px"><button class="btn" data-c="cambiar">Cambiar fecha</button><button class="btn" data-c="quitar">Quitar el corte</button></div>'; }
+    else { h='<b>🧮 Cuentas desde siempre.</b> Hoy se suman todos los recibos del mes, incluso los de antes de organizarte.'
+        +'<div style="margin-top:8px"><button class="btn primary" data-c="hoy">Empezar cuentas claras desde hoy</button></div>'; }
+    b.innerHTML=h;
+  }
+  document.addEventListener('click',function(e){
+    var t=e.target.closest&&e.target.closest('#fin-corte [data-c]'); if(!t) return;
+    var a=t.getAttribute('data-c');
+    if(a==='hoy'){ if(!confirm('¿Empezar las cuentas del consultorio desde hoy ('+bonito(hoy())+')? Los recibos anteriores NO se borran, solo dejan de sumarse en las cuentas.')) return; DB.set(K,hoy()); }
+    else if(a==='cambiar'){ var v=(document.getElementById('fin-corte-f')||{}).value; if(!/^\d{4}-\d{2}-\d{2}$/.test(v||'')) return; DB.set(K,v); }
+    else if(a==='quitar'){ DB.set(K,''); }
+    if(typeof renderAll==='function') renderAll();
+    if(window._frApi&&window._frApi.repintar) try{ window._frApi.repintar(); }catch(x){}
+    if(typeof toast==='function') toast(a==='quitar'?'Corte quitado':'Cuentas claras desde '+bonito(corte()||hoy())+' ✓');
+  });
+  var n=0, iv=setInterval(function(){ envolver(); if(++n>30) clearInterval(iv); },500); envolver();
+  var gp=window.goPage; if(typeof gp==='function'&&!gp._c){ window.goPage=function(name){ var r=gp.apply(this,arguments); if(name==='finanzas'){ try{ envolver(); barra(); }catch(e){} } return r; }; window.goPage._c=1; }
 })();
