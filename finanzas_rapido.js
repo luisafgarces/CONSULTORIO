@@ -60,7 +60,7 @@
   function catsConsultorio(){ var s=$('g_cat'); var a=s?[].map.call(s.options,function(o){return o.value||o.text;}):[]; return a.length?a:['Materiales y papelería','Plataformas o apps','Publicidad','Arriendo','Otro']; }
   var MESES=['Ene','Feb','Mar','Abr','May','Jun','Jul','Ago','Sep','Oct','Nov','Dic'];
   function anioAct(){ return new Date().getFullYear(); }
-  var estado=window._frApi.estado={ tipo: ls('fr_tipo')==='ingreso'?'ingreso':'gasto', anio: anioAct(), vista: ls('fr_vista')==='consultorio'?'consultorio':'personal', abierto: false, fecha: '', otraFecha: false, cfg: false, pagandoTarjeta: false };
+  var estado=window._frApi.estado={ tipo: ls('fr_tipo')==='ingreso'?'ingreso':'gasto', anio: anioAct(), vista: ls('fr_vista')==='consultorio'?'consultorio':'personal', abierto: false, fecha: '', otraFecha: false, cfg: false, pagandoTarjeta: false, editId: null };
   function suma(a,f){ return a.filter(f||function(){return true;}).reduce(function(s,g){ return s+(+g.monto||0); },0); }
   function esIngreso(g){ return g && g.tipo==='ingreso'; }
   function esPagoTarjeta(g){ return g && g.tipo==='pagotarjeta'; }
@@ -103,9 +103,9 @@
     var c=$('fin-rapido'); if(!c) return; var cats=catsConsultorio(), ing=(estado.tipo==='ingreso'), keepC=($('fr-concepto')||{}).value||'';
     if(!ult.cat || cats.indexOf(ult.cat)<0) ult.cat=cats[cats.length-1];
     var P=leerP(), hoy=new Date(), mes=mesDe(ymd(hoy)), l0=ymd(lunesDe(hoy));
-    var h='<div class="fr-card"><h4>⚡ Anota un movimiento</h4>'
+    var h='<div class="fr-card"><h4>'+(estado.editId?'✏️ Editando un movimiento':'⚡ Anota un movimiento')+'</h4>'
       +'<div class="fr-chips" style="margin-top:0"><button class="fr-chip'+(!ing?' on':'')+'" data-a="tipo" data-v="gasto">💸 Gasto</button><button class="fr-chip'+(ing?' on':'')+'" data-a="tipo" data-v="ingreso">💰 Ingreso personal</button></div>'
-      +'<div class="fr-lin" style="margin-top:10px"><input type="text" id="fr-linea" placeholder="'+(ing?'Ej.: 1718861 nómina':'Ej.: 25000 papelería')+'" autocomplete="off" enterkeyhint="done"><button class="fr-go" data-a="guardar">Guardar</button></div>'
+      +'<div class="fr-lin" style="margin-top:10px"><input type="text" id="fr-linea" placeholder="'+(ing?'Ej.: 1718861 nómina':'Ej.: 25000 papelería')+'" autocomplete="off" enterkeyhint="done"><button class="fr-go" data-a="guardar">'+(estado.editId?'Guardar cambios':'Guardar')+'</button></div>'+(estado.editId?'<div class="fr-chips" style="margin:4px 0 0"><button class="fr-chip" data-a="cancelaredit" style="min-height:38px;font-size:.82rem">Cancelar edición</button></div>':'')
       +'<input type="text" id="fr-concepto" maxlength="80" placeholder="'+(ing?'¿De qué fue? (opcional) Ej.: nómina, clase':'¿En qué fue? (opcional) Ej.: mercado, taxi')+'" autocomplete="off" enterkeyhint="done" style="margin-top:8px">'
       +'<div class="fr-prev" id="fr-prev"></div>'
       +'<div class="fr-chips" style="margin:2px 0 0"><button class="fr-chip'+(!estado.fecha&&!estado.otraFecha?' on':'')+'" data-a="fecha" data-v="hoy" style="min-height:38px;font-size:.82rem">📅 Hoy</button><button class="fr-chip'+(estado.fecha===diaYmd(-1)?' on':'')+'" data-a="fecha" data-v="ayer" style="min-height:38px;font-size:.82rem">Ayer</button><button class="fr-chip'+(estado.otraFecha?' on':'')+'" data-a="fecha" data-v="otra" style="min-height:38px;font-size:.82rem">Otra fecha</button>'
@@ -125,7 +125,7 @@
       +'<div class="fr-sub" style="margin-top:6px">Salió '+pesos(suma(gMes))+' · esta semana '+pesos(suma(semana))+'</div>'
       +'<div class="fr-sub">💳 Tarjeta '+pesos(suma(gMes,function(g){return g.medio==='tarjeta';}))+' · 💵 Mi plata '+pesos(suma(gMes,function(g){return g.medio!=='tarjeta';}))+'</div></div>';
     var ult10=P.slice().sort(function(a,b){ return String(b.fecha+b.id).localeCompare(String(a.fecha+a.id)); }).slice(0,8);
-    h+='<div class="fr-card"><h4>Últimos movimientos personales</h4>'+(ult10.length?ult10.map(function(g){ var inn=esIngreso(g), pt=esPagoTarjeta(g); return '<div class="fr-it"><div><b>'+esc(g.desc||(pt?'Pago de la tarjeta':inn?'Ingreso':'Gasto'))+'</b><div class="fr-sub">'+esc(g.fecha)+' · '+(pt?'💳 pago de tarjeta':inn?'💰 ingreso':(g.medio==='tarjeta'?'💳 tarjeta':'💵 mi plata'))+'</div></div><div style="display:flex;align-items:center;gap:4px"><b>'+(inn?'+':'')+pesos(g.monto)+'</b><button class="fr-x" data-a="borrar" data-id="'+esc(g.id)+'">Quitar</button></div></div>'; }).join(''):'<div class="fr-sub">Todavía no hay movimientos personales. Cuando registres el primero, aparece aquí. Sin afán.</div>')+'</div>'
+    h+='<div class="fr-card"><h4>Últimos movimientos personales</h4>'+(ult10.length?ult10.map(function(g){ var inn=esIngreso(g), pt=esPagoTarjeta(g); return '<div class="fr-it"><div><b>'+esc(g.desc||(pt?'Pago de la tarjeta':inn?'Ingreso':'Gasto'))+'</b><div class="fr-sub">'+esc(g.fecha)+' · '+(pt?'💳 pago de tarjeta':inn?'💰 ingreso':(g.medio==='tarjeta'?'💳 tarjeta':'💵 mi plata'))+'</div></div><div style="display:flex;align-items:center;gap:4px"><b>'+(inn?'+':'')+pesos(g.monto)+'</b>'+(pt?'':'<button class="fr-x" data-a="editar" data-id="'+esc(g.id)+'">Editar</button>')+'<button class="fr-x" data-a="borrar" data-id="'+esc(g.id)+'">Quitar</button></div></div>'; }).join(''):'<div class="fr-sub">Todavía no hay movimientos personales. Cuando registres el primero, aparece aquí. Sin afán.</div>')+'</div>'
       +'<div class="fr-card"><button class="fr-chip" data-a="verAnio" style="width:100%">📊 Mi año '+(estado.abierto?'▴':'▾')+'</button>'+(estado.abierto?'<div style="margin-top:10px">'+htmlAnio()+'</div>':'')+'</div>'
       +'<div class="fr-sub" style="margin:0 2px 10px">Los gastos del consultorio los ves también en <b>Resumen</b> e <b>Historial</b>, como siempre.</div>';
     if(typeof window._frPagosHTML==='function'){ try{ h=window._frPagosHTML(h); }catch(e){ console.warn('[pagos]',e); } }
@@ -140,10 +140,13 @@
     if(!r){ toastS('Escribe el monto, por ejemplo: '+(ing?'1718861 nómina':'25000 papelería')); return; }
     var cpt=(($('fr-concepto')||{}).value||'').replace(/[<>]/g,'').trim().slice(0,80), desc=cpt||r.desc||(ing?'Ingreso':'Gasto'), fecha=fechaElegida();
     if(ing){
-      var PI=leerP(); PI.push({id:String(Date.now()),tipo:'ingreso',fecha:fecha,monto:r.monto,desc:desc}); guardarP(PI);
-      toastS('✅ Ingreso guardado: '+pesos(r.monto));
+      var PI=leerP(), eid=estado.editId, nuevoI={id:eid||String(Date.now()),tipo:'ingreso',fecha:fecha,monto:r.monto,desc:desc};
+      if(eid){ var ki=-1; PI.forEach(function(x,q){ if(String(x.id)===String(eid)) ki=q; }); if(ki>=0) PI[ki]=nuevoI; else PI.push(nuevoI); } else PI.push(nuevoI);
+      guardarP(PI); estado.editId=null;
+      toastS(eid?'✅ Cambios guardados':'✅ Ingreso guardado: '+pesos(r.monto));
     } else {
       if(!ult.donde){ toastS('Toca si es del Consultorio o Personal'); return; }
+      if(estado.editId && ult.donde==='consultorio'){ toastS('Un gasto personal no se puede pasar al consultorio al editarlo. Cancela y anótalo nuevo.'); return; }
       if(ult.donde==='consultorio'){
         if(typeof registros==='undefined' || typeof finGuardar!=='function'){ toastS('No pude guardar en el Finanzas del consultorio'); return; }
         var cat=($('fr-cat')||{}).value||'Otro'; ult.cat=cat; ls('fr_cat',cat);
@@ -153,8 +156,10 @@
         toastS('✅ Gasto del consultorio guardado: '+pesos(r.monto));
       } else {
         if(!ult.medio){ toastS('Toca si pagaste con Tarjeta o con Mi plata'); return; }
-        var P=leerP(); P.push({id:String(Date.now()),fecha:fecha,monto:r.monto,desc:desc,medio:ult.medio}); guardarP(P);
-        toastS('✅ Guardado: '+pesos(r.monto));
+        var P=leerP(), eid2=estado.editId, nuevoG={id:eid2||String(Date.now()),fecha:fecha,monto:r.monto,desc:desc,medio:ult.medio};
+        if(eid2){ var kg=-1; P.forEach(function(x,q){ if(String(x.id)===String(eid2)) kg=q; }); if(kg>=0) P[kg]=nuevoG; else P.push(nuevoG); } else P.push(nuevoG);
+        guardarP(P); estado.editId=null;
+        toastS(eid2?'✅ Cambios guardados':'✅ Guardado: '+pesos(r.monto));
       }
     }
     v.value=''; var kcl=$('fr-concepto'); if(kcl) kcl.value=''; estado.fecha=''; estado.otraFecha=false; pintar(); var n=$('fr-linea'); if(n) n.focus();
@@ -165,6 +170,14 @@
     if(a==='donde'){ ult.donde=b.getAttribute('data-v'); ls('fr_donde',ult.donde); var txt=($('fr-linea')||{}).value||''; pintar(); var n=$('fr-linea'); if(n){ n.value=txt; preview(); } }
     else if(a==='medio'){ ult.medio=b.getAttribute('data-v'); ls('fr_medio',ult.medio); var t2=($('fr-linea')||{}).value||''; pintar(); var n2=$('fr-linea'); if(n2){ n2.value=t2; preview(); } }
     else if(a==='guardar') guardar();
+    else if(a==='cancelaredit'){ estado.editId=null; estado.fecha=''; estado.otraFecha=false; pintar(); }
+    else if(a==='editar'){
+      var ge=leerP().filter(function(x){ return String(x.id)===b.getAttribute('data-id'); })[0]; if(!ge) return;
+      estado.editId=ge.id; estado.tipo=esIngreso(ge)?'ingreso':'gasto';
+      if(!esIngreso(ge)){ ult.donde='personal'; ls('fr_donde','personal'); ult.medio=(ge.medio==='tarjeta')?'tarjeta':'efectivo'; ls('fr_medio',ult.medio); }
+      if(ge.fecha===hoyLocal()){ estado.fecha=''; estado.otraFecha=false; } else if(ge.fecha===diaYmd(-1)){ estado.fecha=ge.fecha; estado.otraFecha=false; } else { estado.fecha=ge.fecha; estado.otraFecha=true; }
+      pintar(); var nl=$('fr-linea'), nc=$('fr-concepto'); if(nl){ nl.value=String(ge.monto); } if(nc){ nc.value=(ge.desc&&ge.desc!=='Gasto'&&ge.desc!=='Ingreso')?ge.desc:''; } preview(); if(nl){ nl.focus(); if(nl.scrollIntoView) nl.scrollIntoView({block:'center'}); }
+    }
     else if(a==='fecha'){ var v0=b.getAttribute('data-v'), t0=($('fr-linea')||{}).value||''; if(v0==='hoy'){ estado.fecha=''; estado.otraFecha=false; } else if(v0==='ayer'){ estado.fecha=diaYmd(-1); estado.otraFecha=false; } else { estado.otraFecha=true; estado.fecha=estado.fecha||hoyLocal(); } pintar(); var n0=$('fr-linea'); if(n0){ n0.value=t0; preview(); } }
     else if(a==='tipo'){ estado.tipo=b.getAttribute('data-v')==='ingreso'?'ingreso':'gasto'; ls('fr_tipo',estado.tipo); var t3=($('fr-linea')||{}).value||''; pintar(); var n3=$('fr-linea'); if(n3){ n3.value=t3; preview(); } }
     else if(a==='repetir'){ var g0=leerP().filter(function(x){ return String(x.id)===b.getAttribute('data-id'); })[0]; if(g0){ estado.tipo=esIngreso(g0)?'ingreso':'gasto'; if(!esIngreso(g0)){ ult.donde='personal'; ls('fr_donde','personal'); if(g0.medio){ ult.medio=g0.medio; ls('fr_medio',g0.medio); } } pintar(); var n4=$('fr-linea'); if(n4){ n4.value=g0.monto+' '+(g0.desc||''); preview(); n4.focus(); } } }
