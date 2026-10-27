@@ -114,7 +114,7 @@
     if(rep.length) h+='<div class="fr-chips" style="margin-top:2px">'+rep.map(function(g,i){ return '<button class="fr-chip" data-a="repetir" data-id="'+esc(g.id)+'" style="font-size:.8rem;min-height:38px">↻ '+(esIngreso(g)?'+':'')+esc(g.desc||'Gasto')+' · '+pesos(g.monto)+'</button>'; }).join('')+'</div>';
     if(!ing){
       h+='<div class="fr-chips" id="fr-donde"><button class="fr-chip'+(ult.donde==='consultorio'?' on':'')+'" data-a="donde" data-v="consultorio">🏥 Consultorio</button><button class="fr-chip'+(ult.donde==='personal'?' on':'')+'" data-a="donde" data-v="personal">🏠 Personal</button></div>'
-      +'<div class="fr-chips" id="fr-medio" style="display:'+(ult.donde==='personal'?'flex':'none')+'"><button class="fr-chip'+(ult.medio==='tarjeta'?' on':'')+'" data-a="medio" data-v="tarjeta">💳 Tarjeta</button><button class="fr-chip'+(ult.medio==='efectivo'?' on':'')+'" data-a="medio" data-v="efectivo">💵 Mi plata</button></div>'
+      +'<div class="fr-chips" id="fr-medio" style="display:'+(ult.donde==='personal'?'flex':'none')+'"><button class="fr-chip'+(ult.medio==='tarjeta'?' on':'')+'" data-a="medio" data-v="tarjeta">💳 Tarjeta</button><button class="fr-chip'+(ult.medio==='efectivo'?' on':'')+'" data-a="medio" data-v="efectivo">💵 Mi plata</button><button class="fr-chip'+(ult.medio==='nequi'?' on':'')+'" data-a="medio" data-v="nequi">📱 Nequi</button></div>'
       +'<div id="fr-catw" style="display:'+(ult.donde==='consultorio'?'block':'none')+';margin-top:10px"><select id="fr-cat">'+cats.map(function(k){ return '<option'+(k===ult.cat?' selected':'')+'>'+esc(k)+'</option>'; }).join('')+'</select></div>';
     } else h+='<div class="fr-sub" style="margin-top:8px">Los pagos de pacientes no se anotan aquí: entran solos cuando haces el recibo.</div>';
     h+='</div>';
@@ -174,7 +174,7 @@
     else if(a==='editar'){
       var ge=leerP().filter(function(x){ return String(x.id)===b.getAttribute('data-id'); })[0]; if(!ge) return;
       estado.editId=ge.id; estado.tipo=esIngreso(ge)?'ingreso':'gasto';
-      if(!esIngreso(ge)){ ult.donde='personal'; ls('fr_donde','personal'); ult.medio=(ge.medio==='tarjeta')?'tarjeta':'efectivo'; ls('fr_medio',ult.medio); }
+      if(!esIngreso(ge)){ ult.donde='personal'; ls('fr_donde','personal'); ult.medio=(ge.medio==='tarjeta')?'tarjeta':(ge.medio==='nequi'?'nequi':'efectivo'); ls('fr_medio',ult.medio); }
       if(ge.fecha===hoyLocal()){ estado.fecha=''; estado.otraFecha=false; } else if(ge.fecha===diaYmd(-1)){ estado.fecha=ge.fecha; estado.otraFecha=false; } else { estado.fecha=ge.fecha; estado.otraFecha=true; }
       pintar(); var nl=$('fr-linea'), nc=$('fr-concepto'); if(nl){ nl.value=String(ge.monto); } if(nc){ nc.value=(ge.desc&&ge.desc!=='Gasto'&&ge.desc!=='Ingreso')?ge.desc:''; } preview(); if(nl){ nl.focus(); if(nl.scrollIntoView) nl.scrollIntoView({block:'center'}); }
     }
@@ -307,20 +307,100 @@
   }
 
 
-  // ---- Nequi del consultorio: tu saldo + recibos pagados por Nequi − gastos del consultorio, desde que lo escribiste ----
-  function nqBase(c){ return c.nequi&&c.nequi.monto!=null&&c.nequi.monto!==''; }
-  function estadoNequi(c){
-    var q=c.nequi||{}, has=nqBase(c), saldo=+q.monto||0, movs=[], ts=+q.ts||0, dia=q.dia||'';
-    if(has && typeof registros!=='undefined' && Array.isArray(registros)){
-      registros.forEach(function(r){
-        var nuevo = (+r.id>1e12) ? (+r.id>ts) : (String(r.fecha||'')>dia);
-        if(!nuevo) return;
-        if(r.tipo==='ingreso' && r.estado==='pagado' && r.metodo==='nequi'){ saldo+=(+r.monto||0); movs.push({f:r.fecha,t:'Recibo: '+(r.paciente||'paciente'),d:+r.monto||0}); }
-        else if(r.tipo==='gasto'){ saldo-=(+r.monto||0); movs.push({f:r.fecha,t:r.descripcion||'Gasto del consultorio',d:-(+r.monto||0)}); }
+  // ---- Dinero del consultorio: bolsillos Nequi / Bancolombia / efectivo + plata tuya «de paso» en el Nequi ----
+  var BK=['nequi','banco','efectivo'], BN={nequi:'Nequi',banco:'Bancolombia',efectivo:'Efectivo'}, BI={nequi:'📱',banco:'🏦',efectivo:'💵'};
+  var E2={form:'',hist:false};
+  function bolsaBase(c){ var B=c.bol||{}; if(!B.nequi&&c.nequi&&c.nequi.monto!=null&&c.nequi.monto!=='') B=Object.assign({},B,{nequi:c.nequi}); return B; }
+  function bolsa(c){
+    var B=bolsaBase(c), R=(typeof registros!=='undefined'&&Array.isArray(registros))?registros:[], P=A.leerP(), M=Array.isArray(c.bmov)?c.bmov:[];
+    var ks=['nequi','banco','efectivo','paso'], pk={}, ref=null, has=false, otros=0;
+    ks.forEach(function(k){ var q=B[k]; if(q&&q.monto!=null&&q.monto!==''){ has=true; if(!ref||(+q.ts||0)<ref.ts) ref={ts:+q.ts||0,dia:q.dia||''}; } });
+    ks.forEach(function(k){ var q=B[k], h=!!(q&&q.monto!=null&&q.monto!==''); pk[k]={has:h,base:h?(+q.monto||0):0,ts:h?(+q.ts||0):(ref?ref.ts:0),dia:h?(q.dia||''):(ref?ref.dia:''),saldo:h?(+q.monto||0):0,movs:[]}; });
+    function mover(k,d,f,t){ pk[k].saldo+=d; pk[k].movs.push({f:f,t:t,d:d}); }
+    if(has){
+      R.forEach(function(r){
+        if(r.tipo==='ingreso' && r.estado==='pagado'){
+          var k2={nequi:'nequi',bancolombia:'banco',transferencia:'banco',efectivo:'efectivo'}[r.metodo], mom=+r.pagadoTs||((+r.id>1e12)?+r.id:0), fch=String(r.fechaRecibo||r.fecha||'');
+          if(!k2){ if(mom?mom>ref.ts:fch>ref.dia) otros+=(+r.monto||0); return; }
+          if(mom?mom>pk[k2].ts:fch>pk[k2].dia) mover(k2,+r.monto||0,r.fechaRecibo||r.fecha,'Recibo: '+(r.paciente||'paciente'));
+        } else if(r.tipo==='gasto'){
+          var kd=(r.desde&&(r.desde==='nequi'||r.desde==='banco'||r.desde==='efectivo'))?r.desde:'nequi', p=pk[kd];
+          if((+r.id>1e12)?(+r.id>p.ts):(String(r.fecha||'')>p.dia)) mover(kd,-(+r.monto||0),r.fecha,r.descripcion||'Gasto del consultorio');
+        }
       });
+      M.forEach(function(m){ var mt=+m.id||0, v=+m.monto||0; if(!v) return;
+        if(m.tipo==='pasar'&&pk[m.de]&&pk[m.a]){ if(mt>pk[m.de].ts) mover(m.de,-v,m.fecha,'Pasé a '+BN[m.a]); if(mt>pk[m.a].ts) mover(m.a,v,m.fecha,'Recibí de '+BN[m.de]); }
+        else if(m.tipo==='paso'){ if(mt>pk.paso.ts) mover('paso',v,m.fecha,'Pasé plata mía de Bancolombia al Nequi'); }
+      });
+      P.forEach(function(g){ if(g.medio!=='nequi'||g.tipo==='ingreso'||g.tipo==='pagotarjeta') return; if((+g.id||0)>pk.paso.ts) mover('paso',-(+g.monto||0),g.fecha,g.desc||'Pago personal con Nequi'); });
     }
-    return {has:has, base:+q.monto||0, saldo:saldo, movs:movs};
+    var def=Math.max(0,-pk.paso.saldo), nqEff=pk.nequi.saldo-def;
+    return {has:has,pk:pk,otros:otros,def:def,nequi:nqEff,banco:pk.banco.saldo,efectivo:pk.efectivo.saldo,paso:Math.max(0,pk.paso.saldo),total:nqEff+pk.banco.saldo+pk.efectivo.saldo};
   }
+  function estadoNequi(c){ var b=bolsa(c), k=(c.gastoDesde&&BN[c.gastoDesde])?c.gastoDesde:'nequi', p=b.pk[k]; return {has:b.has,base:p.base,saldo:(k==='nequi'?b.nequi:p.saldo),movs:p.movs,k:k}; }
+  function sel(id,v){ return '<select id="'+id+'" style="width:100%;margin:2px 0 6px">'+BK.map(function(k){ return '<option value="'+k+'"'+(k===v?' selected':'')+'>'+BI[k]+' '+BN[k]+'</option>'; }).join('')+'</select>'; }
+  function htmlBolsa(c){
+    var b=bolsa(c), h='<div class="fr-card bo-card"><h4>💰 Dinero del consultorio</h4>';
+    if(!b.has) h+='<div class="fr-sub">Aún no está configurado. Escribe cuánto hay hoy en cada cuenta y desde ahí se alimenta solo: suma los recibos pagados y resta los gastos del consultorio.</div>';
+    else {
+      h+='<div class="fr-num">'+(b.total<0?'−':'')+pesos(Math.abs(b.total))+'</div>'
+       +'<div class="fr-sub">📱 Nequi '+pesos(b.nequi)+' · 🏦 Bancolombia '+pesos(b.banco)+' · 💵 Efectivo '+pesos(b.efectivo)+'</div>';
+      if(b.paso>0) h+='<div class="fr-sub">🏠 En el Nequi hay además '+pesos(b.paso)+' tuyos de paso (no cuentan como del consultorio)</div>';
+      if(b.def>0) h+='<div class="fr-aviso">⚠️ Pagaste '+pesos(b.def)+' de cosas personales con el Nequi sin tener plata tuya de paso. Esa plata salió del consultorio: cuenta como un retiro tuyo.</div>';
+      if(b.otros>0) h+='<div class="fr-aviso">⚠️ Hay '+pesos(b.otros)+' en recibos pagados por Nu, Davibank o Breve desde el reinicio que no suman a ningún bolsillo. Si esa plata cayó a una de tus cuentas del consultorio, cambia el método del recibo.</div>';
+      BK.forEach(function(k){ if(b.pk[k].saldo<0&&!(k==='nequi'&&b.def>0)) h+='<div class="fr-aviso">⚠️ '+BN[k]+' quedó en negativo: revisa si falta un recibo o si un gasto salió de otra cuenta.</div>'; });
+    }
+    var f=E2.form;
+    if(f==='reinicio'){
+      h+='<div class="fr-cfg" style="margin-top:8px"><div class="fr-sub"><b>Reiniciar desde hoy</b>: escribe lo que hay <b>ahora</b> en cada cuenta. Los recibos anteriores no se borran; solo dejan de sumarse.</div>'
+       +inp('bo-r-nq','Todo lo que hay hoy en el Nequi (con la plata tuya de paso, si hay)','','Ej.: 560000')
+       +inp('bo-r-paso','De eso, ¿cuánto es TUYO (de paso, no del consultorio)? 0 si nada','','Ej.: 0')
+       +inp('bo-r-banco','Plata del consultorio que está en Bancolombia (solo la de consultas)','','Ej.: 0')
+       +inp('bo-r-efe','Efectivo del consultorio','','Ej.: 0')
+       +'<div class="fr-chips"><button class="fr-go" data-a="bo-ok-reinicio">Reiniciar desde hoy</button><button class="fr-chip" data-a="bo-cancel">Cancelar</button></div></div>';
+    } else if(f==='pasar'){
+      h+='<div class="fr-cfg" style="margin-top:8px"><div class="fr-sub"><b>Pasé plata del consultorio de una cuenta a otra</b> (el total no cambia)</div><div class="fr-sub">De</div>'+sel('bo-p-de','banco')+'<div class="fr-sub">A</div>'+sel('bo-p-a','nequi')+inp('bo-p-m','Cuánto','','Ej.: 80000')
+       +'<div class="fr-chips"><button class="fr-go" data-a="bo-ok-pasar">Guardar</button><button class="fr-chip" data-a="bo-cancel">Cancelar</button></div></div>';
+    } else if(f==='paso'){
+      h+='<div class="fr-cfg" style="margin-top:8px"><div class="fr-sub"><b>Pasé plata MÍA de Bancolombia al Nequi</b> (para un pago personal; no es del consultorio)</div>'+inp('bo-s-m','Cuánto','','Ej.: 50000')
+       +'<div class="fr-chips"><button class="fr-go" data-a="bo-ok-paso">Guardar</button><button class="fr-chip" data-a="bo-cancel">Cancelar</button></div><div class="fr-sub">Después, cuando pagues algo personal con el Nequi, elige «📱 Nequi» y se descuenta de esta plata.</div></div>';
+    } else {
+      h+='<div class="fr-chips" style="margin:8px 0 0">'+(b.has?'<button class="fr-chip" data-a="bo-form" data-v="pasar" style="min-height:40px;font-size:.82rem">↔️ Pasé plata entre mis cuentas</button><button class="fr-chip" data-a="bo-form" data-v="paso" style="min-height:40px;font-size:.82rem">🏠 Pasé plata mía al Nequi</button><button class="fr-chip" data-a="bo-hist" style="min-height:40px;font-size:.82rem">'+(E2.hist?'Ocultar cuenta':'¿Cómo salió?')+'</button>':'')
+       +'<button class="fr-chip" data-a="bo-form" data-v="reinicio" style="min-height:40px;font-size:.82rem">'+(b.has?'🔄 Reiniciar':'▶️ Configurar')+'</button></div>';
+      if(b.has&&E2.hist){
+        ['nequi','banco','efectivo','paso'].forEach(function(k){ var p=b.pk[k], t=(k==='paso')?'🏠 Tuya de paso en el Nequi':BI[k]+' '+BN[k]; h+='<div class="fr-cfg" style="margin-top:6px"><div class="fr-sub"><b>'+t+'</b>: partió de '+pesos(p.base)+'</div>'+(p.movs.length?p.movs.slice(-8).map(function(m){ return '<div class="fr-it"><div><b>'+esc(m.t)+'</b><div class="fr-sub">'+esc(m.f||'')+'</div></div><b>'+(m.d>0?'+':'−')+pesos(Math.abs(m.d))+'</b></div>'; }).join(''):'<div class="fr-sub">sin movimientos nuevos.</div>')+'</div>'; });
+        h+='<div class="fr-sub" style="margin-top:6px">Suma los recibos pagados (según su método: Nequi, Bancolombia o transferencia, efectivo) y resta los gastos del consultorio. Si el saldo real es otro, reinicia con el valor correcto.</div>';
+      }
+    }
+    return h+'</div>';
+  }
+  function refrescarBolsa(){ try{ A.repintar(); }catch(e){} try{ if(window._frBarra) window._frBarra(); }catch(e){} }
+  document.addEventListener('click',function(e){
+    var b=e.target.closest&&e.target.closest('[data-a^="bo-"]'); if(!b) return;
+    var card=b.closest('.bo-card'), a=b.getAttribute('data-a'), c=cfg(), hoyS=A.hoyLocal();
+    function bv(id){ var x=card&&card.querySelector('[id="'+id+'"]'); return x?x.value.trim():''; }
+    if(a==='bo-form'){ E2.form=b.getAttribute('data-v')||''; }
+    else if(a==='bo-cancel'){ E2.form=''; }
+    else if(a==='bo-hist'){ E2.hist=!E2.hist; }
+    else if(a==='bo-ok-reinicio'){
+      if(bv('bo-r-nq')===''){ A.toast('Escribe cuánto hay hoy en el Nequi (0 si nada)'); return; }
+      var nq=num(bv('bo-r-nq')), pas=Math.min(num(bv('bo-r-paso')),nq), bn=num(bv('bo-r-banco')), ef=num(bv('bo-r-efe'));
+      if(!confirm('¿Reiniciar el dinero del consultorio con estos saldos y empezar las cuentas desde hoy? Los recibos anteriores NO se borran.')) return;
+      var ts=Date.now(); c.bol={nequi:{monto:nq-pas,ts:ts,dia:hoyS},banco:{monto:bn,ts:ts,dia:hoyS},efectivo:{monto:ef,ts:ts,dia:hoyS},paso:{monto:pas,ts:ts,dia:hoyS}}; c.nequi={monto:nq-pas,ts:ts,dia:hoyS}; c.bmov=[]; sv(c);
+      try{ DB.set('finanzas_corte',hoyS); }catch(x){} try{ renderAll(); }catch(x){} E2.form=''; A.toast('✅ Listo: cuentas claras desde hoy');
+    }
+    else if(a==='bo-ok-pasar'){
+      var de=bv('bo-p-de'), a2=bv('bo-p-a'), m=num(bv('bo-p-m'));
+      if(!m||m<=0){ A.toast('Escribe cuánto pasaste'); return; } if(de===a2){ A.toast('Elige cuentas distintas'); return; }
+      c.bmov=Array.isArray(c.bmov)?c.bmov:[]; c.bmov.push({id:Date.now(),tipo:'pasar',de:de,a:a2,monto:m,fecha:hoyS}); sv(c); E2.form=''; A.toast('✅ Anotado');
+    }
+    else if(a==='bo-ok-paso'){
+      var m2=num(bv('bo-s-m')); if(!m2||m2<=0){ A.toast('Escribe cuánto pasaste'); return; }
+      c.bmov=Array.isArray(c.bmov)?c.bmov:[]; c.bmov.push({id:Date.now(),tipo:'paso',monto:m2,fecha:hoyS}); sv(c); E2.form=''; A.toast('✅ Anotado: es plata tuya de paso');
+    }
+    refrescarBolsa();
+  });
+  window._frBolsaHTML=function(){ return htmlBolsa(cfg()); };
 
   // ---- plan: pagos de los próximos 30 días (y los que quedaron atrasados) con sugerencia ----
   function pctDe(p){ var v=parseFloat(p&&p.pct); if(isFinite(v)&&v>=0&&v<=100) return v; return (p&&p.donde==='consultorio')?100:0; }
@@ -410,9 +490,7 @@
       if(plan.aviso) h+='<div class="fr-aviso">⚠️ Según lo que registraste, el <b>'+lab(plan.aviso.f)+'</b> te faltarían <b>'+pesos(plan.aviso.falta)+'</b>. Hay tiempo de revisarlo; por ahora es solo un aviso.</div>';
     }
     var nq=estadoNequi(c), accNq=0;
-    if(nq.has){ h+='<div class="fr-sub">🏥 Nequi del consultorio: <b>'+pesos(nq.saldo)+'</b> <button class="fr-x" data-a="pg-cuentan">'+(E.cuentaN?'ocultar cuenta':'¿cómo salió?')+'</button></div>';
-      if(E.cuentaN){ h+='<div class="fr-cfg" style="margin-top:4px"><div class="fr-sub">Partiste de <b>'+pesos(nq.base)+'</b>. Desde entonces:</div>'+(nq.movs.length?nq.movs.map(function(m){ return '<div class="fr-it"><div><b>'+esc(m.t)+'</b><div class="fr-sub">'+esc(m.f||'')+'</div></div><b>'+(m.d>0?'+':'−')+pesos(Math.abs(m.d))+'</b></div>'; }).join(''):'<div class="fr-sub">no hay movimientos nuevos.</div>')+'<div class="fr-sub">Suma los recibos pagados por Nequi y resta los gastos del consultorio. Si tu saldo real es otro, actualízalo en «⚙️ Mis números».</div></div>'; } }
-    else h+='<div class="fr-sub">🏥 Agrega lo que tienes en el Nequi del consultorio en «⚙️ Mis números».</div>';
+    if(c.pagos.some(function(p){return partes(p).cons>0;})){ h+='<div class="fr-sub">🏥 Los gastos del consultorio salen de:</div><div class="fr-chips" style="margin:4px 0">'+BK.map(function(k){ return '<button class="fr-chip'+((c.gastoDesde||'nequi')===k?' on':'')+'" data-a="pg-gd" data-v="'+k+'" style="min-height:40px;font-size:.84rem">'+BI[k]+' '+BN[k]+'</button>'; }).join('')+'</div>'+(nq.has?'<div class="fr-sub">Ahí hay '+pesos(nq.saldo)+' del consultorio.</div>':''); }
     if(E.pagandoTarjeta){ var sug=plan.est.stm?Math.max(0,plan.est.debe):0; h+='<div class="fr-row"><input type="text" id="pg-pt" inputmode="numeric" value="'+(sug||'')+'" placeholder="Monto que pagaste"><button class="fr-go" data-a="pg-ptok">Guardar pago</button></div>'; }
     else if(tarjetaOK(t)) h+='<div class="fr-chips" style="margin:6px 0 0">'+chip('pg-pt','💳 Pagué la tarjeta')+'</div>';
     h+='<div style="margin-top:10px">';
@@ -421,11 +499,11 @@
       var sug=it.medio, puro=(it.monto<=0), mixto=(it.cons>0&&it.monto>0);
       h+='<div class="fr-pg"><div class="fr-pgh"><div><b>'+esc(it.p.nombre||'Pago')+'</b> · '+pesos(it.total)+(puro?' <span class="fr-sub">(consultorio)</span>':'')+'<div class="fr-sub">'+(it.atrasado?'⏰ Venció el '+lab(it.orig)+' — sin culpa, cuando puedas':'📅 '+lab(it.fecha))+'</div></div></div>';
       if(mixto) h+='<div class="fr-sub">🏥 <b>'+pesos(it.cons)+'</b> del consultorio ('+pctDe(it.p)+'%) · 🏠 <b>'+pesos(it.monto)+'</b> de tu plata</div>';
-      if(it.cons>0){ accNq+=it.cons; if(nq.has) h+='<div class="fr-sug">'+(accNq<=nq.saldo?'🏥 '+(mixto?'La parte del consultorio alcanza':'Alcanza')+' con el Nequi del consultorio':'⚠️ El Nequi del consultorio no alcanza')+'</div>'+(accNq<=nq.saldo?'':'<div class="fr-sub">Tienes '+pesos(nq.saldo)+' y con este pago faltarían '+pesos(accNq-nq.saldo)+'.</div>'); }
+      if(it.cons>0){ accNq+=it.cons; if(nq.has) h+='<div class="fr-sug">'+(accNq<=nq.saldo?'🏥 '+(mixto?'La parte del consultorio alcanza':'Alcanza')+' con el dinero del consultorio ('+BN[nq.k]+')':'⚠️ El dinero del consultorio ('+BN[nq.k]+') no alcanza')+'</div>'+(accNq<=nq.saldo?'':'<div class="fr-sub">Tienes '+pesos(nq.saldo)+' y con este pago faltarían '+pesos(accNq-nq.saldo)+'.</div>'); }
       if(!puro){
         if(it.tarj && sug==='?') h+='<div class="fr-sub">Puede ir en tarjeta. Completa «Mis números» para saber si conviene.</div>';
         else if(plan.listo) h+='<div class="fr-sug">'+(sug==='tarjeta'?'💳 '+(mixto?'Tu parte: ponla':'Ponlo')+' en la tarjeta':'💵 '+(mixto?'Tu parte: págala':'Págalo')+' con tu plata')+'</div>'+(it.motivo?'<div class="fr-sub">'+esc(it.motivo)+'</div>':'');
-        h+='<div class="fr-chips" style="margin:6px 0 0"><button class="fr-chip'+(sug==='tarjeta'?' on':'')+'" data-a="pg-pagar" data-i="'+i+'" data-m="tarjeta" style="min-height:40px;font-size:.82rem"'+(tarjetaOK(t)&&it.p.tarjeta?'':' disabled')+'>✓ Pagué con 💳</button><button class="fr-chip'+(sug==='efectivo'?' on':'')+'" data-a="pg-pagar" data-i="'+i+'" data-m="efectivo" style="min-height:40px;font-size:.82rem">✓ Pagué con 💵</button></div>'+(mixto?'<div class="fr-sub">Al marcarlo anoto la parte del consultorio y la tuya.</div>':'');
+        h+='<div class="fr-chips" style="margin:6px 0 0"><button class="fr-chip'+(sug==='tarjeta'?' on':'')+'" data-a="pg-pagar" data-i="'+i+'" data-m="tarjeta" style="min-height:40px;font-size:.82rem"'+(tarjetaOK(t)&&it.p.tarjeta?'':' disabled')+'>✓ Pagué con 💳</button><button class="fr-chip'+(sug==='efectivo'?' on':'')+'" data-a="pg-pagar" data-i="'+i+'" data-m="efectivo" style="min-height:40px;font-size:.82rem">✓ Pagué con 💵</button><button class="fr-chip" data-a="pg-pagar" data-i="'+i+'" data-m="nequi" style="min-height:40px;font-size:.82rem">✓ Pagué con 📱 Nequi</button></div>'+(mixto?'<div class="fr-sub">Al marcarlo anoto la parte del consultorio y la tuya.</div>':'');
       } else h+='<div class="fr-chips" style="margin:6px 0 0"><button class="fr-chip" data-a="pg-pagar" data-i="'+i+'" data-m="consultorio" style="min-height:40px;font-size:.82rem">✓ Pagado</button></div>';
       if(it.atrasado) h+='<div class="fr-chips" style="margin:6px 0 0"><button class="fr-chip" data-a="pg-ya" data-i="'+i+'" style="min-height:40px;font-size:.8rem">Ya lo había pagado (solo quitarlo)</button></div>';
       h+='</div>';
@@ -455,7 +533,7 @@
   function htmlCfg(c){
     var t=c.tarjeta, n=c.nomina, d=c.disp, cats=A.catsConsultorio();
     var h='<div class="fr-cfg"><div class="fr-sub"><b>💵 Cuánto tienes hoy</b> (en tu cuenta, sin contar la tarjeta; actualízalo cuando quieras)</div>'+inp('pg-disp','Disponible hoy',d.monto,'Ej.: 400000')+'<button class="fr-chip" data-a="pg-disp" style="min-height:40px;font-size:.84rem">Actualizar solo esto (ya revisé mi saldo)</button>'
-      +'<div class="fr-sub" style="margin-top:8px"><b>🏥 Nequi del consultorio</b> (donde te entra lo de las consultas)</div>'+inp('pg-nq','Lo que tienes hoy en ese Nequi',c.nequi&&c.nequi.monto!=null?c.nequi.monto:'','Ej.: 150000')+'<button class="fr-chip" data-a="pg-nq" style="min-height:40px;font-size:.84rem">Actualizar el Nequi</button>'
+      +'<div class="fr-sub" style="margin-top:8px"><b>💰 Dinero del consultorio</b> (Nequi, Bancolombia y efectivo)</div><button class="fr-chip" data-a="bo-form" data-v="reinicio" style="min-height:40px;font-size:.84rem">🔄 Reiniciar / configurar (se abre arriba)</button>'
       +'<div class="fr-sub" style="margin-top:8px"><b>💳 Tarjeta de crédito</b> (siempre a una cuota)</div>'+inp('pg-cupo','Cupo',t.cupo,'Ej.: 1000000')+'<div class="fr-2">'+inp('pg-corte','Día de corte',t.corte,'Ej.: 10')+inp('pg-pago','Día de pago',t.pago,'Ej.: 25')+'</div>'+inp('pg-debo','Cuánto debes hoy en la tarjeta (0 si nada)',t.debo,'Ej.: 0')
       +'<div class="fr-sub" style="margin-top:8px"><b>💰 Tu nómina</b></div>'+inp('pg-nm','Monto de cada pago',n.monto,'Ej.: 1718861')+inp('pg-nd','Días del mes en que te llega',(n.dias||[]).join(', '),'Ej.: 15, 30','text')
       +'<div class="fr-chips"><button class="fr-go" data-a="pg-guardar">Guardar mis números</button></div>'
@@ -491,7 +569,7 @@
     var c=cfg(), plan=armarPlan(c);
     // se inserta después de la tarjeta de «Anota un movimiento»
     var cut=htmlBase.indexOf('<div class="fr-card"><h4>🏠 Personal');
-    var bloque=htmlPagos(c,plan)+htmlConsMes(c);
+    var bloque=htmlBolsa(c)+htmlPagos(c,plan)+htmlConsMes(c);
     return cut>0 ? htmlBase.slice(0,cut)+bloque+htmlBase.slice(cut) : htmlBase+bloque;
   };
 
@@ -541,11 +619,11 @@
     var hoyS=A.hoyLocal(), pc=pctDe(it.p), mixto=(it.cons>0&&it.monto>0);
     if(it.cons>0){
       if(typeof registros==='undefined'||typeof finGuardar!=='function'){ A.toast('No pude guardar en el Finanzas del consultorio'); return; }
-      var reg={id:Date.now(),tipo:'gasto',descripcion:it.p.nombre+(mixto?' ('+pc+'%)':''),fecha:hoyS,monto:it.cons,categoria:(it.p.categoria)||'Otro'};
+      var reg={id:Date.now(),tipo:'gasto',descripcion:it.p.nombre+(mixto?' ('+pc+'%)':''),fecha:hoyS,monto:it.cons,categoria:(it.p.categoria)||'Otro',desde:(c.gastoDesde||'nequi')};
       if(window.ROL_ACTUAL==='administrador' && typeof finEnviarARevision==='function') finEnviarARevision(reg); else { registros.push(reg); finGuardar(); try{ renderAll(); }catch(e){} }
     }
     if(it.monto>0){
-      var P=A.leerP(); P.push({id:String(Date.now()+1),fecha:hoyS,monto:it.monto,desc:it.p.nombre+(mixto?' ('+(100-pc)+'%)':''),medio:medio==='tarjeta'?'tarjeta':'efectivo'}); A.guardarP(P);
+      var P=A.leerP(); P.push({id:String(Date.now()+1),fecha:hoyS,monto:it.monto,desc:it.p.nombre+(mixto?' ('+(100-pc)+'%)':''),medio:medio==='tarjeta'?'tarjeta':(medio==='nequi'?'nequi':'efectivo')}); A.guardarP(P);
     }
     c.pagados[it.key]=true; sv(c); A.toast('✅ Pago anotado: '+it.p.nombre); A.repintar();
   }
@@ -555,6 +633,7 @@
     if(a==='pg-imp'){ E.imp=!E.imp; A.repintar(); }
     else if(a==='pg-impok'){ importar(); }
     else if(a==='pg-nq'){ var c3=cfg(), raw=val('pg-nq'); if(raw===''){ A.toast('Escribe cuánto tienes en el Nequi'); return; } c3.nequi={monto:num(raw),ts:Date.now(),dia:A.hoyLocal()}; sv(c3); A.toast('✅ Nequi actualizado'); A.repintar(); }
+    else if(a==='pg-gd'){ var c9=cfg(); c9.gastoDesde=b.getAttribute('data-v')||'nequi'; sv(c9); A.repintar(); }
     else if(a==='pg-cuentan'){ E.cuentaN=!E.cuentaN; A.repintar(); }
     else if(a==='pg-ya'){ var c2=cfg(), pl=armarPlan(c2), it2=pl.items[+b.getAttribute('data-i')]; if(it2){ c2.pagados[it2.key]=true; sv(c2); A.toast('Listo, lo quité sin anotar ningún gasto'); A.repintar(); } }
     else if(a==='pg-disp'){ var c1=cfg(), nd=num(val('pg-disp')); if(!nd&&val('pg-disp')===''){ A.toast('Escribe cuánto tienes hoy'); return; } c1.disp={monto:nd,ts:Date.now()}; sv(c1); A.toast('✅ Disponible actualizado'); A.repintar(); }
@@ -656,6 +735,9 @@
     if(typeof window.renderResumen==='function' && !window.renderResumen._c){
       var o=window.renderResumen; window.renderResumen=function(){ filtrando=true; try{ return o.apply(this,arguments); } finally{ filtrando=false; } }; window.renderResumen._c=1;
     }
+    if(typeof window.marcarComoPagado==='function' && !window.marcarComoPagado._c){
+      var mp=window.marcarComoPagado; window.marcarComoPagado=function(){ var id=(typeof reciboActual!=='undefined'&&reciboActual)?reciboActual.id:null; var r=mp.apply(this,arguments); try{ var x=registros.filter(function(q){return q.id===id;})[0]; if(x&&x.estado==='pagado'&&!x.pagadoTs){ x.pagadoTs=Date.now(); finGuardar(); renderAll(); } }catch(e){} return r; }; window.marcarComoPagado._c=1;
+    }
     if(typeof window.renderAll==='function' && !window.renderAll._c){
       var ra=window.renderAll; window.renderAll=function(){ var r=ra.apply(this,arguments); try{ barra(); }catch(e){} return r; }; window.renderAll._c=1;
     }
@@ -669,7 +751,14 @@
     else { h='<b>🧮 Cuentas desde siempre.</b> Hoy se suman todos los recibos del mes, incluso los de antes de organizarte.'
         +'<div style="margin-top:8px"><button class="btn primary" data-c="hoy">Empezar cuentas claras desde hoy</button></div>'; }
     b.innerHTML=h;
+    var bl=document.getElementById('fin-bolsa'); if(!bl){ bl=document.createElement('div'); bl.id='fin-bolsa'; nav.parentNode.insertBefore(bl,b); }
+    try{ bl.innerHTML=window._frBolsaHTML?window._frBolsaHTML():''; }catch(e){}
+    var si=document.getElementById('stat-ingresos'), sn=document.getElementById('stat-neta');
+    if(si&&si.previousElementSibling) si.previousElementSibling.textContent='Valor en recibos';
+    if(sn&&sn.previousElementSibling) sn.previousElementSibling.textContent='Recibos − gastos (no es plata disponible)';
   }
+  window._frBarra=barra;
+  (function(){ var st=document.createElement('style'), css=''; document.querySelectorAll('style').forEach(function(x){ if(!css&&x.textContent.indexOf('#fin-rapido .fr-card{')>=0) css=x.textContent; }); if(css){ st.textContent=css.split('#fin-rapido').join('#fin-bolsa'); document.head.appendChild(st); } })();
   document.addEventListener('click',function(e){
     var t=e.target.closest&&e.target.closest('#fin-corte [data-c]'); if(!t) return;
     var a=t.getAttribute('data-c');
