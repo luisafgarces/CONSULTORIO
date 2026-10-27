@@ -683,8 +683,8 @@
     re = /(?:^|[^0-9])(\d{1,2})[\/\-.](\d{1,2})[\/\-.](\d{2}|\d{4})(?![0-9])/g;
     while((m=re.exec(T))){ var d2=+m[1], mo2=+m[2]-1, y2=+m[3]; if(y2<100) y2+=2000; if(mo2<0||mo2>11) continue; if(!validaFecha(y2,mo2,d2)) continue; var i2=m.index+m[0].indexOf(m[1]); addF(i2, m[0].length-(i2-m.index), new Date(y2,mo2,d2), texto.substr(i2, m[0].length-(i2-m.index))); }
     // 2b) 2026-10-25
-    re = /(?:^|[^0-9])(\d{4})-(\d{2})-(\d{2})(?![0-9])/g;
-    while((m=re.exec(T))){ var y3=+m[1], mo3=+m[2]-1, d3=+m[3]; if(validaFecha(y3,mo3,d3)){ var i3=m.index+m[0].indexOf(m[1]); addF(i3, 10, new Date(y3,mo3,d3), texto.substr(i3,10)); } }
+    re = /(?:^|[^0-9])(\d{4})[-\/.](\d{1,2})[-\/.](\d{1,2})(?![0-9])/g;
+    while((m=re.exec(T))){ var y3=+m[1], mo3=+m[2]-1, d3=+m[3]; if(validaFecha(y3,mo3,d3)){ var i3=m.index+m[0].indexOf(m[1]); addF(i3, m[0].length-(i3-m.index), new Date(y3,mo3,d3), texto.substr(i3,m[0].length-(i3-m.index))); } }
     // 3) 25/10 (sin año) — se ignoran fracciones como 1/2
     re = /(?:^|[^0-9\/\-.])(\d{1,2})[\/\-](\d{1,2})(?![0-9\/\-.]\d)(?![0-9])/g;
     while((m=re.exec(T))){ var d4=+m[1], mo4=+m[2]-1; if(mo4<0||mo4>11||d4<1||d4>31) continue; if(+m[2]<=4 && +m[1]<+m[2]) continue; var f4=fechaSinAnio(mo4,d4,hoy); var i4=m.index+m[0].indexOf(m[1]); if(fechas.some(function(x){ return i4>=x.i && i4<x.fin; })) continue; addF(i4, m[0].length-(i4-m.index), f4, texto.substr(i4, m[0].length-(i4-m.index))); }
@@ -706,10 +706,10 @@
     while((m=re.exec(T))){ var ha=+m[1], hb=+m[3]; if(ha<1||ha>12||hb<1||hb>12) continue; var hb24=ap(hb,m[5]), ha24=ap(ha,m[5]); if(ha24*60+(m[2]?+m[2]:0) >= hb24*60+(m[4]?+m[4]:0)){ ha24=ap(ha, m[5]==='p'?'a':'p'); if(ha24*60+(m[2]?+m[2]:0) >= hb24*60+(m[4]?+m[4]:0)) continue; }
       var ir=m.index+m[0].indexOf(m[1]); var lr=m[0].length-(ir-m.index); horas.push({i:ir, fin:ir+lr, h:ha24, m:m[2]?+m[2]:0, hf:{h:hb24,m:m[4]?+m[4]:0}, txt:texto.substr(ir,lr)}); }
     // 3:30 p. m. | 3 pm | 3pm
-    re = /(?:^|[^0-9:])(\d{1,2})(?::([0-5]\d))?\s*(a|p)\.?\s?m\.?(?![a-z])/g;
+    re = /(?:^|[^0-9:])(\d{1,2})(?::([0-5]\d))?(?::[0-5]\d)?\s*(a|p)\.?\s?m\.?(?![a-z])/g;
     while((m=re.exec(T))){ var h1=+m[1]; if(h1<1||h1>12) continue; var i5=m.index+m[0].indexOf(m[1]); if(horas.some(function(x){ return i5>=x.i && i5<x.fin; })) continue; addH(i5, m[0].length-(i5-m.index), ap(h1,m[3]), m[2]?+m[2]:0, texto.substr(i5, m[0].length-(i5-m.index))); }
     // 15:30 (24 h) — solo si no quedó ya cubierto por un am/pm
-    re = /(?:^|[^0-9:])([01]?\d|2[0-3]):([0-5]\d)(?![0-9])(?!\s?(?:a|p)\.?\s?m)/g;
+    re = /(?:^|[^0-9:])([01]?\d|2[0-3]):([0-5]\d)(?::[0-5]\d)?(?![0-9])(?!\s?(?:a|p)\.?\s?m)/g;
     while((m=re.exec(T))){ var i6=m.index+m[0].indexOf(m[1]); if(horas.some(function(x){ return i6>=x.i && i6<x.fin; })) continue; addH(i6, m[1].length+1+2, +m[1], +m[2], texto.substr(i6, m[1].length+3)); }
     // 15h30 | 18h05
     re = /(?:^|[^0-9:])([01]?\d|2[0-3])h([0-5]\d)(?![0-9])/g;
@@ -758,7 +758,11 @@
   window.agxDetectarFechas = detectarFechas; window.agxEtiquetaFecha = etiquetaFecha;
 
   function tituloDe(texto){
-    var l=String(texto||'').replace(/[<>]/g,'').split(/\n/).map(function(x){ return x.replace(/\s+/g,' ').trim(); }).filter(Boolean)[0]||'';
+    var limpio=String(texto||'').replace(/[<>]/g,'');
+    // correos tipo «tu cita para MEDICO GENERAL, fue programada…» → «Cita medico general»
+    var c=/\bcita\s+(?:para|de|con)\s+([A-ZÁÉÍÓÚÑ][A-ZÁÉÍÓÚÑ ]{3,40}?)\s*(?:,|\.|\s+fue\b|\s+es\b|$)/.exec(limpio.replace(/\s+/g,' '));
+    if(c){ var e=c[1].trim().toLowerCase(); return 'Cita '+e; }
+    var l=limpio.split(/\n/).map(function(x){ return x.replace(/\s+/g,' ').trim(); }).filter(Boolean)[0]||'';
     return l.length>80 ? l.slice(0,77).replace(/\s+\S*$/,'')+'…' : l;
   }
   // abre el formulario de «Nuevo compromiso» ya rellenado; r puede ser null (solo texto)
@@ -805,4 +809,59 @@
     b.onclick=function(){ abrirVentana(); };
     var seg=tb.querySelector('.agg-seg'); if(seg) tb.insertBefore(b,seg); else tb.appendChild(b);
   };
+
+  // ---------- entrada por enlace: …/index.html?app=agenda&texto=…#agenda (para un Atajo del iPhone) ----------
+  (function(){
+    var q=null; try{ q=new URLSearchParams(location.search).get('texto'); }catch(e){}
+    if(!q || !q.trim()) return;
+    try{ var nueva=location.search.replace(/([?&])texto=[^&]*&?/,'$1').replace(/[?&]$/,''); history.replaceState(null,'',location.pathname+nueva+location.hash); }catch(e){}
+    var intentos=0, iv=setInterval(function(){
+      intentos++;
+      var lo=$('login-overlay'), listo=(!lo || getComputedStyle(lo).display==='none');
+      if(listo && typeof goPage==='function' && $('ag-container')){
+        clearInterval(iv);
+        try{ goPage('agenda'); var tb=document.querySelector('.ag-tab[data-tab="horario"]'); if(tb && typeof agSwitchTab==='function') agSwitchTab('horario',tb); }catch(e){}
+        setTimeout(function(){ abrirVentana(q.slice(0,4000)); },400);
+      }
+      if(intentos>240) clearInterval(iv);
+    },500);
+  })();
+
+  /* ===== 📅 Pasar una cita del consultorio a Google Calendar (con iniciales, sin datos clínicos) =====
+     Abre Google Calendar con la cita ya llenada; allí das un toque en «Agregar videoconferencia de Google Meet». */
+  (function(){
+    function p2(n){ return ('0'+n).slice(-2); }
+    function gcal(s){ var m=/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/.exec(String(s||'')); return m? m[1]+m[2]+m[3]+'T'+m[4]+m[5]+'00' : null; }
+    function mas(s,min){ var m=/^(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2})/.exec(String(s||'')); if(!m) return null; var d=new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5]+min); return ''+d.getFullYear()+p2(d.getMonth()+1)+p2(d.getDate())+'T'+p2(d.getHours())+p2(d.getMinutes())+'00'; }
+    function iniciales(n){ return String(n||'').replace(/[^A-Za-zÁÉÍÓÚÜÑáéíóúüñ\s]/g,' ').split(/\s+/).filter(function(w){return w.length>0;}).map(function(w){ return w.charAt(0).toUpperCase()+'.'; }).join(''); }
+    function tituloSeguro(e){
+      var t=String(e.titulo||'').trim(), m=/^(.*?)\s[-–—]\s(.+)$/.exec(t), pref, nom;
+      if(m){ pref=m[1].trim()||'Sesión'; nom=m[2]; }
+      else if(/sesi[oó]n/i.test(t)){ return t.replace(/[<>]/g,''); }
+      else { pref='Sesión'; nom=t; }
+      var ini=iniciales(nom); return (pref+(ini?' – '+ini:'')).replace(/[<>]/g,'');
+    }
+    window.agxGoogleCalUrl=function(e){
+      var ini=gcal(e.inicio); if(!ini) return null; var fin=gcal(e.fin); if(!fin||fin<=ini) fin=mas(e.inicio,50);
+      var virt=(e.tipo==='virtual');
+      var tit=tituloSeguro(e)+(virt?' (virtual)':'');
+      var det=virt?'Sesión virtual. Agrega el link con «Agregar videoconferencia de Google Meet».':'Sesión presencial.';
+      return 'https://calendar.google.com/calendar/render?action=TEMPLATE&text='+encodeURIComponent(tit)+'&dates='+ini+'/'+fin+'&ctz=America%2FBogota&details='+encodeURIComponent(det);
+    };
+    var oEd=window.agEditarEvento; if(typeof oEd!=='function' || oEd._gcal) return;
+    window.agEditarEvento=function(id){
+      var r=oEd.apply(this, arguments);
+      try{
+        var ov=document.getElementById('ag-edit-overlay'), row=ov && ov.querySelector('.btn-row'); if(!row) return r;
+        var e=(window.agEventos||[]).filter(function(x){return x.id===id;})[0];
+        var b=document.getElementById('agx-gcal-btn');
+        if(!b){ b=document.createElement('button'); b.type='button'; b.id='agx-gcal-btn'; b.className='btn'; b.textContent='📅 Pasar a Google Calendar'; row.insertBefore(b, row.firstChild.nextSibling); }
+        var ok=!!(e && e.tipo!=='admin' && (!e.calendario||e.calendario==='consultorio') && e.inicio);
+        b.style.display=ok?'':'none';
+        b.onclick=function(){ var u=ok&&window.agxGoogleCalUrl(e); if(!u){ if(typeof toast==='function') toast('No pude armar el enlace de esta cita'); return; } window.open(u,'_blank','noopener'); };
+      }catch(err){}
+      return r;
+    };
+    window.agEditarEvento._gcal=true;
+  })();
 })();
