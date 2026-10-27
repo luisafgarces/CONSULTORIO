@@ -100,12 +100,13 @@
   function diaYmd(off){ var d=new Date(); d.setDate(d.getDate()+off); return ymd(d); }
   function fechaElegida(){ var f=$('fr-fecha'); var v=(f&&f.value)||estado.fecha||''; return /^\d{4}-\d{2}-\d{2}$/.test(v)?v:hoyLocal(); }
   function pintar(){
-    var c=$('fin-rapido'); if(!c) return; var cats=catsConsultorio(), ing=(estado.tipo==='ingreso');
+    var c=$('fin-rapido'); if(!c) return; var cats=catsConsultorio(), ing=(estado.tipo==='ingreso'), keepC=($('fr-concepto')||{}).value||'';
     if(!ult.cat || cats.indexOf(ult.cat)<0) ult.cat=cats[cats.length-1];
     var P=leerP(), hoy=new Date(), mes=mesDe(ymd(hoy)), l0=ymd(lunesDe(hoy));
     var h='<div class="fr-card"><h4>⚡ Anota un movimiento</h4>'
       +'<div class="fr-chips" style="margin-top:0"><button class="fr-chip'+(!ing?' on':'')+'" data-a="tipo" data-v="gasto">💸 Gasto</button><button class="fr-chip'+(ing?' on':'')+'" data-a="tipo" data-v="ingreso">💰 Ingreso personal</button></div>'
       +'<div class="fr-lin" style="margin-top:10px"><input type="text" id="fr-linea" placeholder="'+(ing?'Ej.: 1718861 nómina':'Ej.: 25000 papelería')+'" autocomplete="off" enterkeyhint="done"><button class="fr-go" data-a="guardar">Guardar</button></div>'
+      +'<input type="text" id="fr-concepto" maxlength="80" placeholder="'+(ing?'¿De qué fue? (opcional) Ej.: nómina, clase':'¿En qué fue? (opcional) Ej.: mercado, taxi')+'" autocomplete="off" enterkeyhint="done" style="margin-top:8px">'
       +'<div class="fr-prev" id="fr-prev"></div>'
       +'<div class="fr-chips" style="margin:2px 0 0"><button class="fr-chip'+(!estado.fecha&&!estado.otraFecha?' on':'')+'" data-a="fecha" data-v="hoy" style="min-height:38px;font-size:.82rem">📅 Hoy</button><button class="fr-chip'+(estado.fecha===diaYmd(-1)?' on':'')+'" data-a="fecha" data-v="ayer" style="min-height:38px;font-size:.82rem">Ayer</button><button class="fr-chip'+(estado.otraFecha?' on':'')+'" data-a="fecha" data-v="otra" style="min-height:38px;font-size:.82rem">Otra fecha</button>'
       +(estado.otraFecha?'<input type="date" id="fr-fecha" value="'+esc(estado.fecha||hoyLocal())+'" max="'+hoyLocal()+'" style="font-size:16px;padding:8px;border:1.5px solid #f0d8de;border-radius:12px">':'')+'</div>';
@@ -128,16 +129,16 @@
       +'<div class="fr-card"><button class="fr-chip" data-a="verAnio" style="width:100%">📊 Mi año '+(estado.abierto?'▴':'▾')+'</button>'+(estado.abierto?'<div style="margin-top:10px">'+htmlAnio()+'</div>':'')+'</div>'
       +'<div class="fr-sub" style="margin:0 2px 10px">Los gastos del consultorio los ves también en <b>Resumen</b> e <b>Historial</b>, como siempre.</div>';
     if(typeof window._frPagosHTML==='function'){ try{ h=window._frPagosHTML(h); }catch(e){ console.warn('[pagos]',e); } }
-    c.innerHTML=h;
+    c.innerHTML=h; var kc=$('fr-concepto'); if(kc&&keepC) kc.value=keepC;
   }
   function preview(){
-    var v=$('fr-linea'), p=$('fr-prev'); if(!v||!p) return; var r=leerLinea(v.value);
-    p.textContent = r ? '→ '+pesos(r.monto)+(r.desc?' · '+r.desc:'') : (v.value.trim()?'Escribe también el monto, por ejemplo «25000 papelería».':'');
+    var v=$('fr-linea'), p=$('fr-prev'); if(!v||!p) return; var r=leerLinea(v.value), cn=(($('fr-concepto')||{}).value||'').trim();
+    p.textContent = r ? '→ '+pesos(r.monto)+((cn||r.desc)?' · '+(cn||r.desc):'') : (v.value.trim()?'Escribe también el monto, por ejemplo «25000 papelería».':'');
   }
   function guardar(){
     var v=$('fr-linea'); if(!v) return; var r=leerLinea(v.value), ing=(estado.tipo==='ingreso');
     if(!r){ toastS('Escribe el monto, por ejemplo: '+(ing?'1718861 nómina':'25000 papelería')); return; }
-    var desc=r.desc||(ing?'Ingreso':'Gasto'), fecha=fechaElegida();
+    var cpt=(($('fr-concepto')||{}).value||'').replace(/[<>]/g,'').trim().slice(0,80), desc=cpt||r.desc||(ing?'Ingreso':'Gasto'), fecha=fechaElegida();
     if(ing){
       var PI=leerP(); PI.push({id:String(Date.now()),tipo:'ingreso',fecha:fecha,monto:r.monto,desc:desc}); guardarP(PI);
       toastS('✅ Ingreso guardado: '+pesos(r.monto));
@@ -156,7 +157,7 @@
         toastS('✅ Guardado: '+pesos(r.monto));
       }
     }
-    v.value=''; estado.fecha=''; estado.otraFecha=false; pintar(); var n=$('fr-linea'); if(n) n.focus();
+    v.value=''; var kcl=$('fr-concepto'); if(kcl) kcl.value=''; estado.fecha=''; estado.otraFecha=false; pintar(); var n=$('fr-linea'); if(n) n.focus();
   }
   function clic(e){
     var b=e.target.closest&&e.target.closest('[data-a]'); if(!b||!$('fin-rapido')||!$('fin-rapido').contains(b)) return;
@@ -194,9 +195,9 @@
       if(d){ var g=window._frUndo; if(g){ var P=leerP(); P.push(g); guardarP(P); window._frUndo=null; pintar(); toastS('Listo, lo recuperé'); } return; }
       clic(e);
     });
-    s.addEventListener('input',function(e){ if(e.target&&e.target.id==='fr-linea') preview(); });
+    s.addEventListener('input',function(e){ if(e.target&&(e.target.id==='fr-linea'||e.target.id==='fr-concepto')) preview(); });
     s.addEventListener('change',function(e){ if(e.target&&e.target.id==='fr-fecha') estado.fecha=e.target.value||''; });
-    s.addEventListener('keydown',function(e){ if(e.key==='Enter'&&e.target&&e.target.id==='fr-linea'){ e.preventDefault(); guardar(); } });
+    s.addEventListener('keydown',function(e){ if(e.key==='Enter'&&e.target&&(e.target.id==='fr-linea'||e.target.id==='fr-concepto')){ e.preventDefault(); guardar(); } });
     var ref=$('fin-resumen'); if(ref&&ref.parentNode) ref.parentNode.insertBefore(s,ref); else pg.appendChild(s);
     window.agxGastoRapido=function(){ if(typeof goPage==='function') goPage('finanzas'); b.click(); };
   }
@@ -277,9 +278,10 @@
   // ---- lo que ya registraste desde que escribiste «cuánto tienes hoy» / «cuánto debes» ----
   function estadoActual(c){
     var P=A.leerP(), t=c.tarjeta, tsC=+c.disp.ts||0, tsT=+t.deboTs||0, hoy=hoy0();
-    var cash=(+c.disp.monto||0);
-    P.forEach(function(g){ var id=+g.id||0; if(id<=tsC) return;
-      if(g.tipo==='ingreso') cash+=(+g.monto||0); else if(g.tipo==='pagotarjeta') cash-=(+g.monto||0); else if(g.medio!=='tarjeta') cash-=(+g.monto||0); });
+    var cash=(+c.disp.monto||0), movs=[];
+    P.forEach(function(g){ var id=+g.id||0; if(id<=tsC) return; var d=0;
+      if(g.tipo==='ingreso') d=(+g.monto||0); else if(g.tipo==='pagotarjeta') d=-(+g.monto||0); else if(g.medio!=='tarjeta') d=-(+g.monto||0);
+      if(d){ cash+=d; movs.push({f:g.fecha,t:g.desc||(g.tipo==='ingreso'?'Ingreso':g.tipo==='pagotarjeta'?'Pago de la tarjeta':'Gasto'),d:d}); } });
     var stm={}, pagosT=0;
     function suma(k,v){ stm[k]=(stm[k]||0)+v; }
     if(tarjetaOK(t) && +t.debo>0) suma(yy(proxPago(hoy,t)), +t.debo);
@@ -288,7 +290,23 @@
       else if(g.medio==='tarjeta' && g.tipo!=='ingreso' && tarjetaOK(t)){ var f=parseY(g.fecha)||hoy; suma(yy(vence(f,t)), +g.monto||0); } });
     var ks=Object.keys(stm).sort(), resto=pagosT; ks.forEach(function(k){ var q=Math.min(stm[k],resto); stm[k]-=q; resto-=q; }); // los pagos se aplican al más antiguo
     var debe=0; ks.forEach(function(k){ debe+=stm[k]; }); if(resto>0) debe=Math.max(0,debe-resto);
-    return {cash:cash, stm:stm, debe:debe, cupoLibre:(+t.cupo||0)-debe, hayDisp: c.disp.monto!=null && c.disp.monto!=='' };
+    return {cash:cash, movs:movs, stm:stm, debe:debe, cupoLibre:(+t.cupo||0)-debe, hayDisp: c.disp.monto!=null && c.disp.monto!=='' };
+  }
+
+
+  // ---- Nequi del consultorio: tu saldo + recibos pagados por Nequi − gastos del consultorio, desde que lo escribiste ----
+  function nqBase(c){ return c.nequi&&c.nequi.monto!=null&&c.nequi.monto!==''; }
+  function estadoNequi(c){
+    var q=c.nequi||{}, has=nqBase(c), saldo=+q.monto||0, movs=[], ts=+q.ts||0, dia=q.dia||'';
+    if(has && typeof registros!=='undefined' && Array.isArray(registros)){
+      registros.forEach(function(r){
+        var nuevo = (+r.id>1e12) ? (+r.id>ts) : (String(r.fecha||'')>dia);
+        if(!nuevo) return;
+        if(r.tipo==='ingreso' && r.estado==='pagado' && r.metodo==='nequi'){ saldo+=(+r.monto||0); movs.push({f:r.fecha,t:'Recibo: '+(r.paciente||'paciente'),d:+r.monto||0}); }
+        else if(r.tipo==='gasto'){ saldo-=(+r.monto||0); movs.push({f:r.fecha,t:r.descripcion||'Gasto del consultorio',d:-(+r.monto||0)}); }
+      });
+    }
+    return {has:has, base:+q.monto||0, saldo:saldo, movs:movs};
   }
 
   // ---- plan: pagos de los próximos 30 días (y los que quedaron atrasados) con sugerencia ----
@@ -368,11 +386,18 @@
     var h='<div class="fr-card"><h4>📅 Pagos por hacer</h4>', t=c.tarjeta; h+=htmlNom(c,'pg-nmv');
     if(!plan.listo) h+='<div class="fr-sub" style="margin-bottom:8px">Para que te diga con qué pagar, cuéntame <b>cuánto tienes hoy</b> y los datos de tu tarjeta en «⚙️ Mis números».</div>';
     else {
-      h+='<div class="fr-sub">💵 Con lo que anotaste tienes hoy <b>'+pesos(plan.est.cash)+'</b></div>';
+      h+='<div class="fr-sub">💵 Con lo que anotaste tienes hoy <b>'+pesos(plan.est.cash)+'</b> <button class="fr-x" data-a="pg-cuenta">'+(E.cuenta?'ocultar cuenta':'¿cómo salió?')+'</button></div>';
+      if(E.cuenta){ h+='<div class="fr-cfg" style="margin-top:4px"><div class="fr-sub">Partiste de <b>'+pesos(+c.disp.monto||0)+'</b> (lo que escribiste en «Disponible hoy»). Desde entonces:</div>'+(plan.est.movs.length?plan.est.movs.map(function(m){ return '<div class="fr-it"><div><b>'+esc(m.t)+'</b><div class="fr-sub">'+esc(m.f||'')+'</div></div><b>'+(m.d>0?'+':'−')+pesos(Math.abs(m.d))+'</b></div>'; }).join(''):'<div class="fr-sub">no has registrado movimientos con tu plata.</div>')+'<div class="fr-sub">Si tu saldo real es otro, escríbelo en «⚙️ Mis números» → «Disponible hoy» y toca «Actualizar solo esto».</div></div>'; }
+      if(+t.cupo>0 && +t.debo>+t.cupo) h+='<div class="fr-aviso">💳 Revisa la tarjeta: dice que debes más que el cupo. El <b>cupo</b> es el total de la tarjeta (por ejemplo 1.000.000), no lo que te queda disponible.</div>';
+      else if(+t.cupo>0 && !(+t.corte>=1)) h+='<div class="fr-aviso">💳 Falta el <b>día de corte</b> de la tarjeta (míralo en la app del banco). Sin él no te puedo decir qué conviene pagar con tarjeta.</div>';
       if(tarjetaOK(t)){ var ks=Object.keys(plan.est.stm).filter(function(k){return plan.est.stm[k]>0;}).sort(), prox=ks[0];
         h+='<div class="fr-sub">💳 Debes <b>'+pesos(plan.est.debe)+'</b> · cupo libre '+pesos(Math.max(0,plan.est.cupoLibre))+(prox?' · próximo pago '+lab(parseY(prox))+' ('+pesos(plan.est.stm[prox])+')':'')+'</div>'; }
       if(plan.aviso) h+='<div class="fr-aviso">⚠️ Según lo que registraste, el <b>'+lab(plan.aviso.f)+'</b> te faltarían <b>'+pesos(plan.aviso.falta)+'</b>. Hay tiempo de revisarlo; por ahora es solo un aviso.</div>';
     }
+    var nq=estadoNequi(c), accNq=0;
+    if(nq.has){ h+='<div class="fr-sub">🏥 Nequi del consultorio: <b>'+pesos(nq.saldo)+'</b> <button class="fr-x" data-a="pg-cuentan">'+(E.cuentaN?'ocultar cuenta':'¿cómo salió?')+'</button></div>';
+      if(E.cuentaN){ h+='<div class="fr-cfg" style="margin-top:4px"><div class="fr-sub">Partiste de <b>'+pesos(nq.base)+'</b>. Desde entonces:</div>'+(nq.movs.length?nq.movs.map(function(m){ return '<div class="fr-it"><div><b>'+esc(m.t)+'</b><div class="fr-sub">'+esc(m.f||'')+'</div></div><b>'+(m.d>0?'+':'−')+pesos(Math.abs(m.d))+'</b></div>'; }).join(''):'<div class="fr-sub">no hay movimientos nuevos.</div>')+'<div class="fr-sub">Suma los recibos pagados por Nequi y resta los gastos del consultorio. Si tu saldo real es otro, actualízalo en «⚙️ Mis números».</div></div>'; } }
+    else h+='<div class="fr-sub">🏥 Agrega lo que tienes en el Nequi del consultorio en «⚙️ Mis números».</div>';
     if(E.pagandoTarjeta){ var sug=plan.est.stm?Math.max(0,plan.est.debe):0; h+='<div class="fr-row"><input type="text" id="pg-pt" inputmode="numeric" value="'+(sug||'')+'" placeholder="Monto que pagaste"><button class="fr-go" data-a="pg-ptok">Guardar pago</button></div>'; }
     else if(tarjetaOK(t)) h+='<div class="fr-chips" style="margin:6px 0 0">'+chip('pg-pt','💳 Pagué la tarjeta')+'</div>';
     h+='<div style="margin-top:10px">';
@@ -384,7 +409,8 @@
         if(it.tarj && sug==='?') h+='<div class="fr-sub">Puede ir en tarjeta. Completa «Mis números» para saber si conviene.</div>';
         else if(plan.listo) h+='<div class="fr-sug">'+(sug==='tarjeta'?'💳 Ponlo en la tarjeta':'💵 Págalo con tu plata')+'</div>'+(it.motivo?'<div class="fr-sub">'+esc(it.motivo)+'</div>':'');
         h+='<div class="fr-chips" style="margin:6px 0 0"><button class="fr-chip'+(sug==='tarjeta'?' on':'')+'" data-a="pg-pagar" data-i="'+i+'" data-m="tarjeta" style="min-height:40px;font-size:.82rem"'+(tarjetaOK(t)&&it.p.tarjeta?'':' disabled')+'>✓ Pagué con 💳</button><button class="fr-chip'+(sug==='efectivo'?' on':'')+'" data-a="pg-pagar" data-i="'+i+'" data-m="efectivo" style="min-height:40px;font-size:.82rem">✓ Pagué con 💵</button></div>';
-      } else h+='<div class="fr-chips" style="margin:6px 0 0"><button class="fr-chip" data-a="pg-pagar" data-i="'+i+'" data-m="consultorio" style="min-height:40px;font-size:.82rem">✓ Pagado</button></div>';
+      } else { accNq+=it.monto; if(nq.has) h+='<div class="fr-sug">'+(accNq<=nq.saldo?'🏥 Alcanza con el Nequi del consultorio':'⚠️ El Nequi del consultorio no alcanza')+'</div>'+(accNq<=nq.saldo?'':'<div class="fr-sub">Tienes '+pesos(nq.saldo)+' y con este pago faltarían '+pesos(accNq-nq.saldo)+'.</div>'); h+='<div class="fr-chips" style="margin:6px 0 0"><button class="fr-chip" data-a="pg-pagar" data-i="'+i+'" data-m="consultorio" style="min-height:40px;font-size:.82rem">✓ Pagado</button></div>'; }
+      if(it.atrasado) h+='<div class="fr-chips" style="margin:6px 0 0"><button class="fr-chip" data-a="pg-ya" data-i="'+i+'" style="min-height:40px;font-size:.8rem">Ya lo había pagado (solo quitarlo)</button></div>';
       h+='</div>';
     });
     h+='</div><div class="fr-chips" style="margin-top:8px">'+chip('pg-todos','📋 Todos mis pagos fijos ('+c.pagos.length+') '+(E.todos?'▴':'▾'))+chip('pg-cfg','⚙️ Mis números '+(E.cfg?'▴':'▾'))+'</div>';
@@ -411,7 +437,8 @@
   function inp(id,lbl,val,ph,extra){ return '<div class="fr-f"><label>'+lbl+'</label><input type="text" id="'+id+'" value="'+esc(val==null?'':val)+'" placeholder="'+esc(ph||'')+'" inputmode="'+(extra||'numeric')+'"></div>'; }
   function htmlCfg(c){
     var t=c.tarjeta, n=c.nomina, d=c.disp, cats=A.catsConsultorio();
-    var h='<div class="fr-cfg"><div class="fr-sub"><b>💵 Cuánto tienes hoy</b> (en tu cuenta, sin contar la tarjeta; actualízalo cuando quieras)</div>'+inp('pg-disp','Disponible hoy',d.monto,'Ej.: 400000')
+    var h='<div class="fr-cfg"><div class="fr-sub"><b>💵 Cuánto tienes hoy</b> (en tu cuenta, sin contar la tarjeta; actualízalo cuando quieras)</div>'+inp('pg-disp','Disponible hoy',d.monto,'Ej.: 400000')+'<button class="fr-chip" data-a="pg-disp" style="min-height:40px;font-size:.84rem">Actualizar solo esto (ya revisé mi saldo)</button>'
+      +'<div class="fr-sub" style="margin-top:8px"><b>🏥 Nequi del consultorio</b> (donde te entra lo de las consultas)</div>'+inp('pg-nq','Lo que tienes hoy en ese Nequi',c.nequi&&c.nequi.monto!=null?c.nequi.monto:'','Ej.: 150000')+'<button class="fr-chip" data-a="pg-nq" style="min-height:40px;font-size:.84rem">Actualizar el Nequi</button>'
       +'<div class="fr-sub" style="margin-top:8px"><b>💳 Tarjeta de crédito</b> (siempre a una cuota)</div>'+inp('pg-cupo','Cupo',t.cupo,'Ej.: 1000000')+'<div class="fr-2">'+inp('pg-corte','Día de corte',t.corte,'Ej.: 10')+inp('pg-pago','Día de pago',t.pago,'Ej.: 25')+'</div>'+inp('pg-debo','Cuánto debes hoy en la tarjeta (0 si nada)',t.debo,'Ej.: 0')
       +'<div class="fr-sub" style="margin-top:8px"><b>💰 Tu nómina</b></div>'+inp('pg-nm','Monto de cada pago',n.monto,'Ej.: 1718861')+inp('pg-nd','Días del mes en que te llega',(n.dias||[]).join(', '),'Ej.: 15, 30','text')
       +'<div class="fr-chips"><button class="fr-go" data-a="pg-guardar">Guardar mis números</button></div>'
@@ -473,7 +500,12 @@
   document.addEventListener('click',function(e){
     var b=e.target.closest&&e.target.closest('[data-a^="pg-"]'); var root=document.getElementById('fin-rapido'); var fl0=document.getElementById('fr-nom-flot'); if(!b||!((root&&root.contains(b))||(fl0&&fl0.contains(b)))) return;
     var a=b.getAttribute('data-a');
-    if(a==='pg-editar'){ var c0=cfg(), q=c0.pagos.filter(function(x){return String(x.id)===b.getAttribute('data-id');})[0]; if(q){ E.edit=q.id; E.pnFrec=q.frec==='unico'?'unico':'mensual'; E.pnDonde=q.donde==='consultorio'?'consultorio':'personal'; E.cfg=true; A.repintar(); var fm=document.getElementById('pn-form'); if(fm&&fm.scrollIntoView) fm.scrollIntoView({block:'center'}); } }
+    if(a==='pg-nq'){ var c3=cfg(), raw=val('pg-nq'); if(raw===''){ A.toast('Escribe cuánto tienes en el Nequi'); return; } c3.nequi={monto:num(raw),ts:Date.now(),dia:A.hoyLocal()}; sv(c3); A.toast('✅ Nequi actualizado'); A.repintar(); }
+    else if(a==='pg-cuentan'){ E.cuentaN=!E.cuentaN; A.repintar(); }
+    else if(a==='pg-ya'){ var c2=cfg(), pl=armarPlan(c2), it2=pl.items[+b.getAttribute('data-i')]; if(it2){ c2.pagados[it2.key]=true; sv(c2); A.toast('Listo, lo quité sin anotar ningún gasto'); A.repintar(); } }
+    else if(a==='pg-disp'){ var c1=cfg(), nd=num(val('pg-disp')); if(!nd&&val('pg-disp')===''){ A.toast('Escribe cuánto tienes hoy'); return; } c1.disp={monto:nd,ts:Date.now()}; sv(c1); A.toast('✅ Disponible actualizado'); A.repintar(); }
+    else if(a==='pg-cuenta'){ E.cuenta=!E.cuenta; A.repintar(); }
+    else if(a==='pg-editar'){ var c0=cfg(), q=c0.pagos.filter(function(x){return String(x.id)===b.getAttribute('data-id');})[0]; if(q){ E.edit=q.id; E.pnFrec=q.frec==='unico'?'unico':'mensual'; E.pnDonde=q.donde==='consultorio'?'consultorio':'personal'; E.cfg=true; A.repintar(); var fm=document.getElementById('pn-form'); if(fm&&fm.scrollIntoView) fm.scrollIntoView({block:'center'}); } }
     else if(a==='pg-cancelar'){ E.edit=null; E.pnFrec='mensual'; E.pnDonde='personal'; A.repintar(); }
     else if(a==='pg-todos'){ E.todos=!E.todos; A.repintar(); }
     else if(a==='pg-nomsi'){ nomSi(b.getAttribute('data-k'),b.getAttribute('data-inp')); }
