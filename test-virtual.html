@@ -260,6 +260,9 @@
     <div class="icono">✅</div>
     <h2>¡Listo, gracias!</h2>
     <p>Tus respuestas fueron enviadas correctamente.<br>Tu psicóloga las revisará pronto.</p>
+    <div id="crisis-extra" hidden style="margin-top:14px;background:#fdecea;border:1.5px solid #e57373;border-radius:12px;padding:12px 14px;font-size:0.88rem;color:#7a2f2f;text-align:left;line-height:1.5">
+      <strong>Gracias por contestar con sinceridad.</strong> Si en este momento estás en peligro o sientes que puedes hacerte daño, no esperes: llama ahora a la <strong>línea 106</strong> (Colombia), a la <strong>línea 123</strong> o ve a urgencias. Si puedes, avisa a una persona de confianza para que te acompañe.
+    </div>
     <p style="margin-top:14px;font-size:0.82rem">Si en algún momento sientes que estás en peligro o piensas en hacerte daño, llama a la <strong>línea 106</strong> o ve a urgencias.</p>
   </div>
 
@@ -329,7 +332,9 @@ function renderEscala(escala){
 
     const num = document.createElement("div");
     num.className = "num";
-    num.textContent = `Pregunta ${idx + 1} de ${escala.preguntas.length}`;
+    num.textContent = pregunta.etiqueta ? pregunta.etiqueta : `Pregunta ${idx + 1} de ${escala.preguntas.length}`;
+    div.dataset.preguntaId = pregunta.id;
+    if (pregunta.solo_si){ div.hidden = true; }
     div.appendChild(num);
 
     const texto = document.createElement("div");
@@ -349,12 +354,13 @@ function renderEscala(escala){
       input.type = "radio";
       input.name = pregunta.id;
       input.value = opcion.valor;
-      input.required = true;
+      input.required = !pregunta.solo_si;
 
       input.addEventListener("change", () => {
         respuestas[pregunta.id] = opcion.valor;
         opcionesDiv.querySelectorAll(".opcion").forEach(o => o.classList.remove("selected"));
         label.classList.add("selected");
+        actualizarVisibilidad(escala);
         actualizarBotonEnviar(escala);
       });
 
@@ -371,8 +377,34 @@ function renderEscala(escala){
   });
 }
 
+// Preguntas condicionales ("solo_si"): se muestran solo si la respuesta previa coincide.
+function preguntaVisible(p){
+  return !p.solo_si || respuestas[p.solo_si.pregunta_id] === p.solo_si.valor;
+}
+
+function actualizarVisibilidad(escala){
+  // Se repite hasta estabilizar, por si una pregunta oculta condiciona a otra
+  for (let vuelta = 0; vuelta < 3; vuelta++){
+    escala.preguntas.forEach(p => {
+      if (!p.solo_si) return;
+      const div = document.querySelector(`.pregunta[data-pregunta-id="${p.id}"]`);
+      if (!div) return;
+      const visible = preguntaVisible(p);
+      div.hidden = !visible;
+      div.querySelectorAll("input[type=radio]").forEach(i => {
+        i.required = visible;
+        if (!visible) i.checked = false;
+      });
+      if (!visible){
+        delete respuestas[p.id];
+        div.querySelectorAll(".opcion").forEach(o => o.classList.remove("selected"));
+      }
+    });
+  }
+}
+
 function actualizarBotonEnviar(escala){
-  const todasRespondidas = escala.preguntas.every(p => respuestas[p.id] !== undefined);
+  const todasRespondidas = escala.preguntas.filter(preguntaVisible).every(p => respuestas[p.id] !== undefined);
   document.getElementById("btn-enviar").disabled = !todasRespondidas;
 }
 
@@ -509,6 +541,38 @@ function calificar(escala, respuestas){
     resultado.interpretacion = `${resultadoCategorico} (TEPT: ${puntajeTEPT}/24, AAO: ${puntajeAAO}/24)`;
   }
 
+  if (cal.tipo === "cssrs"){
+    // Pesquisa C-SSRS (pauta de triage, versión Chile). Sí=1. p3-p5 solo se preguntan si p2=Sí.
+    const sí = id => respuestas[id] === 1;
+    const p6 = sí("p6"), p6_3m = p6 && sí("p6b");
+    let nivel, valor, texto, accion;
+    if (sí("p4") || sí("p5") || p6_3m){
+      nivel = "alto"; valor = 3;
+      texto = "RIESGO ALTO (ítem 4 o 5, o conducta suicida en los últimos 3 meses)";
+      accion = "Contactar hoy a la paciente. Evaluación presencial dentro de las 24 horas y derivación a evaluación integral de salud mental; si el riesgo es severo, urgencias.";
+    } else if (sí("p3") || (p6 && !p6_3m)){
+      nivel = "moderado"; valor = 2;
+      texto = "RIESGO MODERADO (ítem 3, o conducta suicida hace más de 3 meses)";
+      accion = "Cita presencial lo antes posible y considerar medidas de precaución.";
+    } else if (sí("p1") || sí("p2")){
+      nivel = "bajo"; valor = 1;
+      texto = "RIESGO BAJO (ítem 1 o 2)";
+      accion = "Derivar a evaluación en salud mental y formular el riesgo en la próxima sesión.";
+    } else {
+      nivel = "sin_ideacion"; valor = 0;
+      texto = "Sin ideación ni conducta suicida referida en esta pesquisa";
+      accion = "Sin acciones de triage; mantener la observación clínica.";
+    }
+    resultado.puntaje_total = valor;
+    resultado.interpretacion = texto;
+    resultado.detalle = { nivel: nivel, accion: accion, p6_ultimos_3_meses: p6_3m };
+    if (valor >= 1){
+      resultado.alertas_activadas.push(
+        (valor === 3 ? "🚨 " : "") + "C-SSRS: " + texto + ". " + accion
+      );
+    }
+  }
+
   if (cal.alertas){
     cal.alertas.forEach(alerta => {
       const valor = respuestas[alerta.pregunta_id];
@@ -601,6 +665,9 @@ async function init(){
       });
 
       document.getElementById("form-test").hidden = true;
+      if (escala.calificacion && escala.calificacion.tipo === "cssrs"){
+        document.getElementById("crisis-extra").hidden = false;
+      }
       document.getElementById("pantalla-final").hidden = false;
     }catch(e){
       console.warn("Error guardando resultado:", e);

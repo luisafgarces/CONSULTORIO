@@ -40,7 +40,8 @@ Suite Clínica (PHQ-9/GAD-7) o los baremos/algoritmos oficiales del resto.</p>
 <p>Después de correrla una vez, puedes archivar este archivo (no se necesita
 de nuevo, salvo que quieras agregar otra escala con este método).</p>
 
-<button id="btn-msibpd" onclick="cargarSoloMSIBPD()">Cargar solo el MSI-BPD (nuevo)</button>
+<button id="btn-cssrs" onclick="cargarSoloCSSRS()">Cargar solo el C-SSRS (nuevo)</button>
+<button id="btn-msibpd" onclick="cargarSoloMSIBPD()">Cargar solo el MSI-BPD</button>
 <p style="font-size:.85rem">O, si prefieres recargar todas las escalas (vuelve a escribir las 6, es seguro):</p>
 <button id="btn-cargar" onclick="cargarEscalas()">Cargar todas las escalas en Firestore</button>
 
@@ -533,6 +534,39 @@ const ESCALA_MSIBPD = {
   }
 };
 
+const ESCALA_CSSRS = {
+  id: "cssrs",
+  nombre: "C-SSRS · Escala de Severidad Suicida (pesquisa)",
+  descripcion: "Responde Sí o No. Las preguntas 1 a 5 se refieren al último mes; la 6, a cualquier momento de tu vida. No hay respuestas correctas o incorrectas. Si ahora mismo estás en peligro o piensas en hacerte daño, no esperes a que tu psicóloga lea esto: llama a la línea 106 (Colombia), a la 123 o ve a urgencias.",
+  opciones_respuesta: [ { texto: "Sí", valor: 1 }, { texto: "No", valor: 0 } ],
+  preguntas: [
+    { id: "p1", etiqueta: "Pregunta 1", texto: "En el último mes: ¿Has deseado estar muerto(a) o poder dormirte y no despertar?" },
+    { id: "p2", etiqueta: "Pregunta 2", texto: "En el último mes: ¿Has tenido realmente la idea de suicidarte?" },
+    { id: "p3", etiqueta: "Pregunta 3", solo_si: { pregunta_id: "p2", valor: 1 }, texto: "En el último mes: ¿Has pensado en cómo llevarías esto a cabo?" },
+    { id: "p4", etiqueta: "Pregunta 4", solo_si: { pregunta_id: "p2", valor: 1 }, texto: "En el último mes: ¿Has tenido estas ideas y, en cierto grado, la intención de llevarlas a cabo?" },
+    { id: "p5", etiqueta: "Pregunta 5", solo_si: { pregunta_id: "p2", valor: 1 }, texto: "En el último mes: ¿Has comenzado a elaborar o has elaborado los detalles de cómo suicidarte? ¿Tienes la intención de llevar a cabo este plan?" },
+    { id: "p6", etiqueta: "Pregunta 6", texto: "En cualquier momento de tu vida: ¿Alguna vez has hecho algo, comenzado a hacer algo o te has preparado para hacer algo para terminar con tu vida? (por ejemplo, juntar medicamentos, conseguir un arma, regalar cosas de valor, escribir una carta de despedida, o empezar a hacerlo y no llegar a completarlo)" },
+    { id: "p6b", etiqueta: "Pregunta 6, continuación", solo_si: { pregunta_id: "p6", valor: 1 }, texto: "¿Eso ocurrió dentro de los últimos 3 meses?" }
+  ],
+  calificacion: { tipo: "cssrs" }
+};
+
+async function cargarSoloCSSRS(){
+  const btn = document.getElementById("btn-cssrs");
+  const log = document.getElementById("log");
+  btn.disabled = true;
+  log.textContent = "Cargando solo el C-SSRS...\n";
+  try{
+    await db.collection("escalas_virtuales").doc("cssrs").set(ESCALA_CSSRS);
+    log.textContent += "✔ C-SSRS guardado correctamente. Ya puedes generarlo desde el panel de Tests virtuales.";
+  }catch(e){
+    log.textContent += "\n✖ Error: " + e.message;
+    console.error(e);
+  }finally{
+    btn.disabled = false;
+  }
+}
+
 async function cargarEscalas(){
   const btn = document.getElementById("btn-cargar");
   const log = document.getElementById("log");
@@ -558,7 +592,10 @@ async function cargarEscalas(){
     await db.collection("escalas_virtuales").doc("msibpd").set(ESCALA_MSIBPD);
     log.textContent += "✔ MSI-BPD guardado correctamente (10 ítems, cribado de TLP).\n";
 
-    log.textContent += "\nListo. Ya puedes generar links de test virtual para PHQ-9, GAD-7, YSQ-L3, ASRS-v1.1, ITQ y MSI-BPD.";
+    await db.collection("escalas_virtuales").doc("cssrs").set(ESCALA_CSSRS);
+    log.textContent += "✔ C-SSRS guardado correctamente (pesquisa de riesgo suicida).\n";
+
+    log.textContent += "\nListo. Ya puedes generar links de test virtual para PHQ-9, GAD-7, YSQ-L3, ASRS-v1.1, ITQ, MSI-BPD y C-SSRS.";
   }catch(e){
     log.textContent += "\n✖ Error: " + e.message;
     console.error(e);

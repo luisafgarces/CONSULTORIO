@@ -92,6 +92,7 @@
     <option value="asrs">ASRS-v1.1 (Cribado TDAH adultos)</option>
     <option value="itq">ITQ (Trauma — TEPT / TEPTC)</option>
     <option value="msibpd">MSI-BPD (Cribado TLP)</option>
+    <option value="cssrs">C-SSRS (Riesgo suicida · pesquisa)</option>
   </select>
 
   <label for="input-paciente">Nombre del paciente</label>
@@ -277,7 +278,7 @@ async function cargarLista(){
 
         } else {
           // suma_simple (PHQ-9, GAD-7)
-          resultado = `${d.puntaje_total} · ${escapeHtml(d.interpretacion || '')}`;
+          resultado = (d.escala_id === 'cssrs') ? `<strong>${escapeHtml(d.interpretacion || '')}</strong>` : `${d.puntaje_total} · ${escapeHtml(d.interpretacion || '')}`;
         }
 
         if (d.alertas_activadas && d.alertas_activadas.length){
