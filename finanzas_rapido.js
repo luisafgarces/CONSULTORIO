@@ -477,11 +477,23 @@
 
   // ---- pantalla ----
   function chip(a,txt,extra){ return '<button class="fr-chip" data-a="'+a+'" '+(extra||'')+' style="min-height:40px;font-size:.84rem">'+txt+'</button>'; }
+  function nomRecientes(){
+    var P=A.leerP(), hoy=hoy0(), lim=new Date(hoy.getFullYear(),hoy.getMonth(),hoy.getDate()-35), out=[];
+    P.forEach(function(g){ if(g.tipo==='ingreso'&&g.desc==='Nómina'){ var f=parseY(g.fecha); if(f&&f>=lim) out.push(g); } });
+    return out.sort(function(a,b){ return String(b.fecha).localeCompare(String(a.fecha)); }).slice(0,2);
+  }
+  function htmlNomRec(c){
+    var l=nomRecientes(); if(!l.length) return '';
+    return '<div class="fr-sub" style="margin-top:6px">💰 Nómina registrada (si llegó distinta, edítala)</div>'+l.map(function(g){
+      if(String(E.nomEd)===String(g.id)) return '<div class="fr-row"><input type="text" id="pg-ne" inputmode="numeric" value="'+(+g.monto||0)+'"><button class="fr-go" data-a="pg-neok" data-id="'+esc(g.id)+'">Guardar</button><button class="fr-chip" data-a="pg-necan">Cancelar</button></div>';
+      return '<div class="fr-it"><div><b>Nómina del '+lab(parseY(g.fecha))+'</b></div><div><b>'+pesos(+g.monto||0)+'</b> <button class="fr-x" data-a="pg-ne" data-id="'+esc(g.id)+'">✏️ Editar</button></div></div>'; }).join('');
+  }
   function htmlPagos(c, plan){
-    var h='<div class="fr-card"><h4>📅 Pagos por hacer</h4>', t=c.tarjeta; h+=htmlNom(c,'pg-nmv');
-    if(!plan.listo) h+='<div class="fr-sub" style="margin-bottom:8px">Para que te diga con qué pagar, cuéntame <b>cuánto tienes hoy</b> y los datos de tu tarjeta en «⚙️ Mis números».</div>';
+    var h='<div class="fr-card"><h4>📅 Pagos por hacer</h4>', t=c.tarjeta; h+=htmlNom(c,'pg-nmv'); h+=htmlNomRec(c);
+    if(!plan.listo) h+='<div class="fr-sub" style="margin-bottom:4px"><b>💵 ¿Cuánto tienes hoy en tu cuenta?</b> (sin contar la tarjeta). Sin este dato no te puedo decir con qué pagar.</div><div class="fr-row"><input type="text" id="pg-sd" inputmode="numeric" placeholder="Ej.: 1500000"><button class="fr-go" data-a="pg-sdok">Guardar saldo</button></div>';
     else {
-      h+='<div class="fr-sub">💵 Con lo que anotaste tienes hoy <b>'+pesos(plan.est.cash)+'</b> <button class="fr-x" data-a="pg-cuenta">'+(E.cuenta?'ocultar cuenta':'¿cómo salió?')+'</button></div>';
+      h+='<div class="fr-sub">💵 Con lo que anotaste tienes hoy <b>'+pesos(plan.est.cash)+'</b> <button class="fr-x" data-a="pg-cuenta">'+(E.cuenta?'ocultar cuenta':'¿cómo salió?')+'</button> <button class="fr-x" data-a="pg-sd">✏️ Corregir saldo</button></div>';
+      if(E.sd) h+='<div class="fr-sub" style="margin-top:4px">Escribe lo que <b>de verdad</b> tienes hoy en la cuenta (lo que ves en la app del banco):</div><div class="fr-row"><input type="text" id="pg-sd" inputmode="numeric" value="'+Math.max(0,Math.round(plan.est.cash))+'"><button class="fr-go" data-a="pg-sdok">Guardar saldo</button><button class="fr-chip" data-a="pg-sdcan">Cancelar</button></div>';
       if(E.cuenta){ h+='<div class="fr-cfg" style="margin-top:4px"><div class="fr-sub">Partiste de <b>'+pesos(+c.disp.monto||0)+'</b> (lo que escribiste en «Disponible hoy»). Desde entonces:</div>'+(plan.est.movs.length?plan.est.movs.map(function(m){ return '<div class="fr-it"><div><b>'+esc(m.t)+'</b><div class="fr-sub">'+esc(m.f||'')+'</div></div><b>'+(m.d>0?'+':'−')+pesos(Math.abs(m.d))+'</b></div>'; }).join(''):'<div class="fr-sub">no has registrado movimientos con tu plata.</div>')+'<div class="fr-sub">Si tu saldo real es otro, escríbelo en «⚙️ Mis números» → «Disponible hoy» y toca «Actualizar solo esto».</div></div>'; }
       if(+t.cupo>0 && +t.debo>+t.cupo) h+='<div class="fr-aviso">💳 Revisa la tarjeta: dice que debes más que el cupo. El <b>cupo</b> es el total de la tarjeta (por ejemplo 1.000.000), no lo que te queda disponible.</div>';
       else if(+t.cupo>0 && !(+t.corte>=1)) h+='<div class="fr-aviso">💳 Falta el <b>día de corte</b> de la tarjeta (míralo en la app del banco). Sin él no te puedo decir qué conviene pagar con tarjeta.</div>';
@@ -492,7 +504,7 @@
     var nq=estadoNequi(c), accNq=0;
     if(c.pagos.some(function(p){return partes(p).cons>0;})){ h+='<div class="fr-sub">🏥 Los gastos del consultorio salen de:</div><div class="fr-chips" style="margin:4px 0">'+BK.map(function(k){ return '<button class="fr-chip'+((c.gastoDesde||'nequi')===k?' on':'')+'" data-a="pg-gd" data-v="'+k+'" style="min-height:40px;font-size:.84rem">'+BI[k]+' '+BN[k]+'</button>'; }).join('')+'</div>'+(nq.has?'<div class="fr-sub">Ahí hay '+pesos(nq.saldo)+' del consultorio.</div>':''); }
     if(E.pagandoTarjeta){ var sug=plan.est.stm?Math.max(0,plan.est.debe):0; h+='<div class="fr-row"><input type="text" id="pg-pt" inputmode="numeric" value="'+(sug||'')+'" placeholder="Monto que pagaste"><button class="fr-go" data-a="pg-ptok">Guardar pago</button></div>'; }
-    else if(tarjetaOK(t)) h+='<div class="fr-chips" style="margin:6px 0 0">'+chip('pg-pt','💳 Pagué la tarjeta')+'</div>';
+    else h+='<div class="fr-chips" style="margin:6px 0 0">'+chip('pg-pt','💳 Pagué la tarjeta')+'</div>'+(tarjetaOK(t)?'':'<div class="fr-sub">Aunque no hayas completado «Mis números» de la tarjeta, el pago se descuenta de tu plata. Con el día de corte y de pago también te llevo la cuenta de lo que debes.</div>');
     h+='<div style="margin-top:10px">';
     if(!plan.items.length) h+='<div class="fr-sub">'+(c.pagos.length?'No tienes pagos en los próximos 30 días. 🌿':'Aún no hay pagos. Agrega los que se repiten (arriendo, servicios, cuotas) en «⚙️ Mis números».')+'</div>';
     plan.items.forEach(function(it,i){
@@ -500,12 +512,13 @@
       h+='<div class="fr-pg"><div class="fr-pgh"><div><b>'+esc(it.p.nombre||'Pago')+'</b> · '+pesos(it.total)+(puro?' <span class="fr-sub">(consultorio)</span>':'')+'<div class="fr-sub">'+(it.atrasado?'⏰ Venció el '+lab(it.orig)+' — sin culpa, cuando puedas':'📅 '+lab(it.fecha))+'</div></div></div>';
       if(mixto) h+='<div class="fr-sub">🏥 <b>'+pesos(it.cons)+'</b> del consultorio ('+pctDe(it.p)+'%) · 🏠 <b>'+pesos(it.monto)+'</b> de tu plata</div>';
       if(it.cons>0){ accNq+=it.cons; if(nq.has) h+='<div class="fr-sug">'+(accNq<=nq.saldo?'🏥 '+(mixto?'La parte del consultorio alcanza':'Alcanza')+' con el dinero del consultorio ('+BN[nq.k]+')':'⚠️ El dinero del consultorio ('+BN[nq.k]+') no alcanza')+'</div>'+(accNq<=nq.saldo?'':'<div class="fr-sub">Tienes '+pesos(nq.saldo)+' y con este pago faltarían '+pesos(accNq-nq.saldo)+'.</div>'); }
+      h+='<div class="fr-sub" style="margin-top:6px"><b>¿Lo pagaste?</b> Toca cómo lo pagaste y se actualizan tus cuentas.</div>';
       if(!puro){
         if(it.tarj && sug==='?') h+='<div class="fr-sub">Puede ir en tarjeta. Completa «Mis números» para saber si conviene.</div>';
         else if(plan.listo) h+='<div class="fr-sug">'+(sug==='tarjeta'?'💳 '+(mixto?'Tu parte: ponla':'Ponlo')+' en la tarjeta':'💵 '+(mixto?'Tu parte: págala':'Págalo')+' con tu plata')+'</div>'+(it.motivo?'<div class="fr-sub">'+esc(it.motivo)+'</div>':'');
         h+='<div class="fr-chips" style="margin:6px 0 0"><button class="fr-chip'+(sug==='tarjeta'?' on':'')+'" data-a="pg-pagar" data-i="'+i+'" data-m="tarjeta" style="min-height:40px;font-size:.82rem"'+(tarjetaOK(t)&&it.p.tarjeta?'':' disabled')+'>✓ Pagué con 💳</button><button class="fr-chip'+(sug==='efectivo'?' on':'')+'" data-a="pg-pagar" data-i="'+i+'" data-m="efectivo" style="min-height:40px;font-size:.82rem">✓ Pagué con 💵</button><button class="fr-chip" data-a="pg-pagar" data-i="'+i+'" data-m="nequi" style="min-height:40px;font-size:.82rem">✓ Pagué con 📱 Nequi</button></div>'+(mixto?'<div class="fr-sub">Al marcarlo anoto la parte del consultorio y la tuya.</div>':'');
       } else h+='<div class="fr-chips" style="margin:6px 0 0"><button class="fr-chip" data-a="pg-pagar" data-i="'+i+'" data-m="consultorio" style="min-height:40px;font-size:.82rem">✓ Pagado</button></div>';
-      if(it.atrasado) h+='<div class="fr-chips" style="margin:6px 0 0"><button class="fr-chip" data-a="pg-ya" data-i="'+i+'" style="min-height:40px;font-size:.8rem">Ya lo había pagado (solo quitarlo)</button></div>';
+      h+='<div class="fr-chips" style="margin:6px 0 0"><button class="fr-chip" data-a="pg-ya" data-i="'+i+'" style="min-height:40px;font-size:.8rem">Ya lo había pagado antes (solo quitarlo, sin descontar)</button></div>';
       h+='</div>';
     });
     h+='</div><div class="fr-chips" style="margin-top:8px">'+chip('pg-todos','📋 Todos mis pagos fijos ('+c.pagos.length+') '+(E.todos?'▴':'▾'))+chip('pg-cfg','⚙️ Mis números '+(E.cfg?'▴':'▾'))+'</div>';
@@ -633,6 +646,12 @@
     if(a==='pg-imp'){ E.imp=!E.imp; A.repintar(); }
     else if(a==='pg-impok'){ importar(); }
     else if(a==='pg-nq'){ var c3=cfg(), raw=val('pg-nq'); if(raw===''){ A.toast('Escribe cuánto tienes en el Nequi'); return; } c3.nequi={monto:num(raw),ts:Date.now(),dia:A.hoyLocal()}; sv(c3); A.toast('✅ Nequi actualizado'); A.repintar(); }
+    else if(a==='pg-sd'){ E.sd=!E.sd; A.repintar(); var fsd=document.getElementById('pg-sd'); if(fsd) fsd.focus(); }
+    else if(a==='pg-sdcan'){ E.sd=false; A.repintar(); }
+    else if(a==='pg-sdok'){ var raw2=val('pg-sd'); if(raw2===''){ A.toast('Escribe cuánto tienes hoy'); return; } var c5=cfg(); c5.disp={monto:num(raw2),ts:Date.now()}; sv(c5); E.sd=false; A.toast('✅ Saldo actualizado: '+pesos(num(raw2))); A.repintar(); }
+    else if(a==='pg-ne'){ E.nomEd=b.getAttribute('data-id'); A.repintar(); var fne=document.getElementById('pg-ne'); if(fne) fne.focus(); }
+    else if(a==='pg-necan'){ E.nomEd=null; A.repintar(); }
+    else if(a==='pg-neok'){ var nv=num(val('pg-ne')); if(!nv){ A.toast('Escribe el monto que llegó'); return; } var P7=A.leerP(), ix=-1, idn=b.getAttribute('data-id'); P7.forEach(function(g,q){ if(String(g.id)===String(idn)) ix=q; }); if(ix<0){ A.toast('No encontré esa nómina'); return; } var antes=+P7[ix].monto||0; P7[ix].monto=nv; A.guardarP(P7); E.nomEd=null; var dif=nv-antes; A.toast('✅ Nómina corregida: '+pesos(nv)+(dif?' ('+(dif>0?'+':'−')+pesos(Math.abs(dif))+')':'')); A.repintar(); }
     else if(a==='pg-gd'){ var c9=cfg(); c9.gastoDesde=b.getAttribute('data-v')||'nequi'; sv(c9); A.repintar(); }
     else if(a==='pg-cuentan'){ E.cuentaN=!E.cuentaN; A.repintar(); }
     else if(a==='pg-ya'){ var c2=cfg(), pl=armarPlan(c2), it2=pl.items[+b.getAttribute('data-i')]; if(it2){ c2.pagados[it2.key]=true; sv(c2); A.toast('Listo, lo quité sin anotar ningún gasto'); A.repintar(); } }
