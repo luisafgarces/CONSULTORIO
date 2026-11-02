@@ -108,5 +108,30 @@
     }
     return true;
   }
+
+  /* ---------- Acceso al C-SSRS desde Notas de Sesión ---------- */
+  function tarjetaSesion(){
+    var sel=document.getElementById('ses-sel-pac'); if(!sel) return;
+    var card=document.getElementById('cs-ses-card');
+    if(!card){ card=document.createElement('div'); card.id='cs-ses-card'; var ref=document.getElementById('nrp-ses'); var par=sel.parentNode; if(ref&&ref.parentNode) ref.parentNode.insertBefore(card,ref.nextSibling); else par.parentNode.insertBefore(card,par.nextSibling); }
+    card.innerHTML='<div style="background:#fff8f9;border:1.5px solid #fadae1;border-radius:12px;padding:10px 14px;margin:10px 0;font-size:.85rem"><b>🧭 Evaluar riesgo suicida en esta sesión</b><div style="opacity:.75;margin:4px 0 8px">Abre la C-SSRS (pesquisa) con este paciente ya elegido. Lo que llevas escrito en la nota se queda aquí.</div><button class="btn" type="button" id="cs-ses-btn" style="font-size:.82rem">Aplicar C-SSRS</button></div>';
+  }
+  document.addEventListener('click',function(e){
+    var b=e.target.closest&&e.target.closest('#cs-ses-btn,#cs-volver'); if(!b) return;
+    if(b.id==='cs-ses-btn'){
+      var pid=(document.getElementById('ses-sel-pac')||{}).value; if(!pid){ toast('Selecciona un paciente'); return; }
+      window._csDesdeSesion=true; goPage('tests');
+      var sp=document.getElementById('tst-sel-pac'); if(sp) sp.value=pid;
+      var ts=document.getElementById('tst-sel'); if(ts){ ts.value='cssrs'; loadTest(); }
+      volverBtn();
+    } else { window._csDesdeSesion=false; var v=document.getElementById('cs-volver-wrap'); if(v) v.remove(); goPage('sesiones'); }
+  });
+  function volverBtn(){
+    var pg=document.getElementById('page-tests'); if(!pg||!window._csDesdeSesion||document.getElementById('cs-volver-wrap')) return;
+    var w=document.createElement('div'); w.id='cs-volver-wrap'; w.style.margin='8px 0'; w.innerHTML='<button class="btn" type="button" id="cs-volver" style="font-size:.82rem">↩ Volver a Notas de Sesión</button> <span style="font-size:.78rem;opacity:.75">Guarda el resultado (botón de guardar) antes de volver si quieres que quede en el historial del paciente.</span>';
+    var bar=pg.querySelector('.patient-bar'); bar.parentNode.insertBefore(w,bar.nextSibling);
+  }
+  (function(){ var n=0, iv=setInterval(function(){ try{ tarjetaSesion(); }catch(e){} if(++n>40) clearInterval(iv); },1000); })();
+  (function(){ var o=window.loadSesiones; if(typeof o==='function'&&!o._cs){ window.loadSesiones=function(){ var r=o.apply(this,arguments); try{ tarjetaSesion(); }catch(e){} return r; }; window.loadSesiones._cs=1; window.loadSesiones._nrp=o._nrp; } })();
   var n=0, iv=setInterval(function(){ if(montar()||++n>40) clearInterval(iv); },250);
 })();
