@@ -206,6 +206,26 @@ async function cargarLista(){
       return;
     }
 
+    // Cargamos las escalas (una vez cada una) para poder mostrar la pregunta y lo que contestó en cada ítem
+    const escalasCache = {};
+    const idsEsc = [...new Set(snapshot.docs.map(x => x.data().escala_id).filter(Boolean))];
+    await Promise.all(idsEsc.map(async id => {
+      try{ const ed = await db.collection("escalas_virtuales").doc(id).get(); if (ed.exists) escalasCache[id] = ed.data(); }catch(e){ console.warn("No pude leer la escala", id, e); }
+    }));
+    function htmlRespuestas(d){
+      const esc = escalasCache[d.escala_id], r = d.respuestas;
+      if (!esc || !r || !Array.isArray(esc.preguntas)) return '';
+      const ops = esc.opciones_respuesta || [];
+      const filas = esc.preguntas.map((p, i) => {
+        const v = r[p.id];
+        let resp;
+        if (v === undefined) resp = '<span style="color:var(--border)">Sin respuesta (no aplicaba o no se preguntó)</span>';
+        else { const o = ops.find(x => x.valor === v); resp = `<strong>${escapeHtml(o ? o.texto : String(v))}</strong> <span style="color:var(--border)">(${escapeHtml(String(v))})</span>`; }
+        return `<tr><td style="width:2.2em">${i + 1}</td><td>${escapeHtml(p.texto)}</td><td>${resp}</td></tr>`;
+      }).join('');
+      return `<details><summary>Ver respuestas ítem por ítem (${esc.preguntas.length})</summary><table class="detalle-tabla"><tr><th>N.°</th><th>Pregunta</th><th>Respondió</th></tr>${filas}</table></details>`;
+    }
+
     let html = '<table><tr><th>Paciente</th><th>Escala</th><th>Estado</th><th>Resultado</th></tr>';
 
     snapshot.forEach(doc => {
@@ -280,6 +300,8 @@ async function cargarLista(){
           // suma_simple (PHQ-9, GAD-7)
           resultado = (d.escala_id === 'cssrs') ? `<strong>${escapeHtml(d.interpretacion || '')}</strong>` : `${d.puntaje_total} · ${escapeHtml(d.interpretacion || '')}`;
         }
+
+        resultado += htmlRespuestas(d);
 
         if (d.alertas_activadas && d.alertas_activadas.length){
           resultado += `<br><span class="alerta-item">⚠ ${d.alertas_activadas.map(escapeHtml).join(' / ')}</span>`;
