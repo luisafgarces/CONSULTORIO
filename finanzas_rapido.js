@@ -429,7 +429,10 @@
 
   // ---- plan: pagos de los próximos 30 días (y los que quedaron atrasados) con sugerencia ----
   function pctDe(p){ var v=parseFloat(p&&p.pct); if(isFinite(v)&&v>=0&&v<=100) return v; return (p&&p.donde==='consultorio')?100:0; }
-  function partes(p){ var t=+p.monto||0, c=Math.round(t*pctDe(p)/100); return {tot:t,cons:c,pers:t-c}; }
+  // Servicios que cambian cada mes: el estimado es el promedio de los últimos pagos reales (hasta 6)
+  function histDe(p){ return (p&&p.variable&&Array.isArray(p.hist))?p.hist.filter(function(h){ return +h.m>0; }):[]; }
+  function montoEst(p){ var h=histDe(p); if(!h.length) return +p.monto||0; var u=h.slice(-6), s=0; u.forEach(function(x){ s+=(+x.m); }); return Math.round(s/u.length); }
+  function partes(p){ var t=montoEst(p), c=Math.round(t*pctDe(p)/100); return {tot:t,cons:c,pers:t-c}; }
   function armarPlan(c){
     var hoy=hoy0(), hasta=new Date(hoy.getFullYear(),hoy.getMonth(),hoy.getDate()+30), atras=new Date(hoy.getFullYear(),hoy.getMonth(),hoy.getDate()-20), items=[];
     c.pagos.forEach(function(p){
@@ -654,6 +657,7 @@
       if(it.cons>0){ accNq+=it.cons; if(nq.has) h+='<div class="fr-sug">'+(accNq<=nq.saldo?'🏥 '+(mixto?'La parte del consultorio alcanza':'Alcanza')+' con el dinero del consultorio ('+BN[nq.k]+')':'⚠️ El dinero del consultorio ('+BN[nq.k]+') no alcanza')+'</div>'+(accNq<=nq.saldo?'':'<div class="fr-sub">Tienes '+pesos(nq.saldo)+' y con este pago faltarían '+pesos(accNq-nq.saldo)+'.</div>'); }
       h+='<div class="fr-sub" style="margin-top:6px"><b>¿Lo pagaste?</b> Toca cómo lo pagaste y se actualizan tus cuentas.</div>';
       h+='<div class="fr-row" style="margin-top:4px"><span class="fr-sub" style="align-self:center">'+(it.p.variable?'Valor aprox. (cámbialo por el real):':'Valor que pagaste:')+'</span><input type="text" id="pg-am-'+i+'" inputmode="numeric" value="'+it.total+'" style="max-width:150px"></div>';
+      if(it.p.variable){ var hh=histDe(it.p); h+='<div class="fr-sub">'+(hh.length?'📈 Estimado: promedio de tus últimos '+Math.min(6,hh.length)+' pago'+(Math.min(6,hh.length)>1?'s':'')+(hh.length>=2?' (entre '+pesos(Math.min.apply(null,hh.slice(-6).map(function(x){return +x.m;})))+' y '+pesos(Math.max.apply(null,hh.slice(-6).map(function(x){return +x.m;})))+')':'')+(hh.length<3?'. Con pocos datos puede variar mucho':''):'📈 Aún sin historial: uso el valor que pusiste. Con cada pago real que registres la app calcula el promedio.')+'</div>'; }
       if(it.bol){ h+= it.cubierto ? '<div class="fr-sug">🔒 Ya lo tienes apartado en «'+esc(it.bol.nombre)+'» ('+pesos(it.bolTiene)+')</div>' : '<div class="fr-sub">🔒 En «'+esc(it.bol.nombre)+'» hay '+pesos(it.bolTiene)+(it.bolUsa>0?' y cubre una parte':'')+'; este pago necesita '+pesos(it.bolNeed)+(gmf(c,it.monto)?' (con el 4×1000)':'')+': faltan <b>'+pesos(it.bolNeed-(it.bolUsa||0))+'</b> '+(it.bolUsa>0?'de tu plata libre (o por apartar en el bolsillo).':'por apartar.')+'</div>'; }
       if(!puro){
         if(it.tarj && sug==='?') h+='<div class="fr-sub">Puede ir en tarjeta. Completa «Mis números» para saber si conviene.</div>';
@@ -704,7 +708,8 @@
       +'<div class="fr-f"><label>¿Con qué se paga?</label><select id="pn-medio" style="font-size:16px;padding:10px 12px;border:1.5px solid #f0d8de;border-radius:12px;width:100%;box-sizing:border-box">'+[['segun','🤔 Según disponibilidad (la app te sugiere)'],['tarjeta','💳 Siempre con la tarjeta Nu'],['personal','🏠 Cuenta personal'],['consultorio','🏥 Cuenta del consultorio']].map(function(o){ return '<option value="'+o[0]+'"'+((ed?prefDe(ed):'segun')===o[0]?' selected':'')+'>'+o[1]+'</option>'; }).join('')+'</select></div>'
       +'<label class="fr-ck"><input type="checkbox" id="pn-auto"'+(ed&&ed.auto?' checked':'')+'> ⚡ Es débito automático (no me lo pongas como pendiente: pregúntame el día si ya se debitó)</label>'
       +'<label class="fr-ck"><input type="checkbox" id="pn-tar"'+(ed&&ed.tarjeta&&prefDe(ed)==='segun'?' checked':'')+'> (Solo si elegiste «según disponibilidad») se puede pagar con tarjeta</label>'
-      +'<label class="fr-ck"><input type="checkbox" id="pn-var"'+(ed&&ed.variable?' checked':'')+'> El valor cambia cada mes (te muestro el aproximado: lo último que pagaste)</label>'
+      +'<label class="fr-ck"><input type="checkbox" id="pn-var"'+(ed&&ed.variable?' checked':'')+'> El valor cambia cada mes (la app saca el promedio de tus últimos pagos para estimar el próximo)</label>'
+      +inp('pn-hist','Pagos anteriores de este servicio (opcional): escribe los últimos valores separados por coma, el más reciente al final',(ed&&Array.isArray(ed.hist)?ed.hist.map(function(x){ return x.m; }).join(', '):''),'Ej.: 118000, 135000, 121000','text')
       +inp('pn-pct','% que sale del consultorio',(ed?pctDe(ed):0),'0 = todo personal · 100 = todo consultorio')+'<div class="fr-chips" style="margin:4px 0"><button class="fr-chip" data-a="pg-donde" data-v="personal" style="min-height:40px;font-size:.84rem">🏠 Todo personal (0%)</button><button class="fr-chip" data-a="pg-donde" data-v="consultorio" style="min-height:40px;font-size:.84rem">🏥 Todo consultorio (100%)</button></div>'
       +(bolList(c).length?'<div class="fr-f"><label>🔒 ¿Sale de un bolsillo? (plata que ya apartaste)</label><select id="pn-bol" style="font-size:16px;padding:10px 12px;border:1.5px solid #f0d8de;border-radius:12px;width:100%;box-sizing:border-box"><option value="">No, sale de mi plata libre</option>'+bolList(c).map(function(b){ return '<option value="'+esc(b.id)+'"'+(ed&&String(ed.bolsillo)===String(b.id)?' selected':'')+'>'+esc(b.nombre)+'</option>'; }).join('')+'</select></div>':'')
       +'<button class="fr-go" data-a="pg-agregar" style="margin-top:6px">'+(ed?'Guardar cambios':'Agregar pago')+'</button>'+(ed?' <button class="fr-chip" data-a="pg-cancelar" style="min-height:40px;font-size:.84rem">Cancelar</button>':'')+'</div></div>'
@@ -749,6 +754,7 @@
     c.nomina={monto:num(val('pg-nm')), dias:dias(val('pg-nd')), desde:(c.nomina&&c.nomina.desde)||A.hoyLocal()};
     sv(c); A.toast('✅ Guardé tus números'); return true;
   }
+  function c0hist(id){ var q=cfg().pagos.filter(function(x){ return String(x.id)===String(id); })[0]; return (q&&Array.isArray(q.hist)&&q.hist.length)?q.hist:null; }
   function agregarPago(){
     var nom=val('pn-nom'), mon=num(val('pn-mon')), frec=E.pnFrec==='unico'?'unico':'mensual';
     if(!nom||!mon){ A.toast('Escribe el nombre y el monto'); return; }
@@ -757,7 +763,9 @@
     var pcv=parseFloat(String(val('pn-pct')||'0').replace(',','.')); if(!isFinite(pcv)||pcv<0||pcv>100){ A.toast('El porcentaje va de 0 a 100'); return; }
     p.pct=Math.round(pcv*100)/100; p.donde=p.pct>=100?'consultorio':'personal';
     var bsel=val('pn-bol'); if(bsel) p.bolsillo=bsel;
-    if((document.getElementById('pn-var')||{}).checked) p.variable=true;
+    if((document.getElementById('pn-var')||{}).checked){ p.variable=true;
+      var hv=val('pn-hist'); if(hv){ p.hist=hv.split(/[,;\n]+/).map(function(x){ return num(x); }).filter(function(x){ return x>0; }).slice(-12).map(function(x){ return {f:'',m:x}; }); }
+      else if(E.edit){ var old=c0hist(E.edit); if(old) p.hist=old; } }
     if((document.getElementById('pn-auto')||{}).checked) p.auto=true;
     if(frec==='unico'){ p.fecha=val('pn-fec'); if(!parseY(p.fecha)){ A.toast('Elige la fecha'); return; } }
     else { p.dias=dias(val('pn-dia')); if(!p.dias.length){ A.toast('Escribe el día del mes (1 a 31)'); return; } }
@@ -777,7 +785,7 @@
       var obj={id:ex?ex.id:String(Date.now())+Math.floor(Math.random()*1000),nombre:nom,monto:mon,frec:'mensual',dias:d,pct:Math.round(pc*100)/100,donde:pc>=100?'consultorio':'personal',tarjeta:tar};
       if(auto) obj.auto=true;
       if(mp){ obj.medioPref=mp; obj.tarjeta=(mp==='tarjeta')||(mp==='segun'&&tar); } else if(ex&&ex.medioPref){ obj.medioPref=ex.medioPref; }
-      if(ex){ if(ex.categoria) obj.categoria=ex.categoria; if(ex.bolsillo) obj.bolsillo=ex.bolsillo; if(ex.variable) obj.variable=true; if(ex.auto) obj.auto=true; if(ex.ultimo) obj.ultimo=ex.ultimo; c.pagos[c.pagos.indexOf(ex)]=obj; act++; } else { c.pagos.push(obj); nuevos++; }
+      if(ex){ if(ex.categoria) obj.categoria=ex.categoria; if(ex.bolsillo) obj.bolsillo=ex.bolsillo; if(ex.variable) obj.variable=true; if(ex.hist) obj.hist=ex.hist; if(ex.auto) obj.auto=true; if(ex.ultimo) obj.ultimo=ex.ultimo; c.pagos[c.pagos.indexOf(ex)]=obj; act++; } else { c.pagos.push(obj); nuevos++; }
     });
     sv(c);
     if(malas.length) A.toast('Revisa estas líneas (faltó monto o día): '+malas.join(' · ')); else A.toast('✅ Importé '+nuevos+' nuevos y actualicé '+act);
@@ -798,7 +806,7 @@
         if(window.ROL_ACTUAL==='administrador' && typeof finEnviarARevision==='function') finEnviarARevision(reg); else { registros.push(reg); finGuardar(); try{ renderAll(); }catch(e){} }
       }
     }
-    if(it.ant){ var pp=c.pagos.filter(function(q){ return String(q.id)===String(it.p.id); })[0]; if(pp){ pp.ultimo=real; if(pp.variable) pp.monto=real; } }
+    var pp=c.pagos.filter(function(q){ return String(q.id)===String(it.p.id); })[0]; if(pp){ if(it.ant) pp.ultimo=real; if(pp.variable){ pp.hist=(Array.isArray(pp.hist)?pp.hist:[]).concat([{f:hoyS,m:it.total}]).slice(-12); } }
     if(it.monto>0){
       var P=A.leerP(); P.push({id:String(Date.now()+1),fecha:hoyS,monto:it.monto,desc:it.p.nombre+(mixto?' ('+(100-pc)+'%)':''),medio:medio==='tarjeta'?'tarjeta':(medio==='nequi'?'nequi':'efectivo')}); A.guardarP(P);
     }
