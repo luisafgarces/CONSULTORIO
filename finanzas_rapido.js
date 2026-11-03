@@ -294,6 +294,12 @@
   function vence(S,t){ var c=corteDe(S,t), v=dEn(c.getFullYear(),c.getMonth(),+t.pago); if(v<=c) v=dEn(c.getFullYear(),c.getMonth()+1,+t.pago); return v; }
   function proxPago(S,t){ var v=dEn(S.getFullYear(),S.getMonth(),+t.pago); if(v<S) v=dEn(S.getFullYear(),S.getMonth()+1,+t.pago); return v; }
 
+  // ---- 4×1000 (GMF): cobran el 0,4 % sobre lo que sale de Nequi / Bancolombia ----
+  function gmf(c,m){ return (c&&c.gmf===false)?0:Math.round((+m||0)*0.004); }
+  function norm(t){ return String(t||'').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9 ]/g,' ').replace(/\s+/g,' ').trim(); }
+  function prefDe(p){ var v=p&&p.medioPref; if(v==='tarjeta'||v==='personal'||v==='consultorio'||v==='segun') return v; return (p&&p.tarjeta)?'segun':'personal'; }
+  function bolDeP(c,p){ var L=bolList(c), b=p.bolsillo?bolById(c,p.bolsillo):null; if(b) return b; var n=norm(p.nombre); if(n.length<3) return null;
+    return L.filter(function(x){ var m=norm(x.nombre); return m.length>=3 && (m===n||n.indexOf(m)>=0||m.indexOf(n)>=0); })[0]||null; }
   // ---- bolsillos: plata que ya está en tu cuenta pero apartada para algo (arriendo, etc.) ----
   function bolList(c){ return Array.isArray(c.bolsillos)?c.bolsillos:[]; }
   function bolById(c,id){ return bolList(c).filter(function(b){ return String(b.id)===String(id); })[0]||null; }
@@ -304,18 +310,19 @@
     var P=A.leerP(), t=c.tarjeta, tsC=+c.disp.ts||0, tsT=+t.deboTs||0, hoy=hoy0();
     var cash=(+c.disp.monto||0), movs=[];
     P.forEach(function(g){ var id=+g.id||0; if(id<=tsC) return; var d=0;
-      if(g.tipo==='ingreso') d=(+g.monto||0); else if(g.tipo==='pagotarjeta') d=-(+g.monto||0); else if(g.medio!=='tarjeta') d=-(+g.monto||0);
-      if(d){ cash+=d; movs.push({f:g.fecha,t:g.desc||(g.tipo==='ingreso'?'Ingreso':g.tipo==='pagotarjeta'?'Pago de la tarjeta':'Gasto'),d:d}); } });
-    var stm={}, pagosT=0;
+      var gx=0; if(g.tipo==='ingreso') d=(+g.monto||0); else if(g.tipo==='pagotarjeta'){ gx=gmf(c,g.monto); d=-((+g.monto||0)+gx); } else if(g.medio!=='tarjeta'){ gx=gmf(c,g.monto); d=-((+g.monto||0)+gx); }
+      if(d){ cash+=d; movs.push({f:g.fecha,t:(g.desc||(g.tipo==='ingreso'?'Ingreso':g.tipo==='pagotarjeta'?'Pago de la tarjeta':'Gasto'))+(gx?' (con 4×1000 '+pesos(gx)+')':''),d:d}); } });
+    var stm={}, stmC={}, pagosT=0, consPend=0;
     function suma(k,v){ stm[k]=(stm[k]||0)+v; }
     if(tarjetaOK(t) && +t.debo>0) suma(yy(proxPago(hoy,t)), +t.debo);
     P.forEach(function(g){ var id=+g.id||0; if(id<=tsT) return;
-      if(g.tipo==='pagotarjeta') pagosT+=(+g.monto||0);
+      if(g.tipo==='pagotarjeta') pagosT+=(+g.total||+g.monto||0);
       else if(g.medio==='tarjeta' && g.tipo!=='ingreso' && tarjetaOK(t)){ var f=parseY(g.fecha)||hoy; suma(yy(vence(f,t)), +g.monto||0); } });
-    var ks=Object.keys(stm).sort(), resto=pagosT; ks.forEach(function(k){ var q=Math.min(stm[k],resto); stm[k]-=q; resto-=q; }); // los pagos se aplican al más antiguo
+    (Array.isArray(c.tarjCons)?c.tarjCons:[]).forEach(function(x){ if((+x.ts||0)<=tsT) return; consPend+=(+x.monto||0); if(tarjetaOK(t)){ var f=parseY(x.fecha)||hoy, k=yy(vence(f,t)); suma(k,+x.monto||0); stmC[k]=(stmC[k]||0)+(+x.monto||0); } });
+    var ks=Object.keys(stm).sort(), resto=pagosT; ks.forEach(function(k){ var q=Math.min(stm[k],resto); stm[k]-=q; resto-=q; if(stmC[k]>stm[k]) stmC[k]=stm[k]; }); // los pagos se aplican al más antiguo
     var debe=0; ks.forEach(function(k){ debe+=stm[k]; }); if(resto>0) debe=Math.max(0,debe-resto);
     var apart=0; (Array.isArray(c.bolsillos)?c.bolsillos:[]).forEach(function(b){ apart+=(+b.monto||0); });
-    return {cash:cash, apartado:apart, libre:cash-apart, movs:movs, stm:stm, debe:debe, cupoLibre:(+t.cupo||0)-debe, hayDisp: c.disp.monto!=null && c.disp.monto!=='' };
+    return {stmC:stmC, consPend:consPend, cash:cash, apartado:apart, libre:cash-apart, movs:movs, stm:stm, debe:debe, cupoLibre:(+t.cupo||0)-debe, hayDisp: c.disp.monto!=null && c.disp.monto!=='' };
   }
 
 
@@ -337,11 +344,11 @@
           if(mom?mom>pk[k2].ts:fch>pk[k2].dia) mover(k2,+r.monto||0,r.fechaRecibo||r.fecha,'Recibo: '+(r.paciente||'paciente'));
         } else if(r.tipo==='gasto'){
           var kd=(r.desde&&(r.desde==='nequi'||r.desde==='banco'||r.desde==='efectivo'))?r.desde:'nequi', p=pk[kd];
-          if((+r.id>1e12)?(+r.id>p.ts):(String(r.fecha||'')>p.dia)) mover(kd,-(+r.monto||0),r.fecha,r.descripcion||'Gasto del consultorio');
+          if((+r.id>1e12)?(+r.id>p.ts):(String(r.fecha||'')>p.dia)) mover(kd,-((+r.monto||0)+(kd==='efectivo'?0:gmf(c,r.monto))),r.fecha,(r.descripcion||'Gasto del consultorio')+((kd!=='efectivo'&&gmf(c,r.monto))?' (con 4×1000)':''));
         }
       });
       M.forEach(function(m){ var mt=+m.id||0, v=+m.monto||0; if(!v) return;
-        if(m.tipo==='pasar'&&pk[m.de]&&pk[m.a]){ if(mt>pk[m.de].ts) mover(m.de,-v,m.fecha,'Pasé a '+BN[m.a]); if(mt>pk[m.a].ts) mover(m.a,v,m.fecha,'Recibí de '+BN[m.de]); }
+        if(m.tipo==='pasar'&&pk[m.de]&&pk[m.a]){ if(mt>pk[m.de].ts) mover(m.de,-(v+(m.de==='efectivo'?0:gmf(c,v))),m.fecha,'Pasé a '+BN[m.a]+((m.de!=='efectivo'&&gmf(c,v))?' (con 4×1000)':'')); if(mt>pk[m.a].ts) mover(m.a,v,m.fecha,'Recibí de '+BN[m.de]); }
         else if(m.tipo==='paso'){ if(mt>pk.paso.ts) mover('paso',v,m.fecha,'Pasé plata mía de Bancolombia al Nequi'); }
       });
       P.forEach(function(g){ if(g.medio!=='nequi'||g.tipo==='ingreso'||g.tipo==='pagotarjeta') return; if((+g.id||0)>pk.paso.ts) mover('paso',-(+g.monto||0),g.fecha,g.desc||'Pago personal con Nequi'); });
@@ -427,34 +434,43 @@
     c.pagos.forEach(function(p){
       var fechas = p.frec==='unico' ? (parseY(p.fecha)?[parseY(p.fecha)]:[]) : ocurr(p.dias||[], atras, hasta);
       fechas.forEach(function(f){ if(f<atras||f>hasta) return; var key=p.id+'|'+yy(f); if(c.pagados[key]) return;
-        var pt=partes(p); items.push({p:p,key:key,orig:f,fecha:f<hoy?hoy:f,atrasado:f<hoy,total:pt.tot,cons:pt.cons,monto:pt.pers,tarj:!!p.tarjeta && pt.pers>0,medio:'efectivo',motivo:'',ok:true}); });
+        var pt=partes(p), pref=prefDe(p), tj=(pref==='tarjeta'||(pref==='segun'&&!!p.tarjeta))&&(pt.pers>0||pt.cons>0);
+        items.push({p:p,pref:pref,key:key,orig:f,fecha:f<hoy?hoy:f,atrasado:f<hoy,total:pt.tot,cons:pt.cons,monto:pt.pers,tarj:tj,medio:'efectivo',motivo:'',ok:true}); });
     });
     items.sort(function(a,b){ return a.fecha-b.fecha || a.orig-b.orig; });
-    var avail={}; (Array.isArray(c.bolsillos)?c.bolsillos:[]).forEach(function(b){ avail[b.id]=+b.monto||0; });
-    items.forEach(function(it){ var b=it.p.bolsillo?bolById(c,it.p.bolsillo):null; if(!b||it.monto<=0) return; it.bol=b; it.bolTiene=avail[b.id]||0;
-      if(avail[b.id]>=it.monto){ it.cubierto=true; avail[b.id]-=it.monto; } });
+    var avail={}; bolList(c).forEach(function(b){ avail[b.id]=+b.monto||0; });
+    items.forEach(function(it){ var b=bolDeP(c,it.p); if(!b||it.monto<=0) return; var need=it.monto+gmf(c,it.monto); it.bol=b; it.bolNeed=need; it.bolTiene=avail[b.id]||0;
+      if(avail[b.id]>=need){ it.cubierto=true; avail[b.id]-=need; } });
     var est=estadoActual(c), t=c.tarjeta, nom=(+c.nomina.monto>0)?ocurr(c.nomina.dias||[], new Date(hoy.getFullYear(),hoy.getMonth(),hoy.getDate()+1), hasta):[];
     function eventos(over){
-      var ev=[], stm={}; Object.keys(est.stm).forEach(function(k){ stm[k]=est.stm[k]; });
+      var ev=[], stm={}, stmC={}; Object.keys(est.stm).forEach(function(k){ stm[k]=est.stm[k]; stmC[k]=(est.stmC&&est.stmC[k])||0; });
       nom.forEach(function(f){ ev.push({f:yy(f),d:+c.nomina.monto}); });
-      items.forEach(function(it,i){ if(it.monto<=0||it.cubierto) return; var med=(i in over)?over[i]:it.medio;
-        if(med==='tarjeta' && tarjetaOK(t)){ var k=yy(vence(it.fecha,t)); stm[k]=(stm[k]||0)+it.monto; } else ev.push({f:yy(it.fecha),d:-it.monto}); });
-      Object.keys(stm).forEach(function(k){ if(stm[k]>0) ev.push({f:k,d:-stm[k]}); });
+      items.forEach(function(it,i){ var med=(i in over)?over[i]:it.medio;
+        if(med==='tarjeta' && tarjetaOK(t)){ var k=yy(vence(it.fecha,t)); stm[k]=(stm[k]||0)+it.monto+it.cons; stmC[k]=(stmC[k]||0)+it.cons; }
+        else if(it.monto>0 && !it.cubierto) ev.push({f:yy(it.fecha),d:-(it.monto+gmf(c,it.monto))}); });
+      Object.keys(stm).forEach(function(k){ var pers=stm[k]-(stmC[k]||0); if(pers>0) ev.push({f:k,d:-(pers+gmf(c,pers))}); });
       return ev;
     }
     function caja(ev,f){ var s=est.libre, k=yy(f); ev.forEach(function(e){ if(e.f<=k) s+=e.d; }); return s; }
     var usadoTarj=0, listo=est.hayDisp;
     items.forEach(function(it,i){
-      if(it.monto<=0){ it.medio=''; return; }
+      var tot=it.monto+it.cons;
       if(it.cubierto){ it.medio='bolsillo'; it.motivo=''; return; }
+      if(it.pref==='tarjeta' && tot>0){
+        if(tarjetaOK(t) && (est.debe+usadoTarj+tot)>(+t.cupo||0)){ it.medio='efectivo'; it.motivo='Va en la tarjeta, pero no tiene cupo libre para esto ahora: págalo con tu plata o espera a pagar la tarjeta.'; }
+        else { it.medio='tarjeta'; usadoTarj+=tot; it.motivo='Va en la tarjeta Nu (así lo definiste).'; }
+        return;
+      }
+      if(it.monto<=0){ it.medio=''; return; }
+      if(it.pref==='personal'||it.pref==='consultorio'){ it.medio='efectivo'; it.motivo=it.pref==='consultorio'?'Sale de la cuenta del consultorio (así lo definiste).':'Sale de tu cuenta personal (así lo definiste).'; return; }
       if(!listo){ it.medio=it.tarj?'?':'efectivo'; return; }
       if(it.tarj && tarjetaOK(t)){
-        var vv=vence(it.fecha,t), sinCupo=(est.debe+usadoTarj+it.monto)>(+t.cupo||0);
+        var vv=vence(it.fecha,t), sinCupo=(est.debe+usadoTarj+tot)>(+t.cupo||0);
         var ov={}; ov[i]='tarjeta'; var cT=caja(eventos(ov),vv);
         var ov2={}; ov2[i]='efectivo'; var cE=caja(eventos(ov2),it.fecha);
         if(sinCupo){ it.medio='efectivo'; it.motivo='La tarjeta no tiene cupo libre para esto.'; }
         else if(cT<0){ it.medio='efectivo'; it.motivo='Si lo pones en la tarjeta, el '+lab(vv)+' no te alcanzaría para pagarla completa.'; }
-        else { it.medio='tarjeta'; usadoTarj+=it.monto; it.motivo= cE<0 ? 'Con tu plata no alcanzaría ese día; en la tarjeta lo pagas el '+lab(vv)+', ya con tu nómina.' : 'Puedes ponerlo en la tarjeta: la pagas el '+lab(vv)+' y alcanza.'; }
+        else { it.medio='tarjeta'; usadoTarj+=tot; it.motivo= cE<0 ? 'Con tu plata no alcanzaría ese día; en la tarjeta lo pagas el '+lab(vv)+', ya con tu nómina.' : 'Puedes ponerlo en la tarjeta: la pagas el '+lab(vv)+' y alcanza.'; }
       } else { it.medio='efectivo'; it.motivo = it.tarj ? 'Configura tu tarjeta para que te sugiera.' : (it.p.tarjeta?'':'No se puede con tarjeta.'); }
       it.medio = it.medio||'efectivo';
     });
@@ -531,7 +547,10 @@
   }
 
   // ---- tarjeta «Mis bolsillos» ----
-  function bolProx(c,b){ var best=null; c.pagos.forEach(function(p){ if(String(p.bolsillo)!==String(b.id)) return; var q=partes(p); if(q.pers<=0) return; var f=proxFecha(p,c); if(f&&(!best||f<best.f)) best={f:f,p:p,m:q.pers}; }); return best; }
+  function bolParaQue(c,b){ return c.pagos.filter(function(p){ var x=bolDeP(c,p); return x&&String(x.id)===String(b.id); }); }
+  function selPara(c,id,selId){ return '<div class="fr-f"><label>¿Para qué pago es? (de ahí se descuenta cuando lo pagues)</label><select id="'+id+'" style="font-size:16px;padding:10px 12px;border:1.5px solid #f0d8de;border-radius:12px;width:100%;box-sizing:border-box"><option value="">Para nada en particular (ahorro general)</option>'+c.pagos.map(function(p){ return '<option value="'+esc(p.id)+'"'+(String(p.id)===String(selId)?' selected':'')+'>'+esc(p.nombre)+'</option>'; }).join('')+'</select></div>'; }
+  function ligarPago(c,bid,pid){ c.pagos.forEach(function(p){ if(String(p.bolsillo)===String(bid)&&String(p.id)!==String(pid)) delete p.bolsillo; if(pid&&String(p.id)===String(pid)) p.bolsillo=bid; }); }
+  function bolProx(c,b){ var best=null; c.pagos.forEach(function(p){ var bb=bolDeP(c,p); if(!bb||String(bb.id)!==String(b.id)) return; var q=partes(p); if(q.pers<=0) return; var f=proxFecha(p,c); if(f&&(!best||f<best.f)) best={f:f,p:p,m:q.pers}; }); return best; }
   function htmlBolsillos(c){
     var est=estadoActual(c), L=bolList(c), B=E.bl=E.bl||{f:'',id:'',mov:false}, h='<div class="fr-card bl-card"><h4>🔒 Mis bolsillos</h4>';
     if(!L.length && B.f!=='nuevo'){
@@ -543,14 +562,14 @@
     if(est.hayDisp && est.apartado>est.cash) h+='<div class="fr-aviso">⚠️ Tienes apartado más de lo que hay en la cuenta ('+pesos(est.cash)+'). Revisa tu saldo en «Corregir saldo» o saca plata de algún bolsillo.</div>';
     L.forEach(function(b){
       var px=bolProx(c,b), abierto=(B.id===String(b.id));
-      h+='<div class="fr-pg"><div class="fr-pgh"><div><b>🔒 '+esc(b.nombre)+'</b> · '+pesos(b.monto)+'<div class="fr-sub">'+(+b.quin>0?'Apartas '+pesos(b.quin)+' cada quincena':'Sin monto fijo por quincena')+'</div>'
+      h+='<div class="fr-pg"><div class="fr-pgh"><div><b>🔒 '+esc(b.nombre)+'</b> · '+pesos(b.monto)+'<div class="fr-sub">'+(function(){ var pq=bolParaQue(c,b); return pq.length?'Para: '+pq.map(function(p){ return '«'+esc(p.nombre)+'»'; }).join(', ')+' · ':'Sin pago asignado · '; })()+(+b.quin>0?'Apartas '+pesos(b.quin)+' cada quincena':'Sin monto fijo por quincena')+'</div>'
         +(px?'<div class="fr-sub">Próximo pago: '+esc(px.p.nombre)+' '+pesos(px.m)+' ('+lab(px.f)+') · '+((+b.monto||0)>=px.m?'✓ ya está completo':'faltan <b>'+pesos(px.m-(+b.monto||0))+'</b>')+'</div>':'')+'</div></div>';
       h+='<div class="fr-chips" style="margin:6px 0 0">'+chip('bl-form','＋ Apartar','data-v="apartar" data-id="'+esc(b.id)+'"')+chip('bl-form','− Sacar','data-v="sacar" data-id="'+esc(b.id)+'"')+chip('bl-form','✏️ Editar','data-v="editar" data-id="'+esc(b.id)+'"')+'</div>';
       if(abierto && (B.f==='apartar'||B.f==='sacar')) h+='<div class="fr-sub" style="margin-top:6px">'+(B.f==='apartar'?'¿Cuánto apartas? (sale de tu plata libre; no se mueve de la cuenta)':'¿Cuánto sacas? (vuelve a tu plata libre)')+'</div><div class="fr-row"><input type="text" id="bl-m" inputmode="numeric" placeholder="Ej.: 400000"><button class="fr-go" data-a="bl-ok" data-id="'+esc(b.id)+'">Guardar</button><button class="fr-chip" data-a="bl-cancel">Cancelar</button></div>';
-      if(abierto && B.f==='editar') h+='<div class="fr-cfg" style="margin-top:6px">'+inp('bl-en','Nombre',b.nombre,'','text')+inp('bl-em','Cuánto hay apartado ahora',b.monto,'Ej.: 800000')+inp('bl-eq','Cuánto apartas cada quincena (0 si no es fijo)',b.quin||0,'Ej.: 450000')+'<div class="fr-chips"><button class="fr-go" data-a="bl-ok" data-id="'+esc(b.id)+'">Guardar cambios</button><button class="fr-chip" data-a="bl-cancel">Cancelar</button><button class="fr-chip" data-a="bl-del" data-id="'+esc(b.id)+'">🗑 Quitar bolsillo</button></div><div class="fr-sub">Al quitarlo, la plata apartada vuelve a ser libre.</div></div>';
+      if(abierto && B.f==='editar') h+='<div class="fr-cfg" style="margin-top:6px">'+inp('bl-en','Nombre',b.nombre,'','text')+selPara(c,'bl-ep',(bolParaQue(c,b)[0]||{}).id)+inp('bl-em','Cuánto hay apartado ahora',b.monto,'Ej.: 800000')+inp('bl-eq','Cuánto apartas cada quincena (0 si no es fijo)',b.quin||0,'Ej.: 450000')+'<div class="fr-chips"><button class="fr-go" data-a="bl-ok" data-id="'+esc(b.id)+'">Guardar cambios</button><button class="fr-chip" data-a="bl-cancel">Cancelar</button><button class="fr-chip" data-a="bl-del" data-id="'+esc(b.id)+'">🗑 Quitar bolsillo</button></div><div class="fr-sub">Al quitarlo, la plata apartada vuelve a ser libre.</div></div>';
       h+='</div>';
     });
-    if(B.f==='nuevo') h+='<div class="fr-cfg">'+inp('bl-nn','Nombre del bolsillo','','Ej.: Arriendo','text')+inp('bl-nm','¿Cuánto apartas ya? (0 si empiezas vacío)','','Ej.: 450000')+inp('bl-nq','¿Cuánto apartas cada quincena? (opcional)','','Ej.: 450000')+'<div class="fr-chips"><button class="fr-go" data-a="bl-ok" data-id="">Crear bolsillo</button><button class="fr-chip" data-a="bl-cancel">Cancelar</button></div></div>';
+    if(B.f==='nuevo') h+='<div class="fr-cfg">'+inp('bl-nn','Nombre del bolsillo','','Ej.: Arriendo','text')+selPara(c,'bl-np','')+inp('bl-nm','¿Cuánto apartas ya? (0 si empiezas vacío)','','Ej.: 450000')+inp('bl-nq','¿Cuánto apartas cada quincena? (opcional)','','Ej.: 450000')+'<div class="fr-chips"><button class="fr-go" data-a="bl-ok" data-id="">Crear bolsillo</button><button class="fr-chip" data-a="bl-cancel">Cancelar</button></div></div>';
     else h+='<div class="fr-chips" style="margin:8px 0 0">'+chip('bl-form','＋ Nuevo bolsillo','data-v="nuevo"')+chip('bl-mov',(B.mov?'Ocultar movimientos':'Ver movimientos'))+'</div>';
     if(B.mov){ var M=(Array.isArray(c.bolMov)?c.bolMov:[]).slice(-10).reverse(); h+='<div class="fr-cfg">'+(M.length?M.map(function(m){ return '<div class="fr-it"><div><b>'+esc(m.t)+'</b><div class="fr-sub">'+esc(m.nombre||'')+' · '+esc(m.fecha||'')+'</div></div><b>'+(m.d>0?'+':'−')+pesos(Math.abs(m.d))+'</b></div>'; }).join(''):'<div class="fr-sub">Sin movimientos todavía.</div>')+'</div>'; }
     return h+'</div>';
@@ -572,7 +591,7 @@
       if(B.f==='nuevo'){
         var nn=val('bl-nn'), nm=num(val('bl-nm')), nq=num(val('bl-nq')); if(!nn){ A.toast('Escribe el nombre del bolsillo'); return; }
         if(nm>0 && !libreOk(nm)) return;
-        var nb={id:String(Date.now()),nombre:nn,monto:nm,quin:nq}; c.bolsillos=bolList(c).concat([nb]); if(nm>0) bolMov(c,nb,nm,'Aparté al crear el bolsillo'); sv(c); B.f=''; B.id=''; A.toast('✅ Bolsillo «'+nn+'» creado');
+        var nb={id:String(Date.now()),nombre:nn,monto:nm,quin:nq}; c.bolsillos=bolList(c).concat([nb]); if(val('bl-np')) ligarPago(c,nb.id,val('bl-np')); if(nm>0) bolMov(c,nb,nm,'Aparté al crear el bolsillo'); sv(c); B.f=''; B.id=''; A.toast('✅ Bolsillo «'+nn+'» creado');
       } else if(B.f==='apartar'||B.f==='sacar'){
         var bb=bolById(c,B.id), m=num(val('bl-m')); if(!bb) return; if(!m||m<=0){ A.toast('Escribe cuánto'); return; }
         if(B.f==='apartar'){ if(!libreOk(m)) return; bb.monto=(+bb.monto||0)+m; bolMov(c,bb,m,'Aparté'); A.toast('✅ Apartaste '+pesos(m)+' en «'+bb.nombre+'»'); }
@@ -581,17 +600,30 @@
       } else if(B.f==='editar'){
         var be=bolById(c,B.id); if(!be) return; var en=val('bl-en'), em=num(val('bl-em')), eq=num(val('bl-eq')); if(!en){ A.toast('Escribe el nombre'); return; }
         var dl=em-(+be.monto||0); if(dl>0 && !libreOk(dl)) return;
-        if(dl) bolMov(c,be,dl,'Corregí el monto'); be.nombre=en; be.monto=em; be.quin=eq; sv(c); B.f=''; B.id=''; A.toast('✅ Cambios guardados');
+        if(dl) bolMov(c,be,dl,'Corregí el monto'); be.nombre=en; be.monto=em; be.quin=eq; ligarPago(c,be.id,val('bl-ep')); sv(c); B.f=''; B.id=''; A.toast('✅ Cambios guardados');
       }
     }
     A.repintar();
   },true);
+  function htmlAprox(c, plan){
+    var hoy=hoy0(), ini=new Date(hoy.getFullYear(),hoy.getMonth(),1), fin=new Date(hoy.getFullYear(),hoy.getMonth()+1,0), pend=0, lista=[];
+    c.pagos.forEach(function(p){ if(p.frec==='unico'&&!parseY(p.fecha)) return; var q=partes(p); if(q.pers<=0) return;
+      var fs=p.frec==='unico'?[parseY(p.fecha)]:ocurr(p.dias||[],ini,fin);
+      fs.forEach(function(f){ if(f<ini||f>fin) return; var ok=!!c.pagados[p.id+'|'+yy(f)]; if(!ok) pend+=q.pers; lista.push({n:p.nombre,m:q.pers,f:f,ok:ok,v:!!p.variable}); }); });
+    lista.sort(function(a,b){ return a.f-b.f; });
+    var tar=0, tarC=0, tf=null; if(tarjetaOK(c.tarjeta)){ var ks=Object.keys(plan.est.stm).filter(function(k){ return plan.est.stm[k]>0; }).sort(); ks.forEach(function(k){ var d=parseY(k); if(d>=ini&&d<=fin){ tar+=plan.est.stm[k]; tarC+=(plan.est.stmC&&plan.est.stmC[k])||0; if(!tf) tf=d; } }); }
+    if(!lista.length && !tar) return '';
+    var h='<div class="fr-card"><h4>🗓 Este mes, aprox. a pagar</h4><div class="fr-num">≈ '+pesos(pend+tar-tarC)+'</div><div class="fr-sub">Servicios y pagos que faltan '+pesos(pend)+(tarjeta0(c)?' · 💳 tarjeta ≈ '+pesos(tar)+(tf?' (se paga el '+lab(tf)+')':'')+(tarC>0?' — tú '+pesos(tar-tarC)+' · consultorio '+pesos(tarC):''):'')+'</div>';
+    h+=lista.map(function(x){ return '<div class="fr-it"><div><b>'+(x.ok?'✓ ':'')+esc(x.n)+'</b><div class="fr-sub">'+lab(x.f)+(x.ok?' · pagado':(x.v?' · aprox.':''))+'</div></div><b style="'+(x.ok?'opacity:.5;text-decoration:line-through':'')+'">'+pesos(x.m)+'</b></div>'; }).join('');
+    return h+'<div class="fr-sub" style="margin-top:6px">Es un aproximado: los servicios y la tarjeta cambian cada mes. Al pagar cada uno puedes poner el valor real y el próximo mes arranca desde ahí. Cada pago se reinicia solo el mes siguiente.</div></div>';
+  }
+  function tarjeta0(c){ return tarjetaOK(c.tarjeta); }
   function htmlPagos(c, plan){
     var h='<div class="fr-card"><h4>📅 Pagos por hacer</h4>', t=c.tarjeta; h+=htmlNom(c,'pg-nmv'); h+=htmlNomRec(c);
     if(!plan.listo) h+='<div class="fr-sub" style="margin-bottom:4px">💵 Falta tu saldo: escríbelo en «Mi cuenta personal» (arriba) para que te diga con qué pagar.</div>';
     else {
       h+='<div class="fr-sub">💵 Con lo que anotaste tienes hoy <b>'+pesos(plan.est.apartado>0?plan.est.libre:plan.est.cash)+'</b>'+(plan.est.apartado>0?' libres (y 🔒 '+pesos(plan.est.apartado)+' apartados en bolsillos)':'')+' (el detalle y «Corregir saldo» están en «Mi cuenta personal», arriba)</div>';
-      if(+t.cupo>0 && +t.debo>+t.cupo) h+='<div class="fr-aviso">💳 Revisa la tarjeta: dice que debes más que el cupo. El <b>cupo</b> es el total de la tarjeta (por ejemplo 1.000.000), no lo que te queda disponible.</div>';
+      if(+t.cupo>0 && (+t.debo>+t.cupo||plan.est.debe>+t.cupo)) h+='<div class="fr-aviso">💳 Las cuentas de la tarjeta no cuadran: el cupo es <b>'+pesos(t.cupo)+'</b> y según lo anotado debes <b>'+pesos(Math.max(+t.debo||0,plan.est.debe))+'</b>. Si ya la pagaste, toca «✓ Mi tarjeta ya está en $0». Si no, corrige el cupo o lo que debes en «⚙️ Mis números».</div>';
       else if(+t.cupo>0 && !(+t.corte>=1)) h+='<div class="fr-aviso">💳 Falta el <b>día de corte</b> de la tarjeta (míralo en la app del banco). Sin él no te puedo decir qué conviene pagar con tarjeta.</div>';
       if(tarjetaOK(t)){ var ks=Object.keys(plan.est.stm).filter(function(k){return plan.est.stm[k]>0;}).sort(), prox=ks[0];
         h+='<div class="fr-sub">💳 Debes <b>'+pesos(plan.est.debe)+'</b> · cupo libre '+pesos(Math.max(0,plan.est.cupoLibre))+(prox?' · próximo pago '+lab(parseY(prox))+' ('+pesos(plan.est.stm[prox])+')':'')+'</div>'; }
@@ -599,22 +631,24 @@
     }
     var nq=estadoNequi(c), accNq=0;
     if(c.pagos.some(function(p){return partes(p).cons>0;})){ h+='<div class="fr-sub">🏥 Los gastos del consultorio salen de:</div><div class="fr-chips" style="margin:4px 0">'+BK.map(function(k){ return '<button class="fr-chip'+((c.gastoDesde||'nequi')===k?' on':'')+'" data-a="pg-gd" data-v="'+k+'" style="min-height:40px;font-size:.84rem">'+BI[k]+' '+BN[k]+'</button>'; }).join('')+'</div>'+(nq.has?'<div class="fr-sub">Ahí hay '+pesos(nq.saldo)+' del consultorio.</div>':''); }
-    if(E.pagandoTarjeta){ var sug=plan.est.stm?Math.max(0,plan.est.debe):0; h+='<div class="fr-row"><input type="text" id="pg-pt" inputmode="numeric" value="'+(sug||'')+'" placeholder="Monto que pagaste"><button class="fr-go" data-a="pg-ptok">Guardar pago</button></div>'; }
-    else h+='<div class="fr-chips" style="margin:6px 0 0">'+chip('pg-pt','💳 Pagué la tarjeta')+'</div>'+(tarjetaOK(t)?'':'<div class="fr-sub">Aunque no hayas completado «Mis números» de la tarjeta, el pago se descuenta de tu plata. Con el día de corte y de pago también te llevo la cuenta de lo que debes.</div>');
+    if(E.pagandoTarjeta){ var sug=plan.est.stm?Math.max(0,plan.est.debe):0; h+='<div class="fr-row"><input type="text" id="pg-pt" inputmode="numeric" value="'+(sug||'')+'" placeholder="Monto que pagaste"><button class="fr-go" data-a="pg-ptok">Guardar pago</button><button class="fr-chip" data-a="pg-ptcan">Cancelar</button></div><label class="fr-ck"><input type="checkbox" id="pg-pt0" checked> Con este pago la tarjeta quedó en $0 (cupo completo otra vez)</label>'+(plan.est.consPend>0?'<div class="fr-sub">🏥 Del total, el consultorio aporta lo de sus compras en la tarjeta (hasta '+pesos(plan.est.consPend)+') y 🏠 tú pones el resto. Se pagan completas, no el mínimo.</div>':''); }
+    else h+='<div class="fr-chips" style="margin:6px 0 0">'+chip('pg-pt','💳 Pagué la tarjeta')+chip('pg-t0','✓ Mi tarjeta ya está en $0')+'</div>'+(tarjetaOK(t)?'':'<div class="fr-sub">Aunque no hayas completado «Mis números» de la tarjeta, el pago se descuenta de tu plata. Con el día de corte y de pago también te llevo la cuenta de lo que debes.</div>');
     h+='<div style="margin-top:10px">';
     if(!plan.items.length) h+='<div class="fr-sub">'+(c.pagos.length?'No tienes pagos en los próximos 30 días. 🌿':'Aún no hay pagos. Agrega los que se repiten (arriendo, servicios, cuotas) en «⚙️ Mis números».')+'</div>';
     plan.items.forEach(function(it,i){
-      var sug=it.medio, puro=(it.monto<=0), mixto=(it.cons>0&&it.monto>0);
+      var sug=it.medio, puro=(it.monto<=0&&it.medio!=='tarjeta'), mixto=(it.cons>0&&it.monto>0);
       h+='<div class="fr-pg"><div class="fr-pgh"><div><b>'+esc(it.p.nombre||'Pago')+'</b> · '+pesos(it.total)+(puro?' <span class="fr-sub">(consultorio)</span>':'')+'<div class="fr-sub">'+(it.atrasado?'⏰ Venció el '+lab(it.orig)+' — sin culpa, cuando puedas':'📅 '+lab(it.fecha))+'</div></div></div>';
       if(mixto) h+='<div class="fr-sub">🏥 <b>'+pesos(it.cons)+'</b> del consultorio ('+pctDe(it.p)+'%) · 🏠 <b>'+pesos(it.monto)+'</b> de tu plata</div>';
       if(it.cons>0){ accNq+=it.cons; if(nq.has) h+='<div class="fr-sug">'+(accNq<=nq.saldo?'🏥 '+(mixto?'La parte del consultorio alcanza':'Alcanza')+' con el dinero del consultorio ('+BN[nq.k]+')':'⚠️ El dinero del consultorio ('+BN[nq.k]+') no alcanza')+'</div>'+(accNq<=nq.saldo?'':'<div class="fr-sub">Tienes '+pesos(nq.saldo)+' y con este pago faltarían '+pesos(accNq-nq.saldo)+'.</div>'); }
       h+='<div class="fr-sub" style="margin-top:6px"><b>¿Lo pagaste?</b> Toca cómo lo pagaste y se actualizan tus cuentas.</div>';
-      if(it.bol){ h+= it.cubierto ? '<div class="fr-sug">🔒 Ya lo tienes apartado en «'+esc(it.bol.nombre)+'» ('+pesos(it.bolTiene)+')</div>' : '<div class="fr-sub">🔒 En «'+esc(it.bol.nombre)+'» hay '+pesos(it.bolTiene)+' y este pago es de '+pesos(it.monto)+': faltan <b>'+pesos(it.monto-it.bolTiene)+'</b> por apartar.</div>'; }
+      h+='<div class="fr-row" style="margin-top:4px"><span class="fr-sub" style="align-self:center">'+(it.p.variable?'Valor aprox. (cámbialo por el real):':'Valor que pagaste:')+'</span><input type="text" id="pg-am-'+i+'" inputmode="numeric" value="'+it.total+'" style="max-width:150px"></div>';
+      if(it.bol){ h+= it.cubierto ? '<div class="fr-sug">🔒 Ya lo tienes apartado en «'+esc(it.bol.nombre)+'» ('+pesos(it.bolTiene)+')</div>' : '<div class="fr-sub">🔒 En «'+esc(it.bol.nombre)+'» hay '+pesos(it.bolTiene)+' y este pago necesita '+pesos(it.bolNeed)+(gmf(c,it.monto)?' (con el 4×1000)':'')+': faltan <b>'+pesos(it.bolNeed-it.bolTiene)+'</b> por apartar.</div>'; }
       if(!puro){
         if(it.tarj && sug==='?') h+='<div class="fr-sub">Puede ir en tarjeta. Completa «Mis números» para saber si conviene.</div>';
-        else if(plan.listo && !it.cubierto) h+='<div class="fr-sug">'+(sug==='tarjeta'?'💳 '+(mixto?'Tu parte: ponla':'Ponlo')+' en la tarjeta':'💵 '+(mixto?'Tu parte: págala':'Págalo')+' con tu plata')+'</div>'+(it.motivo?'<div class="fr-sub">'+esc(it.motivo)+'</div>':'');
+        else if((plan.listo||it.pref!=='segun') && !it.cubierto) h+='<div class="fr-sug">'+(sug==='tarjeta'?'💳 '+(mixto?'Tu parte: ponla':'Ponlo')+' en la tarjeta Nu':(it.pref==='consultorio'?'🏥 Págalo desde la cuenta del consultorio':'💵 '+(mixto?'Tu parte: págala':'Págalo')+' con tu plata'))+'</div>'+(it.motivo?'<div class="fr-sub">'+esc(it.motivo)+'</div>':'')+((sug!=='tarjeta'&&gmf(c,it.monto)>0)?'<div class="fr-sub">+ el 4×1000 ≈ '+pesos(gmf(c,it.monto))+'</div>':'');
         h+='<div class="fr-chips" style="margin:6px 0 0">'+(it.cubierto?'<button class="fr-chip on" data-a="pg-pagar" data-i="'+i+'" data-m="bolsillo" style="min-height:40px;font-size:.82rem">✓ Pagué con el bolsillo «'+esc(it.bol.nombre)+'»</button>':'')+'<button class="fr-chip'+(sug==='tarjeta'?' on':'')+'" data-a="pg-pagar" data-i="'+i+'" data-m="tarjeta" style="min-height:40px;font-size:.82rem"'+(tarjetaOK(t)&&it.p.tarjeta?'':' disabled')+'>✓ Pagué con 💳</button><button class="fr-chip'+(sug==='efectivo'&&!it.cubierto?' on':'')+'" data-a="pg-pagar" data-i="'+i+'" data-m="efectivo" style="min-height:40px;font-size:.82rem">✓ Pagué con 💵</button><button class="fr-chip" data-a="pg-pagar" data-i="'+i+'" data-m="nequi" style="min-height:40px;font-size:.82rem">✓ Pagué con 📱 Nequi</button></div>'+(mixto?'<div class="fr-sub">Al marcarlo anoto la parte del consultorio y la tuya.</div>':'');
-      } else h+='<div class="fr-chips" style="margin:6px 0 0"><button class="fr-chip" data-a="pg-pagar" data-i="'+i+'" data-m="consultorio" style="min-height:40px;font-size:.82rem">✓ Pagado</button></div>';
+      } else if(it.medio==='tarjeta') h+='<div class="fr-sug">💳 Ponlo en la tarjeta Nu (el consultorio aporta su parte cuando pagues la tarjeta)</div><div class="fr-chips" style="margin:6px 0 0"><button class="fr-chip on" data-a="pg-pagar" data-i="'+i+'" data-m="tarjeta" style="min-height:40px;font-size:.82rem"'+(tarjetaOK(t)?'':' disabled')+'>✓ Pagué con 💳</button></div>'+(tarjetaOK(t)?'':'<div class="fr-sub">Completa «Mis números» de la tarjeta para registrarlo.</div>');
+      else h+='<div class="fr-chips" style="margin:6px 0 0"><button class="fr-chip" data-a="pg-pagar" data-i="'+i+'" data-m="consultorio" style="min-height:40px;font-size:.82rem">✓ Pagado</button></div>';
       h+='<div class="fr-chips" style="margin:6px 0 0"><button class="fr-chip" data-a="pg-ya" data-i="'+i+'" style="min-height:40px;font-size:.8rem">Ya lo había pagado antes (solo quitarlo, sin descontar)</button></div>';
       h+='</div>';
     });
@@ -644,6 +678,7 @@
     var t=c.tarjeta, n=c.nomina, d=c.disp, cats=A.catsConsultorio();
     var h='<div class="fr-cfg"><div class="fr-sub"><b>💵 Cuánto tienes hoy</b> (en tu cuenta, sin contar la tarjeta; actualízalo cuando quieras)</div>'+inp('pg-disp','Disponible hoy',d.monto,'Ej.: 400000')+'<button class="fr-chip" data-a="pg-disp" style="min-height:40px;font-size:.84rem">Actualizar solo esto (ya revisé mi saldo)</button>'
       +'<div class="fr-sub" style="margin-top:8px"><b>💰 Dinero del consultorio</b> (Nequi, Bancolombia y efectivo)</div><button class="fr-chip" data-a="bo-form" data-v="reinicio" style="min-height:40px;font-size:.84rem">🔄 Reiniciar / configurar (se abre arriba)</button>'
+      +'<label class="fr-ck" style="margin-top:8px"><input type="checkbox" id="pg-gmf"'+(c.gmf===false?'':' checked')+'> Me cobran el 4×1000 en Nequi y Bancolombia (lo sumo a cada pago que sale de tu cuenta)</label>'
       +'<div class="fr-sub" style="margin-top:8px"><b>💳 Tarjeta de crédito</b> (siempre a una cuota)</div>'+inp('pg-cupo','Cupo',t.cupo,'Ej.: 1000000')+'<div class="fr-2">'+inp('pg-corte','Día de corte',t.corte,'Ej.: 10')+inp('pg-pago','Día de pago',t.pago,'Ej.: 25')+'</div>'+inp('pg-debo','Cuánto debes hoy en la tarjeta (0 si nada)',t.debo,'Ej.: 0')
       +'<div class="fr-sub" style="margin-top:8px"><b>💰 Tu nómina</b></div>'+inp('pg-nm','Monto de cada pago',n.monto,'Ej.: 1718861')+inp('pg-nd','Días del mes en que te llega',(n.dias||[]).join(', '),'Ej.: 15, 30','text')
       +'<div class="fr-chips"><button class="fr-go" data-a="pg-guardar">Guardar mis números</button></div>'
@@ -653,12 +688,14 @@
     h+='<div class="fr-card" id="pn-form" style="margin:10px 0 0;background:#fffafb"><b style="font-size:.85rem">'+(ed?'✏️ Editando: '+esc(ed.nombre):'＋ Agregar un pago')+'</b>'+inp('pn-nom','Nombre',ed?ed.nombre:'','Ej.: Arriendo, Internet, Netflix','text')+inp('pn-mon','Monto',ed?ed.monto:'','Ej.: 350000')
       +'<div class="fr-chips" style="margin:4px 0"><button class="fr-chip'+(E.pnFrec!=='unico'?' on':'')+'" data-a="pg-frec" data-v="mensual" style="min-height:40px;font-size:.84rem">Cada mes</button><button class="fr-chip'+(E.pnFrec==='unico'?' on':'')+'" data-a="pg-frec" data-v="unico" style="min-height:40px;font-size:.84rem">Una sola vez</button></div>'
       +(E.pnFrec==='unico'?'<div class="fr-f"><label>Fecha</label><input type="date" id="pn-fec" value="'+esc(ed&&ed.fecha||'')+'"></div>':inp('pn-dia','Día(s) del mes',ed&&ed.dias?ed.dias.join(', '):'','Ej.: 5   (o 15, 30)','text'))
-      +'<label class="fr-ck"><input type="checkbox" id="pn-tar"'+(ed&&ed.tarjeta?' checked':'')+'> Se puede pagar con tarjeta (por ejemplo, débito automático)</label>'
+      +'<div class="fr-f"><label>¿Con qué se paga?</label><select id="pn-medio" style="font-size:16px;padding:10px 12px;border:1.5px solid #f0d8de;border-radius:12px;width:100%;box-sizing:border-box">'+[['segun','🤔 Según disponibilidad (la app te sugiere)'],['tarjeta','💳 Siempre con la tarjeta Nu'],['personal','🏠 Cuenta personal'],['consultorio','🏥 Cuenta del consultorio']].map(function(o){ return '<option value="'+o[0]+'"'+((ed?prefDe(ed):'segun')===o[0]?' selected':'')+'>'+o[1]+'</option>'; }).join('')+'</select></div>'
+      +'<label class="fr-ck"><input type="checkbox" id="pn-tar"'+(ed&&ed.tarjeta&&prefDe(ed)==='segun'?' checked':'')+'> (Solo si elegiste «según disponibilidad») se puede pagar con tarjeta</label>'
+      +'<label class="fr-ck"><input type="checkbox" id="pn-var"'+(ed&&ed.variable?' checked':'')+'> El valor cambia cada mes (te muestro el aproximado: lo último que pagaste)</label>'
       +inp('pn-pct','% que sale del consultorio',(ed?pctDe(ed):0),'0 = todo personal · 100 = todo consultorio')+'<div class="fr-chips" style="margin:4px 0"><button class="fr-chip" data-a="pg-donde" data-v="personal" style="min-height:40px;font-size:.84rem">🏠 Todo personal (0%)</button><button class="fr-chip" data-a="pg-donde" data-v="consultorio" style="min-height:40px;font-size:.84rem">🏥 Todo consultorio (100%)</button></div>'
       +(bolList(c).length?'<div class="fr-f"><label>🔒 ¿Sale de un bolsillo? (plata que ya apartaste)</label><select id="pn-bol" style="font-size:16px;padding:10px 12px;border:1.5px solid #f0d8de;border-radius:12px;width:100%;box-sizing:border-box"><option value="">No, sale de mi plata libre</option>'+bolList(c).map(function(b){ return '<option value="'+esc(b.id)+'"'+(ed&&String(ed.bolsillo)===String(b.id)?' selected':'')+'>'+esc(b.nombre)+'</option>'; }).join('')+'</select></div>':'')
       +'<button class="fr-go" data-a="pg-agregar" style="margin-top:6px">'+(ed?'Guardar cambios':'Agregar pago')+'</button>'+(ed?' <button class="fr-chip" data-a="pg-cancelar" style="min-height:40px;font-size:.84rem">Cancelar</button>':'')+'</div></div>'
       +'<div class="fr-chips" style="margin-top:10px"><button class="fr-chip" data-a="pg-imp" style="min-height:40px;font-size:.84rem">📥 Pegar mi lista de pagos '+(E.imp?'▴':'▾')+'</button></div>'
-      +(E.imp?'<div class="fr-card" style="margin:6px 0 0;background:#fffafb"><div class="fr-sub">Una línea por pago, separado con <b>|</b>:<br><b>Nombre | monto | % consultorio | día(s) | tarjeta (sí/no)</b><br>Ejemplo: <i>Internet del hogar | 73000 | 90 | 5 | sí</i><br>Si el nombre ya existe, lo actualiza en vez de repetirlo.</div><textarea id="pg-imp-t" rows="7" style="width:100%;box-sizing:border-box;font-size:16px;padding:10px;border:1.5px solid #f0d8de;border-radius:12px;margin-top:6px;font-family:inherit" placeholder="Internet del hogar | 73000 | 90 | 5 | sí"></textarea><button class="fr-go" data-a="pg-impok" style="margin-top:6px">Importar</button></div>':'');
+      +(E.imp?'<div class="fr-card" style="margin:6px 0 0;background:#fffafb"><div class="fr-sub">Una línea por pago, separado con <b>|</b>:<br><b>Nombre | monto | % consultorio | día(s) | tarjeta (sí/no) | medio</b> (medio: tarjeta, personal, consultorio o según)<br>Ejemplo: <i>Internet del hogar | 73000 | 90 | 5 | sí | tarjeta</i><br>Si el nombre ya existe, lo actualiza en vez de repetirlo.</div><textarea id="pg-imp-t" rows="7" style="width:100%;box-sizing:border-box;font-size:16px;padding:10px;border:1.5px solid #f0d8de;border-radius:12px;margin-top:6px;font-family:inherit" placeholder="Internet del hogar | 73000 | 90 | 5 | sí"></textarea><button class="fr-go" data-a="pg-impok" style="margin-top:6px">Importar</button></div>':'');
     return h;
   }
 
@@ -680,7 +717,7 @@
     var c=cfg(), plan=armarPlan(c);
     // se inserta después de la tarjeta de «Anota un movimiento»
     var cut=htmlBase.indexOf('<div class="fr-card"><h4>🏠 Personal');
-    var bloque=htmlSaldoCard(c)+htmlBolsillos(c)+htmlBolsa(c)+htmlPagos(c,plan)+htmlConsMes(c);
+    var bloque=htmlSaldoCard(c)+htmlBolsillos(c)+htmlBolsa(c)+htmlAprox(c,plan)+htmlPagos(c,plan)+htmlConsMes(c);
     return cut>0 ? htmlBase.slice(0,cut)+bloque+htmlBase.slice(cut) : htmlBase+bloque;
   };
 
@@ -694,6 +731,7 @@
     var nuevoDebo = debo===''?(t.debo||0):num(debo);
     if(nuevoDebo!==(+t.debo||0) || !t.deboTs) t.deboTs=Date.now();
     t.cupo=cupo; t.corte=corte; t.pago=pago; t.debo=nuevoDebo;
+    c.gmf=!!(document.getElementById('pg-gmf')||{checked:true}).checked;
     c.nomina={monto:num(val('pg-nm')), dias:dias(val('pg-nd')), desde:(c.nomina&&c.nomina.desde)||A.hoyLocal()};
     sv(c); A.toast('✅ Guardé tus números'); return true;
   }
@@ -701,14 +739,16 @@
     var nom=val('pn-nom'), mon=num(val('pn-mon')), frec=E.pnFrec==='unico'?'unico':'mensual';
     if(!nom||!mon){ A.toast('Escribe el nombre y el monto'); return; }
     var p={id:String(Date.now()),nombre:nom,monto:mon,frec:frec,donde:'personal',tarjeta:!!(document.getElementById('pn-tar')||{}).checked};
+    var mp=val('pn-medio')||'segun'; p.medioPref=mp; p.tarjeta=(mp==='tarjeta')||(mp==='segun'&&p.tarjeta);
     var pcv=parseFloat(String(val('pn-pct')||'0').replace(',','.')); if(!isFinite(pcv)||pcv<0||pcv>100){ A.toast('El porcentaje va de 0 a 100'); return; }
     p.pct=Math.round(pcv*100)/100; p.donde=p.pct>=100?'consultorio':'personal';
     var bsel=val('pn-bol'); if(bsel) p.bolsillo=bsel;
+    if((document.getElementById('pn-var')||{}).checked) p.variable=true;
     if(frec==='unico'){ p.fecha=val('pn-fec'); if(!parseY(p.fecha)){ A.toast('Elige la fecha'); return; } }
     else { p.dias=dias(val('pn-dia')); if(!p.dias.length){ A.toast('Escribe el día del mes (1 a 31)'); return; } }
     var c=cfg();
     if(E.edit){ var ix=-1; c.pagos.forEach(function(q,i){ if(String(q.id)===String(E.edit)) ix=i; });
-      if(ix>=0){ p.id=c.pagos[ix].id; if(c.pagos[ix].categoria) p.categoria=c.pagos[ix].categoria; c.pagos[ix]=p; sv(c); E.edit=null; E.pnFrec='mensual'; E.pnDonde='personal'; A.toast('✅ Cambios guardados'); A.repintar(); return; } }
+      if(ix>=0){ p.id=c.pagos[ix].id; if(c.pagos[ix].categoria) p.categoria=c.pagos[ix].categoria; if(c.pagos[ix].ultimo) p.ultimo=c.pagos[ix].ultimo; c.pagos[ix]=p; sv(c); E.edit=null; E.pnFrec='mensual'; E.pnDonde='personal'; A.toast('✅ Cambios guardados'); A.repintar(); return; } }
     c.pagos.push(p); sv(c); E.pnFrec='mensual'; A.toast('✅ Pago agregado'); A.repintar();
   }
 
@@ -716,11 +756,12 @@
     var t=(document.getElementById('pg-imp-t')||{}).value||''; var c=cfg(), nuevos=0, act=0, malas=[];
     t.split(/\r?\n/).forEach(function(ln){
       ln=ln.trim(); if(!ln) return; var q=ln.split(/\s*[|;]\s*/);
-      var nom=(q[0]||'').replace(/[<>]/g,'').trim(), mon=num(q[1]), pc=parseFloat(String(q[2]==null||q[2]===''?'0':q[2]).replace('%','').replace(',','.')), d=dias(q[3]), tar=/^\s*(s|si|sí|1|x)\b/i.test(q[4]||'');
+      var nom=(q[0]||'').replace(/[<>]/g,'').trim(), mon=num(q[1]), pc=parseFloat(String(q[2]==null||q[2]===''?'0':q[2]).replace('%','').replace(',','.')), d=dias(q[3]), tar=/^\s*(s|si|sí|1|x)\b/i.test(q[4]||''), mraw=norm(q[5]||''), mp=/^tarj/.test(mraw)?'tarjeta':/^consul/.test(mraw)?'consultorio':/^pers|^cuenta pers/.test(mraw)?'personal':/^seg|^disp/.test(mraw)?'segun':'';
       if(!nom||!mon||!d.length||!isFinite(pc)||pc<0||pc>100){ malas.push(ln.slice(0,40)); return; }
       var ex=c.pagos.filter(function(p){ return String(p.nombre||'').toLowerCase()===nom.toLowerCase(); })[0];
       var obj={id:ex?ex.id:String(Date.now())+Math.floor(Math.random()*1000),nombre:nom,monto:mon,frec:'mensual',dias:d,pct:Math.round(pc*100)/100,donde:pc>=100?'consultorio':'personal',tarjeta:tar};
-      if(ex){ if(ex.categoria) obj.categoria=ex.categoria; if(ex.bolsillo) obj.bolsillo=ex.bolsillo; c.pagos[c.pagos.indexOf(ex)]=obj; act++; } else { c.pagos.push(obj); nuevos++; }
+      if(mp){ obj.medioPref=mp; obj.tarjeta=(mp==='tarjeta')||(mp==='segun'&&tar); } else if(ex&&ex.medioPref){ obj.medioPref=ex.medioPref; }
+      if(ex){ if(ex.categoria) obj.categoria=ex.categoria; if(ex.bolsillo) obj.bolsillo=ex.bolsillo; if(ex.variable) obj.variable=true; if(ex.ultimo) obj.ultimo=ex.ultimo; c.pagos[c.pagos.indexOf(ex)]=obj; act++; } else { c.pagos.push(obj); nuevos++; }
     });
     sv(c);
     if(malas.length) A.toast('Revisa estas líneas (faltó monto o día): '+malas.join(' · ')); else A.toast('✅ Importé '+nuevos+' nuevos y actualicé '+act);
@@ -728,17 +769,24 @@
   }
   function pagar(i,medio){
     var c=cfg(), plan=armarPlan(c), it=plan.items[i]; if(!it) return;
+    var real=num(val('pg-am-'+i)); if(real>0 && real!==it.total){ var pcx=pctDe(it.p), cx=Math.round(real*pcx/100); it.ant=it.total; it.total=real; it.cons=cx; it.monto=real-cx; if(it.bol){ it.bolNeed=it.monto+gmf(c,it.monto); it.cubierto=((it.bolTiene||0)>=it.bolNeed); } }
+    if(medio==='bolsillo' && !it.cubierto){ A.toast('Ese bolsillo no alcanza para este pago'); return; }
     var hoyS=A.hoyLocal(), pc=pctDe(it.p), mixto=(it.cons>0&&it.monto>0);
     if(it.cons>0){
-      if(typeof registros==='undefined'||typeof finGuardar!=='function'){ A.toast('No pude guardar en el Finanzas del consultorio'); return; }
-      var reg={id:Date.now(),tipo:'gasto',descripcion:it.p.nombre+(mixto?' ('+pc+'%)':''),fecha:hoyS,monto:it.cons,categoria:(it.p.categoria)||'Otro',desde:(c.gastoDesde||'nequi')};
-      if(window.ROL_ACTUAL==='administrador' && typeof finEnviarARevision==='function') finEnviarARevision(reg); else { registros.push(reg); finGuardar(); try{ renderAll(); }catch(e){} }
+      if(medio==='tarjeta'){
+        // el consultorio aporta su parte cuando se paga la tarjeta: por ahora queda anotada como compra del consultorio en la tarjeta
+        c.tarjCons=Array.isArray(c.tarjCons)?c.tarjCons:[]; c.tarjCons.push({id:String(Date.now()),ts:Date.now(),fecha:hoyS,monto:it.cons,desc:it.p.nombre+(mixto?' ('+pc+'%)':''),categoria:it.p.categoria||'Otro'});
+      } else {
+        if(typeof registros==='undefined'||typeof finGuardar!=='function'){ A.toast('No pude guardar en el Finanzas del consultorio'); return; }
+        var reg={id:Date.now(),tipo:'gasto',descripcion:it.p.nombre+(mixto?' ('+pc+'%)':''),fecha:hoyS,monto:it.cons,categoria:(it.p.categoria)||'Otro',desde:(c.gastoDesde||'nequi')};
+        if(window.ROL_ACTUAL==='administrador' && typeof finEnviarARevision==='function') finEnviarARevision(reg); else { registros.push(reg); finGuardar(); try{ renderAll(); }catch(e){} }
+      }
     }
-    if(medio==='bolsillo' && !it.cubierto){ A.toast('Ese bolsillo no alcanza para este pago'); return; }
+    if(it.ant){ var pp=c.pagos.filter(function(q){ return String(q.id)===String(it.p.id); })[0]; if(pp){ pp.ultimo=real; if(pp.variable) pp.monto=real; } }
     if(it.monto>0){
       var P=A.leerP(); P.push({id:String(Date.now()+1),fecha:hoyS,monto:it.monto,desc:it.p.nombre+(mixto?' ('+(100-pc)+'%)':''),medio:medio==='tarjeta'?'tarjeta':(medio==='nequi'?'nequi':'efectivo')}); A.guardarP(P);
     }
-    if(medio==='bolsillo' && it.bol){ var bb=bolById(c,it.bol.id); bb.monto=Math.max(0,(+bb.monto||0)-it.monto); bolMov(c,bb,-it.monto,'Pagué '+it.p.nombre); }
+    if(medio==='bolsillo' && it.bol){ var bb=bolById(c,it.bol.id), q2=Math.min(+bb.monto||0,it.bolNeed); bb.monto=(+bb.monto||0)-q2; bolMov(c,bb,-q2,'Pagué '+it.p.nombre); }
     c.pagados[it.key]=true; sv(c); A.toast('✅ Pago anotado: '+it.p.nombre+(medio==='bolsillo'?'. Salió del bolsillo «'+it.bol.nombre+'»':'')); A.repintar();
   }
   document.addEventListener('click',function(e){
@@ -770,8 +818,16 @@
     else if(a==='pg-donde'){ var fpc=document.getElementById('pn-pct'); if(fpc) fpc.value=(b.getAttribute('data-v')==='consultorio'?'100':'0'); }
     else if(a==='pg-quitar'){ var id=b.getAttribute('data-id'), c=cfg(); c.pagos=c.pagos.filter(function(p){ return String(p.id)!==id; }); sv(c); A.repintar(); }
     else if(a==='pg-pagar') pagar(+b.getAttribute('data-i'), b.getAttribute('data-m'));
+    else if(a==='pg-ptcan'){ E.pagandoTarjeta=false; A.repintar(); }
+    else if(a==='pg-t0'){ if(!confirm('¿Dejar la deuda de la tarjeta en $0 y el cupo completo? (No mueve tu plata: úsalo si ya la pagaste y solo falta reiniciar.)')) return; var ct=cfg(); ct.tarjeta.debo=0; ct.tarjeta.deboTs=Date.now(); ct.tarjCons=[]; sv(ct); A.toast('✅ Tarjeta en $0: cupo libre '+pesos(+ct.tarjeta.cupo||0)); A.repintar(); }
     else if(a==='pg-pt'){ E.pagandoTarjeta=true; A.repintar(); var f=document.getElementById('pg-pt'); if(f) f.focus(); }
-    else if(a==='pg-ptok'){ var m=num(val('pg-pt')); if(!m){ A.toast('Escribe cuánto pagaste'); return; } var P=A.leerP(); P.push({id:String(Date.now()),tipo:'pagotarjeta',fecha:A.hoyLocal(),monto:m,desc:'Pago de la tarjeta'}); A.guardarP(P); E.pagandoTarjeta=false; A.toast('✅ Pago de tarjeta anotado'); A.repintar(); }
+    else if(a==='pg-ptok'){ var m=num(val('pg-pt')); if(!m){ A.toast('Escribe cuánto pagaste'); return; } var cero=!!(document.getElementById('pg-pt0')||{}).checked; var cT=cfg(), estT=estadoActual(cT), Y=Math.min(estT.consPend||0,m), Z=m-Y, pid=String(Date.now());
+      var P=A.leerP(); P.push({id:pid,tipo:'pagotarjeta',fecha:A.hoyLocal(),monto:Z,total:m,consultorio:Y,desc:'Pago de la tarjeta'+(Y>0?' (tu parte; el consultorio puso '+pesos(Y)+')':'')}); A.guardarP(P);
+      if(Y>0){ var reg={id:Date.now()+1,tipo:'gasto',descripcion:'Tarjeta Nu (parte del consultorio)',fecha:A.hoyLocal(),monto:Y,categoria:'Otro',desde:(cT.gastoDesde||'nequi')};
+        if(typeof registros!=='undefined'&&typeof finGuardar==='function'){ if(window.ROL_ACTUAL==='administrador' && typeof finEnviarARevision==='function') finEnviarARevision(reg); else { registros.push(reg); finGuardar(); try{ renderAll(); }catch(x){} } }
+        var q=Y, L=(Array.isArray(cT.tarjCons)?cT.tarjCons:[]).slice(); for(var z=0;z<L.length&&q>0;z++){ var u=Math.min(+L[z].monto||0,q); L[z].monto=(+L[z].monto||0)-u; q-=u; } cT.tarjCons=L.filter(function(x){ return (+x.monto||0)>0; }); }
+      if(cero){ cT.tarjeta.debo=0; cT.tarjeta.deboTs=+pid; cT.tarjCons=[]; }
+      sv(cT); E.pagandoTarjeta=false; A.toast('✅ Tarjeta pagada: '+pesos(m)+(Y>0?' ('+'tú '+pesos(Z)+' · consultorio '+pesos(Y)+')':'')+(cero?'. Quedó en $0, cupo completo':'')); A.repintar(); }
   },true);
   // estilos
   var st=document.createElement('style'); st.textContent='#fin-rapido .fr-pg{border-top:1px solid #f6e6ea;padding:10px 0}#fin-rapido .fr-pg:first-child{border-top:none}#fin-rapido .fr-sug{font-weight:700;color:#7a3c4b;margin-top:4px}#fin-rapido .fr-aviso{background:#fff3e6;border:1.5px solid #e8c9a0;border-radius:12px;padding:8px 10px;margin:8px 0;font-size:.85rem;color:#7a4a1c}#fin-rapido .fr-cfg{margin-top:10px;border-top:1px solid #f6e6ea;padding-top:10px}#fin-rapido .fr-f{display:flex;flex-direction:column;gap:3px;margin:6px 0}#fin-rapido .fr-f label{font-size:.74rem;color:#a0536a}#fin-rapido .fr-f input{font-size:16px;padding:10px 12px;border:1.5px solid #f0d8de;border-radius:12px;width:100%;box-sizing:border-box;font-family:inherit}#fin-rapido .fr-2{display:grid;grid-template-columns:1fr 1fr;gap:8px}#fin-rapido .fr-row{display:flex;gap:8px;margin-top:8px}#fin-rapido .fr-row input{flex:1;font-size:16px;padding:10px 12px;border:1.5px solid #f0d8de;border-radius:12px}#fin-rapido .fr-ck{display:flex;gap:8px;align-items:center;font-size:.85rem;margin:6px 0}#fin-rapido .fr-ck input{width:22px;height:22px}#fin-rapido .fr-chip[disabled]{opacity:.45}#fin-rapido .fr-nom,#fr-nom-flot .fr-nom{background:#fff8e6;border:1.5px solid #e8d49a;border-radius:14px;padding:10px;margin:0 0 10px}#fr-nom-flot{position:fixed;left:10px;right:10px;bottom:10px;z-index:9000;max-width:460px;margin:0 auto;box-shadow:0 6px 24px rgba(0,0,0,.2);border-radius:14px;background:#fff}#fr-nom-flot .fr-row{display:flex;gap:8px;margin-top:8px;flex-wrap:wrap}#fr-nom-flot .fr-row input{flex:1;min-width:0;font-size:16px;padding:10px 12px;border:1.5px solid #f0d8de;border-radius:12px}#fr-nom-flot .fr-go,#fin-rapido .fr-go{padding:10px 14px}#fr-nom-flot .fr-chip{border:1.5px solid #f0d8de;border-radius:20px;background:#fff;padding:6px 14px}#fr-nom-flot .fr-sub{font-size:.76rem;color:#a0536a;margin-top:4px}#fin-rapido .fr-it{gap:8px;min-width:0}#fin-rapido .fr-it>div:first-child{min-width:0;flex:1;overflow-wrap:anywhere}#fin-rapido .fr-row{flex-wrap:wrap}#fin-rapido .fr-row input{min-width:0}#fin-rapido .fr-go{max-width:100%}';
