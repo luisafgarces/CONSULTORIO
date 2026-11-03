@@ -712,6 +712,7 @@
       +inp('pn-hist','Pagos anteriores de este servicio (opcional): escribe los últimos valores separados por coma, el más reciente al final',(ed&&Array.isArray(ed.hist)?ed.hist.map(function(x){ return x.m; }).join(', '):''),'Ej.: 118000, 135000, 121000','text')
       +inp('pn-pct','% que sale del consultorio',(ed?pctDe(ed):0),'0 = todo personal · 100 = todo consultorio')+'<div class="fr-chips" style="margin:4px 0"><button class="fr-chip" data-a="pg-donde" data-v="personal" style="min-height:40px;font-size:.84rem">🏠 Todo personal (0%)</button><button class="fr-chip" data-a="pg-donde" data-v="consultorio" style="min-height:40px;font-size:.84rem">🏥 Todo consultorio (100%)</button></div>'
       +(bolList(c).length?'<div class="fr-f"><label>🔒 ¿Sale de un bolsillo? (plata que ya apartaste)</label><select id="pn-bol" style="font-size:16px;padding:10px 12px;border:1.5px solid #f0d8de;border-radius:12px;width:100%;box-sizing:border-box"><option value="">No, sale de mi plata libre</option>'+bolList(c).map(function(b){ return '<option value="'+esc(b.id)+'"'+(ed&&String(ed.bolsillo)===String(b.id)?' selected':'')+'>'+esc(b.nombre)+'</option>'; }).join('')+'</select></div>':'')
+      +(ed?'':'<label class="fr-ck"><input type="checkbox" id="pn-pas" checked> Las fechas de este pago que ya pasaron (por ejemplo, la de este mes) <b>ya las pagué</b>: no me las pongas como pendientes ni me descuentes nada</label>')
       +'<button class="fr-go" data-a="pg-agregar" style="margin-top:6px">'+(ed?'Guardar cambios':'Agregar pago')+'</button>'+(ed?' <button class="fr-chip" data-a="pg-cancelar" style="min-height:40px;font-size:.84rem">Cancelar</button>':'')+'</div></div>'
       +'<div class="fr-chips" style="margin-top:10px"><button class="fr-chip" data-a="pg-imp" style="min-height:40px;font-size:.84rem">📥 Pegar mi lista de pagos '+(E.imp?'▴':'▾')+'</button></div>'
       +(E.imp?'<div class="fr-card" style="margin:6px 0 0;background:#fffafb"><div class="fr-sub">Una línea por pago, separado con <b>|</b>:<br><b>Nombre | monto | % consultorio | día(s) | tarjeta (sí/no) | medio | automático (sí/no)</b> (medio: tarjeta, personal, consultorio o según)<br>Ejemplo: <i>Internet del hogar | 73000 | 90 | 5 | sí | tarjeta</i><br>Si el nombre ya existe, lo actualiza en vez de repetirlo.</div><textarea id="pg-imp-t" rows="7" style="width:100%;box-sizing:border-box;font-size:16px;padding:10px;border:1.5px solid #f0d8de;border-radius:12px;margin-top:6px;font-family:inherit" placeholder="Internet del hogar | 73000 | 90 | 5 | sí"></textarea><button class="fr-go" data-a="pg-impok" style="margin-top:6px">Importar</button></div>':'');
@@ -772,7 +773,10 @@
     var c=cfg();
     if(E.edit){ var ix=-1; c.pagos.forEach(function(q,i){ if(String(q.id)===String(E.edit)) ix=i; });
       if(ix>=0){ p.id=c.pagos[ix].id; if(c.pagos[ix].categoria) p.categoria=c.pagos[ix].categoria; if(c.pagos[ix].ultimo) p.ultimo=c.pagos[ix].ultimo; c.pagos[ix]=p; sv(c); E.edit=null; E.pnFrec='mensual'; E.pnDonde='personal'; A.toast('✅ Cambios guardados'); A.repintar(); return; } }
-    c.pagos.push(p); sv(c); E.pnFrec='mensual'; A.toast('✅ Pago agregado'); A.repintar();
+    var nPas=0;
+    if((document.getElementById('pn-pas')||{}).checked){ var h0=hoy0(), at0=new Date(h0.getFullYear(),h0.getMonth(),h0.getDate()-20), ay=new Date(h0.getFullYear(),h0.getMonth(),h0.getDate()-1);
+      var fp=p.frec==='unico'?(parseY(p.fecha)?[parseY(p.fecha)]:[]):ocurr(p.dias||[],at0,ay); fp.forEach(function(f){ if(f<h0){ c.pagados[p.id+'|'+yy(f)]=true; nPas++; } }); }
+    c.pagos.push(p); sv(c); E.pnFrec='mensual'; A.toast('✅ Pago agregado'+(nPas?'. Marqué como ya pagadas '+nPas+' fecha'+(nPas>1?'s':'')+' anterior'+(nPas>1?'es':'')+' (sin descontar nada)':'')); A.repintar();
   }
 
   function importar(){
