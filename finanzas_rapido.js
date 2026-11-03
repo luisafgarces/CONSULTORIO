@@ -303,7 +303,7 @@
   // ---- bolsillos: plata que ya está en tu cuenta pero apartada para algo (arriendo, etc.) ----
   function bolList(c){ return Array.isArray(c.bolsillos)?c.bolsillos:[]; }
   function bolById(c,id){ return bolList(c).filter(function(b){ return String(b.id)===String(id); })[0]||null; }
-  function bolMov(c,b,d,t){ c.bolMov=Array.isArray(c.bolMov)?c.bolMov:[]; c.bolMov.push({id:String(Date.now())+Math.floor(Math.random()*1000),bid:b.id,nombre:b.nombre,d:d,fecha:A.hoyLocal(),t:t}); if(c.bolMov.length>200) c.bolMov=c.bolMov.slice(-200); }
+  function bolMov(c,b,d,t,sin){ c.bolMov=Array.isArray(c.bolMov)?c.bolMov:[]; c.bolMov.push({id:String(Date.now())+Math.floor(Math.random()*1000),bid:b.id,nombre:b.nombre,d:d,fecha:A.hoyLocal(),t:t,sin:!!sin}); if(c.bolMov.length>200) c.bolMov=c.bolMov.slice(-200); }
 
   // ---- lo que ya registraste desde que escribiste «cuánto tienes hoy» / «cuánto debes» ----
   function estadoActual(c){
@@ -323,7 +323,9 @@
     var ks=Object.keys(stm).sort(), resto=pagosT; ks.forEach(function(k){ var q=Math.min(stm[k],resto); stm[k]-=q; resto-=q; if(stmC[k]>stm[k]) stmC[k]=stm[k]; }); // los pagos se aplican al más antiguo
     var debe=0; ks.forEach(function(k){ debe+=stm[k]; }); if(resto>0) debe=Math.max(0,debe-resto);
     var apart=0; (Array.isArray(c.bolsillos)?c.bolsillos:[]).forEach(function(b){ apart+=(+b.monto||0); });
-    return {stmC:stmC, consPend:consPend, cash:cash, apartado:apart, libre:cash-apart, movs:movs, stm:stm, debe:debe, cupoLibre:(+t.cupo||0)-debe, hayDisp: c.disp.monto!=null && c.disp.monto!=='' };
+    var aparte=!!c.bolAparte, libreX=cash-apart, cashX=cash;
+    if(aparte){ var ap2=0, t0=Math.max(tsC,+c.bolAparteTs||0); (Array.isArray(c.bolMov)?c.bolMov:[]).forEach(function(m){ if(m.sin||!(parseFloat(String(m.id).slice(0,13))>t0)) return; ap2+=(+m.d||0); movs.push({f:m.fecha,t:(m.d>0?'Aparté en «':'Saqué de «')+(m.nombre||'bolsillo')+'»'+(m.t&&/^Pagué/.test(m.t)?' ('+m.t+')':''),d:-(+m.d||0)}); }); libreX=cash-ap2; cashX=libreX+apart; }
+    return {aparte:aparte, stmC:stmC, consPend:consPend, cash:cashX, apartado:apart, libre:libreX, movs:movs, stm:stm, debe:debe, cupoLibre:(+t.cupo||0)-debe, hayDisp: c.disp.monto!=null && c.disp.monto!=='' };
   }
 
 
@@ -528,16 +530,17 @@
     if(!est.hayDisp){
       return h+'<div class="fr-sub"><b>Aún no me has dicho cuánto tienes.</b> Escribe lo que ves hoy en la app de tu banco (sin contar la tarjeta). Desde ahí, todo lo que entre se suma y todo lo que pagues se resta.</div><div class="fr-row"><input type="text" id="pg-sd" inputmode="numeric" placeholder="Ej.: 950000"><button class="fr-go" data-a="pg-sdok">Guardar saldo</button></div></div>';
     }
-    if(est.apartado>0){ h+='<div class="fr-sub">Libre para gastar</div><div class="fr-num">'+(est.libre<0?'−':'')+pesos(Math.abs(est.libre))+'</div><div class="fr-sub">💵 Total en tu cuenta <b>'+pesos(est.cash)+'</b> · 🔒 Apartado en bolsillos <b>'+pesos(est.apartado)+'</b></div>'; }
+    if(est.apartado>0&&est.aparte){ h+='<div class="fr-sub">Disponible (lo que ves en el banco, sin tus bolsillos)</div><div class="fr-num">'+(est.libre<0?'−':'')+pesos(Math.abs(est.libre))+'</div><div class="fr-sub">🔒 En bolsillos (aparte, no se ve en el disponible) <b>'+pesos(est.apartado)+'</b> · Total con bolsillos <b>'+pesos(est.cash)+'</b></div>'; }
+    else if(est.apartado>0){ h+='<div class="fr-sub">Libre para gastar</div><div class="fr-num">'+(est.libre<0?'−':'')+pesos(Math.abs(est.libre))+'</div><div class="fr-sub">💵 Total en tu cuenta <b>'+pesos(est.cash)+'</b> · 🔒 Apartado en bolsillos <b>'+pesos(est.apartado)+'</b></div>'; }
     else h+='<div class="fr-num">'+pesos(est.cash)+'</div>';
     h+='<div class="fr-sub">Tu saldo de partida más lo que has registrado desde entonces: lo que entra se suma y lo que pagas se resta.</div>';
     h+='<div class="fr-sub">Partiste de <b>'+pesos(+c.disp.monto||0)+'</b>'+(+c.disp.ts>0?' (lo escribiste el '+fechaDeTs(c.disp.ts)+')':'')+'</div>';
     h+='<div class="fr-chips" style="margin:6px 0 0"><button class="fr-chip" data-a="pg-sd" style="min-height:40px;font-size:.84rem">✏️ Corregir saldo</button><button class="fr-chip" data-a="pg-cuenta" style="min-height:40px;font-size:.84rem">'+(E.cuenta?'Ocultar cuenta':'¿Cómo salió?')+'</button></div>';
-    if(E.sd) h+='<div class="fr-sub" style="margin-top:4px">Escribe lo que <b>de verdad</b> tienes hoy en la cuenta (lo que ves en la app del banco):</div><div class="fr-row"><input type="text" id="pg-sd" inputmode="numeric" value="'+Math.max(0,Math.round(est.cash))+'"><button class="fr-go" data-a="pg-sdok">Guardar saldo</button><button class="fr-chip" data-a="pg-sdcan">Cancelar</button></div>';
+    if(E.sd) h+='<div class="fr-sub" style="margin-top:4px">'+(est.aparte?'Escribe el <b>disponible</b> que ves en la app del banco (<b>sin</b> contar tus bolsillos):':'Escribe lo que <b>de verdad</b> tienes hoy en la cuenta (lo que ves en la app del banco, <b>incluyendo</b> tus bolsillos si los hay):')+'</div><div class="fr-row"><input type="text" id="pg-sd" inputmode="numeric" value="'+Math.max(0,Math.round(est.aparte?est.libre:est.cash))+'"><button class="fr-go" data-a="pg-sdok">Guardar saldo</button><button class="fr-chip" data-a="pg-sdcan">Cancelar</button></div>';
       if(E.cuenta){ h+='<div class="fr-cfg" style="margin-top:4px"><div class="fr-sub">Partiste de <b>'+pesos(+c.disp.monto||0)+'</b> (lo que escribiste en «Disponible hoy»). Desde entonces:</div>'+((Array.isArray(c.dispHist)&&c.dispHist.length>1)?'<div class="fr-sub">Saldos que has escrito antes: '+c.dispHist.slice(0,-1).slice(-5).map(function(x){ return pesos(x.monto)+' ('+esc(x.fecha)+')'; }).join(' · ')+'</div>':'')+(plan.est.movs.length?plan.est.movs.map(function(m){ return '<div class="fr-it"><div><b>'+esc(m.t)+'</b><div class="fr-sub">'+esc(m.f||'')+'</div></div><b>'+(m.d>0?'+':'−')+pesos(Math.abs(m.d))+'</b></div>'; }).join(''):'<div class="fr-sub">no has registrado movimientos con tu plata.</div>')+'<div class="fr-sub">Si tu saldo real es otro, escríbelo en «⚙️ Mis números» → «Disponible hoy» y toca «Actualizar solo esto».</div></div>'; }
     return h+'</div>';
   }
-  window._frCash=function(){ try{ var e=estadoActual(cfg()); return e.hayDisp?e.cash:null; }catch(x){ return null; } };
+  window._frCash=function(){ try{ var e=estadoActual(cfg()); return e.hayDisp?(e.aparte?e.libre:e.cash):null; }catch(x){ return null; } };
   function nomRecientes(){
     var P=A.leerP(), hoy=hoy0(), lim=new Date(hoy.getFullYear(),hoy.getMonth(),hoy.getDate()-35), out=[];
     P.forEach(function(g){ if(g.tipo==='ingreso'&&g.desc==='Nómina'){ var f=parseY(g.fecha); if(f&&f>=lim) out.push(g); } });
@@ -562,8 +565,9 @@
     }
     var quin=L.filter(function(b){ return +b.quin>0; }), totq=0; quin.forEach(function(b){ totq+=(+b.quin||0); });
     if(c.apartarPend && quin.length) h+='<div class="fr-nom"><b>💰 Entró tu nómina: ¿apartas para tus bolsillos?</b>'+quin.map(function(b){ return '<div class="fr-sub">🔒 '+esc(b.nombre)+': <b>'+pesos(b.quin)+'</b></div>'; }).join('')+'<div class="fr-chips" style="margin:6px 0 0"><button class="fr-go" data-a="bl-quin">Sí, apartar '+pesos(totq)+'</button><button class="fr-chip" data-a="bl-quinno" style="min-height:40px;font-size:.84rem">Ahora no</button></div><div class="fr-sub">La plata sigue en tu cuenta; solo queda marcada como apartada.</div></div>';
+    h+='<div class="fr-sub" style="margin-bottom:4px">¿Cómo ves tus bolsillos en el banco?</div><div class="fr-chips" style="margin:0 0 6px"><button class="fr-chip'+(c.bolAparte?'':' on')+'" data-a="bl-modo" data-v="dentro" style="min-height:40px;font-size:.8rem">El saldo que escribo ya los incluye</button><button class="fr-chip'+(c.bolAparte?' on':'')+'" data-a="bl-modo" data-v="aparte" style="min-height:40px;font-size:.8rem">Están aparte (el disponible del banco no los muestra)</button></div>';
     h+='<div class="fr-sub">🔒 Apartado <b>'+pesos(est.apartado)+'</b>'+(est.hayDisp?' · 💵 Libre <b>'+(est.libre<0?'−':'')+pesos(Math.abs(est.libre))+'</b>':'')+'</div>';
-    if(est.hayDisp && est.apartado>est.cash) h+='<div class="fr-aviso">⚠️ Tienes apartado más de lo que hay en la cuenta ('+pesos(est.cash)+'). Revisa tu saldo en «Corregir saldo» o saca plata de algún bolsillo.</div>';
+    if(est.hayDisp && !est.aparte && est.apartado>est.cash) h+='<div class="fr-aviso">⚠️ Tienes apartado más de lo que hay en la cuenta ('+pesos(est.cash)+'). Revisa tu saldo en «Corregir saldo» o saca plata de algún bolsillo.</div>';
     L.forEach(function(b){
       var px=bolProx(c,b), abierto=(B.id===String(b.id));
       h+='<div class="fr-pg"><div class="fr-pgh"><div><b>🔒 '+esc(b.nombre)+'</b> · '+pesos(b.monto)+'<div class="fr-sub">'+(function(){ var pq=bolParaQue(c,b); return pq.length?'Para: '+pq.map(function(p){ return '«'+esc(p.nombre)+'»'; }).join(', ')+' · ':'Sin pago asignado · '; })()+(+b.quin>0?'Apartas '+pesos(b.quin)+' cada quincena':'Sin monto fijo por quincena')+'</div>'
@@ -585,6 +589,7 @@
     if(a==='bl-form'){ B.f=b.getAttribute('data-v')||''; B.id=id||''; }
     else if(a==='bl-cancel'){ B.f=''; B.id=''; }
     else if(a==='bl-mov'){ B.mov=!B.mov; }
+    else if(a==='bl-modo'){ var ap=(b.getAttribute('data-v')==='aparte'); if(!!c.bolAparte!==ap){ c.bolAparte=ap; c.bolAparteTs=Date.now(); sv(c); A.toast(ap?'Listo: tu saldo es el disponible del banco y los bolsillos van aparte. Corrige el saldo con el disponible que ves.':'Listo: tu saldo ya incluye los bolsillos.'); } }
     else if(a==='bl-quinno'){ delete c.apartarPend; sv(c); }
     else if(a==='bl-quin'){
       var Lq=bolList(c).filter(function(x){ return +x.quin>0; }), tq=0; Lq.forEach(function(x){ tq+=(+x.quin||0); });
@@ -594,8 +599,8 @@
     else if(a==='bl-ok'){
       if(B.f==='nuevo'){
         var nn=val('bl-nn'), nm=num(val('bl-nm')), nq=num(val('bl-nq')); if(!nn){ A.toast('Escribe el nombre del bolsillo'); return; }
-        if(nm>0 && !libreOk(nm)) return;
-        var nb={id:String(Date.now()),nombre:nn,monto:nm,quin:nq}; c.bolsillos=bolList(c).concat([nb]); if(val('bl-np')) ligarPago(c,nb.id,val('bl-np')); if(nm>0) bolMov(c,nb,nm,'Aparté al crear el bolsillo'); sv(c); B.f=''; B.id=''; A.toast('✅ Bolsillo «'+nn+'» creado');
+        if(nm>0 && !c.bolAparte && !libreOk(nm)) return;
+        var nb={id:String(Date.now()),nombre:nn,monto:nm,quin:nq}; c.bolsillos=bolList(c).concat([nb]); if(val('bl-np')) ligarPago(c,nb.id,val('bl-np')); if(nm>0) bolMov(c,nb,nm,'Aparté al crear el bolsillo',true); sv(c); B.f=''; B.id=''; A.toast('✅ Bolsillo «'+nn+'» creado');
       } else if(B.f==='apartar'||B.f==='sacar'){
         var bb=bolById(c,B.id), m=num(val('bl-m')); if(!bb) return; if(!m||m<=0){ A.toast('Escribe cuánto'); return; }
         if(B.f==='apartar'){ if(!libreOk(m)) return; bb.monto=(+bb.monto||0)+m; bolMov(c,bb,m,'Aparté'); A.toast('✅ Apartaste '+pesos(m)+' en «'+bb.nombre+'»'); }
@@ -603,8 +608,8 @@
         sv(c); B.f=''; B.id='';
       } else if(B.f==='editar'){
         var be=bolById(c,B.id); if(!be) return; var en=val('bl-en'), em=num(val('bl-em')), eq=num(val('bl-eq')); if(!en){ A.toast('Escribe el nombre'); return; }
-        var dl=em-(+be.monto||0); if(dl>0 && !libreOk(dl)) return;
-        if(dl) bolMov(c,be,dl,'Corregí el monto'); be.nombre=en; be.monto=em; be.quin=eq; ligarPago(c,be.id,val('bl-ep')); sv(c); B.f=''; B.id=''; A.toast('✅ Cambios guardados');
+        var dl=em-(+be.monto||0); if(dl>0 && !c.bolAparte && !libreOk(dl)) return;
+        if(dl) bolMov(c,be,dl,'Corregí el monto',true); be.nombre=en; be.monto=em; be.quin=eq; ligarPago(c,be.id,val('bl-ep')); sv(c); B.f=''; B.id=''; A.toast('✅ Cambios guardados');
       }
     }
     A.repintar();
