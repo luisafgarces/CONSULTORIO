@@ -441,15 +441,15 @@
     items.sort(function(a,b){ return a.fecha-b.fecha || a.orig-b.orig; });
     var avail={}; bolList(c).forEach(function(b){ avail[b.id]=+b.monto||0; });
     items.forEach(function(it){ var b=bolDeP(c,it.p); if(!b||it.monto<=0) return; var need=it.monto+gmf(c,it.monto); it.bol=b; it.bolNeed=need; it.bolTiene=avail[b.id]||0;
-      if(avail[b.id]>=need){ it.cubierto=true; avail[b.id]-=need; } });
+      var u=Math.min(avail[b.id]||0,need); it.bolUsa=u; avail[b.id]=(avail[b.id]||0)-u; if(u>=need) it.cubierto=true; });
     var est=estadoActual(c), t=c.tarjeta, nom=(+c.nomina.monto>0)?ocurr(c.nomina.dias||[], new Date(hoy.getFullYear(),hoy.getMonth(),hoy.getDate()+1), hasta):[];
     function eventos(over){
       var ev=[], stm={}, stmC={}; Object.keys(est.stm).forEach(function(k){ stm[k]=est.stm[k]; stmC[k]=(est.stmC&&est.stmC[k])||0; });
-      nom.forEach(function(f){ ev.push({f:yy(f),d:+c.nomina.monto}); });
+      nom.forEach(function(f){ ev.push({f:yy(f),d:+c.nomina.monto,t:'Nómina'}); });
       items.forEach(function(it,i){ var med=(i in over)?over[i]:it.medio;
         if(med==='tarjeta' && tarjetaOK(t)){ var k=yy(vence(it.fecha,t)); stm[k]=(stm[k]||0)+it.monto+it.cons; stmC[k]=(stmC[k]||0)+it.cons; }
-        else if(it.monto>0 && !it.cubierto) ev.push({f:yy(it.fecha),d:-(it.monto+gmf(c,it.monto))}); });
-      Object.keys(stm).forEach(function(k){ var pers=stm[k]-(stmC[k]||0); if(pers>0) ev.push({f:k,d:-(pers+gmf(c,pers))}); });
+        else if(it.monto>0 && !it.cubierto) ev.push({f:yy(it.fecha),d:-(it.monto+gmf(c,it.monto)-(it.bolUsa||0)),t:(it.p.nombre||'Pago')+(it.atrasado?' (vencido)':'')}); });
+      Object.keys(stm).forEach(function(k){ var pers=stm[k]-(stmC[k]||0); if(pers>0) ev.push({f:k,d:-(pers+gmf(c,pers)),t:'Pago de la tarjeta'}); });
       return ev;
     }
     function caja(ev,f){ var s=est.libre, k=yy(f); ev.forEach(function(e){ if(e.f<=k) s+=e.d; }); return s; }
@@ -476,7 +476,7 @@
       it.medio = it.medio||'efectivo';
     });
     var evF=eventos({}), aviso=null;
-    if(listo){ var fechasEv=evF.map(function(e){return e.f;}).sort(); var visto={}; for(var k=0;k<fechasEv.length;k++){ var fk=fechasEv[k]; if(visto[fk]) continue; visto[fk]=1; var cc=caja(evF,parseY(fk)); if(cc<0){ aviso={f:parseY(fk),falta:-cc}; break; } } }
+    if(listo){ var fechasEv=evF.map(function(e){return e.f;}).sort(); var visto={}; for(var k=0;k<fechasEv.length;k++){ var fk=fechasEv[k]; if(visto[fk]) continue; visto[fk]=1; var cc=caja(evF,parseY(fk)); if(cc<0){ var det=evF.filter(function(e){ return e.f<=fk&&e.d<0; }).map(function(e){ return {t:e.t,d:-e.d}; }); aviso={f:parseY(fk),falta:-cc,det:det,libre:est.libre,apartado:est.apartado}; break; } } }
     return {items:items,est:est,aviso:aviso,listo:listo,t:t};
   }
 
@@ -628,7 +628,7 @@
       else if(+t.cupo>0 && !(+t.corte>=1)) h+='<div class="fr-aviso">💳 Falta el <b>día de corte</b> de la tarjeta (míralo en la app del banco). Sin él no te puedo decir qué conviene pagar con tarjeta.</div>';
       if(tarjetaOK(t)){ var ks=Object.keys(plan.est.stm).filter(function(k){return plan.est.stm[k]>0;}).sort(), prox=ks[0];
         h+='<div class="fr-sub">💳 Debes <b>'+pesos(plan.est.debe)+'</b> · cupo libre '+pesos(Math.max(0,plan.est.cupoLibre))+(prox?' · próximo pago '+lab(parseY(prox))+' ('+pesos(plan.est.stm[prox])+')':'')+'</div>'; }
-      if(plan.aviso) h+='<div class="fr-aviso">⚠️ Según lo que registraste, el <b>'+lab(plan.aviso.f)+'</b> te faltarían <b>'+pesos(plan.aviso.falta)+'</b>. Hay tiempo de revisarlo; por ahora es solo un aviso.</div>';
+      if(plan.aviso){ var av=plan.aviso; h+='<div class="fr-aviso">⚠️ Según lo que registraste, el <b>'+lab(av.f)+'</b> te faltarían <b>'+pesos(av.falta)+'</b>. Ojo: es una proyección, no que ya te falte.<div style="margin-top:6px">Tienes <b>'+pesos(av.libre)+'</b> libres'+(av.apartado>0?' (sin contar los '+pesos(av.apartado)+' apartados en bolsillos)':'')+' y hasta ese día salen:</div>'+av.det.map(function(x){ return '<div class="fr-sub" style="color:#7a4a1c">• '+esc(x.t||'Pago')+': '+pesos(x.d)+'</div>'; }).join('')+'<div class="fr-sub" style="margin-top:6px;color:#7a4a1c">Si alguno ya lo pagaste, toca «Ya lo había pagado antes» en ese pago. Si un pago sale de un bolsillo, enlázalo en el bolsillo («¿Para qué pago es?»).</div></div>'; }
     }
     var nq=estadoNequi(c), accNq=0;
     if(c.pagos.some(function(p){return partes(p).cons>0;})){ h+='<div class="fr-sub">🏥 Los gastos del consultorio salen de:</div><div class="fr-chips" style="margin:4px 0">'+BK.map(function(k){ return '<button class="fr-chip'+((c.gastoDesde||'nequi')===k?' on':'')+'" data-a="pg-gd" data-v="'+k+'" style="min-height:40px;font-size:.84rem">'+BI[k]+' '+BN[k]+'</button>'; }).join('')+'</div>'+(nq.has?'<div class="fr-sub">Ahí hay '+pesos(nq.saldo)+' del consultorio.</div>':''); }
@@ -654,11 +654,11 @@
       if(it.cons>0){ accNq+=it.cons; if(nq.has) h+='<div class="fr-sug">'+(accNq<=nq.saldo?'🏥 '+(mixto?'La parte del consultorio alcanza':'Alcanza')+' con el dinero del consultorio ('+BN[nq.k]+')':'⚠️ El dinero del consultorio ('+BN[nq.k]+') no alcanza')+'</div>'+(accNq<=nq.saldo?'':'<div class="fr-sub">Tienes '+pesos(nq.saldo)+' y con este pago faltarían '+pesos(accNq-nq.saldo)+'.</div>'); }
       h+='<div class="fr-sub" style="margin-top:6px"><b>¿Lo pagaste?</b> Toca cómo lo pagaste y se actualizan tus cuentas.</div>';
       h+='<div class="fr-row" style="margin-top:4px"><span class="fr-sub" style="align-self:center">'+(it.p.variable?'Valor aprox. (cámbialo por el real):':'Valor que pagaste:')+'</span><input type="text" id="pg-am-'+i+'" inputmode="numeric" value="'+it.total+'" style="max-width:150px"></div>';
-      if(it.bol){ h+= it.cubierto ? '<div class="fr-sug">🔒 Ya lo tienes apartado en «'+esc(it.bol.nombre)+'» ('+pesos(it.bolTiene)+')</div>' : '<div class="fr-sub">🔒 En «'+esc(it.bol.nombre)+'» hay '+pesos(it.bolTiene)+' y este pago necesita '+pesos(it.bolNeed)+(gmf(c,it.monto)?' (con el 4×1000)':'')+': faltan <b>'+pesos(it.bolNeed-it.bolTiene)+'</b> por apartar.</div>'; }
+      if(it.bol){ h+= it.cubierto ? '<div class="fr-sug">🔒 Ya lo tienes apartado en «'+esc(it.bol.nombre)+'» ('+pesos(it.bolTiene)+')</div>' : '<div class="fr-sub">🔒 En «'+esc(it.bol.nombre)+'» hay '+pesos(it.bolTiene)+(it.bolUsa>0?' y cubre una parte':'')+'; este pago necesita '+pesos(it.bolNeed)+(gmf(c,it.monto)?' (con el 4×1000)':'')+': faltan <b>'+pesos(it.bolNeed-(it.bolUsa||0))+'</b> '+(it.bolUsa>0?'de tu plata libre (o por apartar en el bolsillo).':'por apartar.')+'</div>'; }
       if(!puro){
         if(it.tarj && sug==='?') h+='<div class="fr-sub">Puede ir en tarjeta. Completa «Mis números» para saber si conviene.</div>';
         else if((plan.listo||it.pref!=='segun') && !it.cubierto) h+='<div class="fr-sug">'+(sug==='tarjeta'?'💳 '+(mixto?'Tu parte: ponla':'Ponlo')+' en la tarjeta Nu':(it.pref==='consultorio'?'🏥 Págalo desde la cuenta del consultorio':'💵 '+(mixto?'Tu parte: págala':'Págalo')+' con tu plata'))+'</div>'+(it.motivo?'<div class="fr-sub">'+esc(it.motivo)+'</div>':'')+((sug!=='tarjeta'&&gmf(c,it.monto)>0)?'<div class="fr-sub">+ el 4×1000 ≈ '+pesos(gmf(c,it.monto))+'</div>':'');
-        h+='<div class="fr-chips" style="margin:6px 0 0">'+(it.cubierto?'<button class="fr-chip on" data-a="pg-pagar" data-i="'+i+'" data-m="bolsillo" style="min-height:40px;font-size:.82rem">✓ Pagué con el bolsillo «'+esc(it.bol.nombre)+'»</button>':'')+'<button class="fr-chip'+(sug==='tarjeta'?' on':'')+'" data-a="pg-pagar" data-i="'+i+'" data-m="tarjeta" style="min-height:40px;font-size:.82rem"'+(tarjetaOK(t)&&it.p.tarjeta?'':' disabled')+'>✓ Pagué con 💳</button><button class="fr-chip'+(sug==='efectivo'&&!it.cubierto?' on':'')+'" data-a="pg-pagar" data-i="'+i+'" data-m="efectivo" style="min-height:40px;font-size:.82rem">✓ Pagué con 💵</button><button class="fr-chip" data-a="pg-pagar" data-i="'+i+'" data-m="nequi" style="min-height:40px;font-size:.82rem">✓ Pagué con 📱 Nequi</button></div>'+(mixto?'<div class="fr-sub">Al marcarlo anoto la parte del consultorio y la tuya.</div>':'');
+        h+='<div class="fr-chips" style="margin:6px 0 0">'+(it.bolUsa>0?'<button class="fr-chip'+(it.cubierto?' on':'')+'" data-a="pg-pagar" data-i="'+i+'" data-m="bolsillo" style="min-height:40px;font-size:.82rem">✓ Pagué con el bolsillo «'+esc(it.bol.nombre)+'»'+(it.cubierto?'':' + mi plata')+'</button>':'')+'<button class="fr-chip'+(sug==='tarjeta'?' on':'')+'" data-a="pg-pagar" data-i="'+i+'" data-m="tarjeta" style="min-height:40px;font-size:.82rem"'+(tarjetaOK(t)&&it.p.tarjeta?'':' disabled')+'>✓ Pagué con 💳</button><button class="fr-chip'+(sug==='efectivo'&&!it.cubierto?' on':'')+'" data-a="pg-pagar" data-i="'+i+'" data-m="efectivo" style="min-height:40px;font-size:.82rem">✓ Pagué con 💵</button><button class="fr-chip" data-a="pg-pagar" data-i="'+i+'" data-m="nequi" style="min-height:40px;font-size:.82rem">✓ Pagué con 📱 Nequi</button></div>'+(mixto?'<div class="fr-sub">Al marcarlo anoto la parte del consultorio y la tuya.</div>':'');
       } else if(it.medio==='tarjeta') h+='<div class="fr-sug">💳 Ponlo en la tarjeta Nu (el consultorio aporta su parte cuando pagues la tarjeta)</div><div class="fr-chips" style="margin:6px 0 0"><button class="fr-chip on" data-a="pg-pagar" data-i="'+i+'" data-m="tarjeta" style="min-height:40px;font-size:.82rem"'+(tarjetaOK(t)?'':' disabled')+'>✓ Pagué con 💳</button></div>'+(tarjetaOK(t)?'':'<div class="fr-sub">Completa «Mis números» de la tarjeta para registrarlo.</div>');
       else h+='<div class="fr-chips" style="margin:6px 0 0"><button class="fr-chip" data-a="pg-pagar" data-i="'+i+'" data-m="consultorio" style="min-height:40px;font-size:.82rem">✓ Pagado</button></div>';
       h+='<div class="fr-chips" style="margin:6px 0 0"><button class="fr-chip" data-a="pg-ya" data-i="'+i+'" style="min-height:40px;font-size:.8rem">Ya lo había pagado antes (solo quitarlo, sin descontar)</button></div>';
@@ -785,8 +785,8 @@
   }
   function pagar(i,medio){
     var c=cfg(), plan=armarPlan(c), it=plan.items[i]; if(!it) return;
-    var real=num(val('pg-am-'+i)); if(real>0 && real!==it.total){ var pcx=pctDe(it.p), cx=Math.round(real*pcx/100); it.ant=it.total; it.total=real; it.cons=cx; it.monto=real-cx; if(it.bol){ it.bolNeed=it.monto+gmf(c,it.monto); it.cubierto=((it.bolTiene||0)>=it.bolNeed); } }
-    if(medio==='bolsillo' && !it.cubierto){ A.toast('Ese bolsillo no alcanza para este pago'); return; }
+    var real=num(val('pg-am-'+i)); if(real>0 && real!==it.total){ var pcx=pctDe(it.p), cx=Math.round(real*pcx/100); it.ant=it.total; it.total=real; it.cons=cx; it.monto=real-cx; if(it.bol){ it.bolNeed=it.monto+gmf(c,it.monto); it.bolUsa=Math.min(it.bolTiene||0,it.bolNeed); it.cubierto=(it.bolUsa>=it.bolNeed); } }
+    if(medio==='bolsillo' && !(it.bolUsa>0)){ A.toast('Ese bolsillo está vacío'); return; }
     var hoyS=A.hoyLocal(), pc=pctDe(it.p), mixto=(it.cons>0&&it.monto>0);
     if(it.cons>0){
       if(medio==='tarjeta'){
@@ -802,7 +802,7 @@
     if(it.monto>0){
       var P=A.leerP(); P.push({id:String(Date.now()+1),fecha:hoyS,monto:it.monto,desc:it.p.nombre+(mixto?' ('+(100-pc)+'%)':''),medio:medio==='tarjeta'?'tarjeta':(medio==='nequi'?'nequi':'efectivo')}); A.guardarP(P);
     }
-    if(medio==='bolsillo' && it.bol){ var bb=bolById(c,it.bol.id), q2=Math.min(+bb.monto||0,it.bolNeed); bb.monto=(+bb.monto||0)-q2; bolMov(c,bb,-q2,'Pagué '+it.p.nombre); }
+    if(medio==='bolsillo' && it.bol){ var bb=bolById(c,it.bol.id), q2=Math.min(+bb.monto||0,it.bolUsa||it.bolNeed); bb.monto=(+bb.monto||0)-q2; bolMov(c,bb,-q2,'Pagué '+it.p.nombre); }
     c.pagados[it.key]=true; sv(c); A.toast('✅ Pago anotado: '+it.p.nombre+(medio==='bolsillo'?'. Salió del bolsillo «'+it.bol.nombre+'»':'')); A.repintar();
   }
   document.addEventListener('click',function(e){
